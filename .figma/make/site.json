@@ -1,0 +1,10 @@
+{
+  "description": "Provides KazNU students with an intelligent iOS app for real-time academic tracking, schedule management, campus services, and AI-powered study assistance.",
+  "robots": {
+    "index": false
+  },
+  "accessibility": {
+    "addBypassLinks": false,
+    "ignoreReducedMotion": false
+  }
+}
