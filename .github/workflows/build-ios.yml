@@ -23,9 +23,10 @@ jobs:
     - name: Build Web App
       run: npx vite build
 
-    - name: Add and Sync Capacitor iOS
+    - name: Recreate iOS Native Project
       run: |
-        npx cap add ios || true
+        rm -rf ios
+        npx cap add ios
         npx cap sync ios
 
     - name: Build iOS App (Unsigned IPA)
