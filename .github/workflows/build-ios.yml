@@ -28,11 +28,16 @@ jobs:
         rm -rf ios
         npx cap add ios
         npx cap sync ios
+        cd ios/App && pod install || true
 
     - name: Build iOS App (Unsigned IPA)
       run: |
         cd ios/App
-        xcodebuild -workspace App.xcworkspace -scheme App -configuration Release -sdk iphoneos CODE_SIGNING_ALLOWED=NO CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO -derivedDataPath build
+        if [ -d "App.xcworkspace" ]; then
+          xcodebuild -workspace App.xcworkspace -scheme App -configuration Release -sdk iphoneos CODE_SIGNING_ALLOWED=NO CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO -derivedDataPath build
+        else
+          xcodebuild -project App.xcodeproj -scheme App -configuration Release -sdk iphoneos CODE_SIGNING_ALLOWED=NO CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO -derivedDataPath build
+        fi
         mkdir -p Payload
         cp -r build/Build/Products/Release-iphoneos/App.app Payload/
         zip -r KazNUHelper.ipa Payload
