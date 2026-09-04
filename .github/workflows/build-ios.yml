@@ -15,22 +15,23 @@ jobs:
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
-        node-version: 18
+        node-version: 20
 
     - name: Install Dependencies
       run: npm ci
 
     - name: Build Web App
-      run: npm run build
+      run: npx vite build
 
-    - name: Sync Capacitor iOS
+    - name: Add and Sync Capacitor iOS
       run: |
+        npx cap add ios || true
         npx cap sync ios
 
     - name: Build iOS App (Unsigned IPA)
       run: |
         cd ios/App
-        xcodebuild -workspace App.xcworkspace -scheme App -configuration Release -sdk iphoneos -derivedDataPath build
+        xcodebuild -workspace App.xcworkspace -scheme App -configuration Release -sdk iphoneos CODE_SIGNING_ALLOWED=NO CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO -derivedDataPath build
         mkdir -p Payload
         cp -r build/Build/Products/Release-iphoneos/App.app Payload/
         zip -r KazNUHelper.ipa Payload
