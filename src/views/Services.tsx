@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useI18n } from "../contexts/LanguageContext";
 
 const SERVICES = [
   { icon: "📚", label: "Library", sub: "3 books checked out", color: "#007AFF", bg: "rgba(0,122,255,0.14)" },
@@ -16,6 +17,7 @@ const MONITORED_COURSES = [
 ];
 
 export default function Services() {
+  const t = useI18n();
   const [univerStatus] = useState<"ok" | "slow" | "down">("slow");
   const [barcode, setBarcode] = useState(false);
   const [watching, setWatching] = useState<Record<string, boolean>>({ "Machine Learning": true, "Computer Vision": true });
@@ -27,10 +29,10 @@ export default function Services() {
   }[univerStatus];
 
   return (
-    <div className="h-full overflow-y-auto" style={{ background: "#000" }}>
+    <div className="app-surface h-full overflow-y-auto">
       <div className="px-4 pt-2 pb-32 space-y-4 animate-slide-up">
 
-        <h1 className="text-2xl font-bold text-white" style={{ letterSpacing: "-0.5px" }}>Campus Hub</h1>
+        <h1 className="text-2xl font-bold text-white" style={{ letterSpacing: "-0.5px" }}>{t("campusHub")}</h1>
 
         {/* Univer Status */}
         <div className="glass squircle-lg p-4 card-shadow" style={{ border: `1px solid ${statusInfo.color}30` }}>
@@ -39,11 +41,11 @@ export default function Services() {
               <div className="animate-pulse-glow status-dot" style={{ background: statusInfo.color, color: statusInfo.color }} />
               <div>
                 <p className="text-sm font-bold text-white">Univer System</p>
-                <p className="text-xs mt-0.5" style={{ color: statusInfo.color }}>{statusInfo.label}</p>
+                <p className="text-xs mt-0.5" style={{ color: statusInfo.color }}>{univerStatus === "ok" ? t("allSystems") : univerStatus === "slow" ? t("degradedCache") : t("offlineCache")}</p>
               </div>
             </div>
             <button className="px-3 py-1.5 squircle-sm text-xs font-semibold" style={{ background: "rgba(0,122,255,0.15)", color: "#407AFF" }}>
-              Refresh
+              {t("refresh")}
             </button>
           </div>
 
@@ -55,7 +57,7 @@ export default function Services() {
             ].map((item) => (
               <div key={item.label} className="flex flex-col items-center gap-1.5 py-2 squircle-sm" style={{ background: "rgba(255,255,255,0.04)" }}>
                 <div className="w-1.5 h-1.5 rounded-full" style={{ background: item.ok ? "#30D158" : "#FF9F0A", boxShadow: `0 0 4px ${item.ok ? "#30D158" : "#FF9F0A"}` }} />
-                <p className="text-xs" style={{ color: "rgba(235,235,245,0.6)" }}>{item.label}</p>
+                <p className="text-xs" style={{ color: "rgba(235,235,245,0.6)" }}>{item.label === "Schedule" ? t("schedule") : item.label === "Grades" ? t("grades") : t("registration")}</p>
               </div>
             ))}
           </div>
@@ -72,12 +74,12 @@ export default function Services() {
                 📚
               </div>
               <div className="text-left">
-                <p className="text-sm font-bold text-white">Library Card</p>
-                <p className="text-xs" style={{ color: "rgba(235,235,245,0.45)" }}>Tap to show barcode</p>
+                <p className="text-sm font-bold text-white">{t("libraryCard")}</p>
+                <p className="text-xs" style={{ color: "rgba(235,235,245,0.45)" }}>{t("showBarcode")}</p>
               </div>
             </div>
             <div className="px-2 py-1 squircle-xs text-xs font-semibold" style={{ background: "rgba(0,122,255,0.15)", color: "#407AFF" }}>
-              {barcode ? "Hide" : "Show"}
+              {barcode ? t("hide") : t("show")}
             </div>
           </button>
 
@@ -102,7 +104,7 @@ export default function Services() {
 
         {/* Dorm Utilities */}
         <div className="glass squircle-lg p-4 card-shadow">
-          <p className="text-sm font-bold text-white mb-3">Dorm Utilities — Block B, Rm 214</p>
+            <p className="text-sm font-bold text-white mb-3">{t("dormUtilities")} — Block B, Rm 214</p>
           <div className="grid grid-cols-3 gap-2.5">
             {[
               { icon: "⚡", label: "Electricity", value: "₸840", sub: "balance", color: "#FF9F0A" },
@@ -111,13 +113,14 @@ export default function Services() {
             ].map((u) => (
               <div key={u.label} className="flex flex-col items-center gap-1.5 py-3 squircle-sm" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)" }}>
                 <span style={{ fontSize: 22 }}>{u.icon}</span>
+                <p className="theme-muted text-xs">{u.label === "Electricity" ? t("electricity") : u.label === "Water" ? t("water") : t("internet")}</p>
                 <p className="text-sm font-bold" style={{ color: u.color, fontFamily: "JetBrains Mono" }}>{u.value}</p>
-                <p className="text-xs" style={{ color: "rgba(235,235,245,0.4)" }}>{u.sub}</p>
+                <p className="text-xs" style={{ color: "rgba(235,235,245,0.4)" }}>{u.sub === "balance" ? t("balance") : u.sub === "no issues" ? t("noIssues") : t("uptime")}</p>
               </div>
             ))}
           </div>
           <button className="w-full mt-3 py-2.5 squircle-sm text-sm font-semibold" style={{ background: "rgba(255,159,10,0.12)", color: "#FF9F0A", border: "1px solid rgba(255,159,10,0.2)" }}>
-            Top Up Electricity →
+            {t("topUp")} →
           </button>
         </div>
 
@@ -125,12 +128,12 @@ export default function Services() {
         <div className="glass squircle-lg p-4 card-shadow">
           <div className="flex items-center justify-between mb-3">
             <div>
-              <p className="text-sm font-bold text-white">Course Radar</p>
-              <p className="text-xs mt-0.5" style={{ color: "rgba(235,235,245,0.45)" }}>Live spot monitoring</p>
+              <p className="text-sm font-bold text-white">{t("courseRadar")}</p>
+              <p className="text-xs mt-0.5" style={{ color: "rgba(235,235,245,0.45)" }}>{t("liveMonitoring")}</p>
             </div>
             <div className="px-2 py-1 squircle-xs flex items-center gap-1.5" style={{ background: "rgba(48,209,88,0.12)", border: "1px solid rgba(48,209,88,0.2)" }}>
               <div className="animate-pulse-glow w-1.5 h-1.5 rounded-full" style={{ background: "#30D158" }} />
-              <span className="text-xs font-semibold" style={{ color: "#30D158" }}>Watching</span>
+              <span className="text-xs font-semibold" style={{ color: "#30D158" }}>{t("watching")}</span>
             </div>
           </div>
 
@@ -143,21 +146,21 @@ export default function Services() {
                     <p className="text-sm font-semibold text-white truncate">{c.name}</p>
                     <div className="flex items-center gap-2 mt-0.5">
                       <span className="text-xs" style={{ color: c.spots === 0 ? "#FF453A" : "#30D158", fontFamily: "JetBrains Mono" }}>
-                        {c.spots === 0 ? "Full" : `${c.spots} spots`}
+                        {c.spots === 0 ? t("full") : `${c.spots} ${t("spots")}`}
                       </span>
                       <span className="text-xs" style={{ color: "rgba(235,235,245,0.35)" }}>of {c.total}</span>
                     </div>
                   </div>
                   <button
                     onClick={() => setWatching((w) => ({ ...w, [c.name]: !w[c.name] }))}
-                    className="px-2.5 py-1 squircle-xs text-xs font-semibold transition-all"
+                    className="haptic-action px-2.5 py-1 squircle-xs text-xs font-semibold transition-all"
                     style={{
                       background: isWatching ? "rgba(0,122,255,0.2)" : "rgba(255,255,255,0.08)",
                       color: isWatching ? "#407AFF" : "rgba(235,235,245,0.5)",
                       border: `1px solid ${isWatching ? "rgba(0,122,255,0.3)" : "rgba(255,255,255,0.08)"}`,
                     }}
                   >
-                    {isWatching ? "🔔 On" : "🔕 Off"}
+                    {isWatching ? `🔔 ${t("on")}` : `🔕 ${t("off")}`}
                   </button>
                 </div>
               );
@@ -167,7 +170,7 @@ export default function Services() {
 
         {/* Services Grid */}
         <div>
-          <p className="text-sm font-semibold mb-2.5" style={{ color: "rgba(235,235,245,0.7)" }}>All Services</p>
+          <p className="text-sm font-semibold mb-2.5" style={{ color: "rgba(235,235,245,0.7)" }}>{t("allServices")}</p>
           <div className="grid grid-cols-3 gap-2.5">
             {SERVICES.map((s) => (
               <button key={s.label} className="flex flex-col items-center gap-2 py-4 squircle-md transition-transform active:scale-95" style={{ background: "rgba(28,28,30,0.85)", border: "1px solid rgba(255,255,255,0.06)" }}>
@@ -175,7 +178,7 @@ export default function Services() {
                   {s.icon}
                 </div>
                 <div className="text-center">
-                  <p className="text-xs font-semibold text-white">{s.label}</p>
+                  <p className="text-xs font-semibold text-white">{s.label === "Library" ? t("library") : s.label === "Dorm" ? t("dorm") : s.label === "Unicard" ? t("unicard") : s.label === "Scholarship" ? t("scholarship") : s.label === "Cafeteria" ? t("cafeteria") : t("medical")}</p>
                   <p className="text-xs mt-0.5" style={{ color: "rgba(235,235,245,0.4)", fontSize: 10 }}>{s.sub}</p>
                 </div>
               </button>

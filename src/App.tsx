@@ -1,16 +1,22 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import Dashboard from "./views/Dashboard";
 import Grades from "./views/Grades";
+import Materials from "./views/Materials";
 import Schedule from "./views/Schedule";
 import Services from "./views/Services";
-import AIAssistant from "./views/AIAssistant";
+import Profile from "./views/Profile";
+import { useI18n } from "./contexts/LanguageContext";
+import News, { NewsDetail, type NewsItem } from "./views/News";
+import Notifications from "./views/Notifications";
+import { triggerHaptic } from "./utils/haptics";
+import kaznuLogo from "./assets/kaznu-logo.png";
 
 const TABS = [
   { id: "dashboard", label: "Home", icon: "house.fill" },
-  { id: "grades", label: "Grades", icon: "chart.bar.fill" },
+  { id: "news", label: "News", icon: "newspaper.fill" },
+  { id: "materials", label: "Materials", icon: "book.closed.fill" },
   { id: "schedule", label: "Schedule", icon: "calendar" },
   { id: "services", label: "Services", icon: "square.grid.2x2.fill" },
-  { id: "ai", label: "AI", icon: "sparkles" },
 ];
 
 function TabIcon({ icon, active }: { icon: string; active: boolean }) {
@@ -25,6 +31,11 @@ function TabIcon({ icon, active }: { icon: string; active: boolean }) {
         <path d="M3 12v7h4v-7H3zm0-2h4V7H3v3zm6 9h4V7H9v12zm0-14h4V3H9v2zm6 14h4V3h-4v18z" />
       </svg>
     ),
+    "newspaper.fill": (
+      <svg viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6">
+        <path d="M4 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a3 3 0 0 1-3-3V6a3 3 0 0 1 3-3h1v2H5a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h13V5H4V3zm4 4h8v2H8V7zm0 4h8v2H8v-2zm0 4h5v2H8v-2z" />
+      </svg>
+    ),
     "calendar": (
       <svg viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6">
         <path d="M8 2v2H5a2 2 0 00-2 2v13a2 2 0 002 2h14a2 2 0 002-2V6a2 2 0 00-2-2h-3V2h-2v2H9V2H8zm-3 7h14v9H5V9z" />
@@ -35,9 +46,9 @@ function TabIcon({ icon, active }: { icon: string; active: boolean }) {
         <path d="M3 3h8v8H3V3zm10 0h8v8h-8V3zM3 13h8v8H3v-8zm10 0h8v8h-8v-8z" />
       </svg>
     ),
-    "sparkles": (
+    "book.closed.fill": (
       <svg viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6">
-        <path d="M12 2l1.5 4.5L18 8l-4.5 1.5L12 14l-1.5-4.5L6 8l4.5-1.5L12 2zm7 10l.9 2.7 2.7.9-2.7.9L19 19l-.9-2.7-2.7-.9 2.7-.9L19 12zM5 16l.7 2.1 2.1.7-2.1.7L5 21.5l-.7-2.1-2.1-.7 2.1-.7L5 16z" />
+        <path d="M4 3h15a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2zm0 2v14h15V5H4zm2.5 2.5h9v1.5h-9V7.5zm0 3.5h9v1.5h-9V11zm0 3.5h5v1.5h-5v-1.5z" />
       </svg>
     ),
   };
@@ -46,16 +57,31 @@ function TabIcon({ icon, active }: { icon: string; active: boolean }) {
 
 export default function App() {
   const [activeTab, setActiveTab] = useState("dashboard");
+  const [selectedNews, setSelectedNews] = useState<NewsItem | null>(null);
+  const t = useI18n();
+  const tabLabels = { dashboard: t("home"), news: t("news"), materials: t("materials"), schedule: t("schedule"), services: t("services") };
+
+  useEffect(() => {
+    const handlePointerDown = (event: PointerEvent) => {
+      if ((event.target as HTMLElement).closest(".haptic-action")) triggerHaptic(8);
+    };
+    document.addEventListener("pointerdown", handlePointerDown);
+    return () => document.removeEventListener("pointerdown", handlePointerDown);
+  }, []);
 
   return (
     <div
       className="relative w-full h-full flex flex-col overflow-hidden"
-      style={{ background: "#000", fontFamily: "Inter, system-ui, sans-serif", maxWidth: 430, margin: "0 auto" }}
+      style={{ fontFamily: "Inter, system-ui, sans-serif", maxWidth: 430, margin: "0 auto" }}
     >
       {/* Status Bar */}
-      <div className="flex items-center justify-between px-6 pt-3 pb-1 shrink-0" style={{ height: 44 }}>
-        <span className="text-white text-sm font-semibold" style={{ fontFamily: "Inter" }}>9:41</span>
-        <div className="flex items-center gap-1.5">
+      <div className="app-status-bar px-6 pb-1 shrink-0">
+        <div className="status-bar flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <img className="brand-mark" src={kaznuLogo} alt="Al-Farabi KazNU" />
+            <span className="brand-mark-fallback" hidden aria-hidden="true">K</span>
+            <span className="text-white text-sm font-semibold" style={{ fontFamily: "Inter" }}>9:41</span>
+          </div>
           <svg viewBox="0 0 24 10" fill="white" className="w-4 h-3 opacity-90">
             <rect x="0" y="4" width="3" height="6" rx="0.5" />
             <rect x="4.5" y="3" width="3" height="7" rx="0.5" />
@@ -75,11 +101,15 @@ export default function App() {
 
       {/* Main Content */}
       <div className="flex-1 overflow-hidden relative">
-        {activeTab === "dashboard" && <Dashboard />}
-        {activeTab === "grades" && <Grades />}
+        {activeTab === "dashboard" && <Dashboard onOpenProfile={() => setActiveTab("profile")} onNavigate={setActiveTab} />}
+        {activeTab === "notifications" && <Notifications onBack={() => setActiveTab("dashboard")} onNavigate={setActiveTab} />}
+        {activeTab === "grades" && <Grades onBack={() => setActiveTab("dashboard")} />}
+        {activeTab === "materials" && <Materials />}
         {activeTab === "schedule" && <Schedule />}
         {activeTab === "services" && <Services />}
-        {activeTab === "ai" && <AIAssistant />}
+        {activeTab === "profile" && <Profile onBack={() => setActiveTab("dashboard")} />}
+        {activeTab === "news" && <News onOpenDetail={(item) => { setSelectedNews(item); setActiveTab("news-detail"); }} />}
+        {activeTab === "news-detail" && selectedNews && <NewsDetail item={selectedNews} onBack={() => setActiveTab("news")} />}
       </div>
 
       {/* Tab Bar */}
@@ -90,7 +120,7 @@ export default function App() {
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className="flex flex-col items-center gap-1 px-4 py-1 transition-all duration-200"
+              className="haptic-action flex flex-col items-center gap-1 px-2 py-1 transition-all duration-200"
               style={{ minWidth: 60 }}
             >
               <span style={{ color: active ? "#007AFF" : "rgba(235,235,245,0.45)", transition: "color 0.2s" }}>
@@ -100,7 +130,7 @@ export default function App() {
                 className="text-xs font-medium"
                 style={{ color: active ? "#007AFF" : "rgba(235,235,245,0.45)", fontSize: 10, transition: "color 0.2s" }}
               >
-                {tab.label}
+                {tabLabels[tab.id as keyof typeof tabLabels]}
               </span>
             </button>
           );

@@ -1,0 +1,137 @@
+import { useState } from "react";
+import ThemeSwitcher from "../components/ThemeSwitcher";
+import { useLanguage, useI18n, type Language } from "../contexts/LanguageContext";
+
+interface ProfileProps {
+  onBack: () => void;
+}
+
+function Chevron() {
+  return (
+    <svg viewBox="0 0 20 20" fill="none" className="w-4 h-4" aria-hidden="true">
+      <path d="m7.5 4 5 6-5 6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function BackButton({ onClick }: { onClick: () => void }) {
+  const t = useI18n();
+  return (
+    <button type="button" onClick={onClick} className="haptic-action theme-secondary flex items-center gap-1 text-sm font-semibold">
+      <svg viewBox="0 0 20 20" fill="none" className="w-4 h-4" aria-hidden="true">
+        <path d="m12.5 4-5 6 5 6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+      {t("back")}
+    </button>
+  );
+}
+
+function Settings({ onBack }: { onBack: () => void }) {
+  const { language, setLanguage } = useLanguage();
+  const t = useI18n();
+  const [showLanguages, setShowLanguages] = useState(false);
+  const [newsNotifications, setNewsNotifications] = useState(() => localStorage.getItem("newsNotifications") !== "muted");
+  const languageNames: Record<Language, string> = { EN: "English", KZ: "Қазақша", RU: "Русский" };
+
+  return (
+    <div className="app-surface h-full overflow-y-auto">
+      <div className="px-4 pt-2 pb-32 space-y-4 animate-slide-up">
+        <BackButton onClick={onBack} />
+        <h1 className="text-2xl font-bold text-white">{t("settings")}</h1>
+
+        <section>
+          <p className="theme-section-title text-xs font-semibold uppercase tracking-wide mb-2 px-1">{t("appearance")}</p>
+          <div className="glass squircle-md overflow-hidden">
+            <div className="flex items-center justify-between px-4 py-4">
+              <div>
+                <p className="text-sm font-semibold text-white">{t("theme")}</p>
+                <p className="theme-muted text-xs mt-0.5">{t("chooseTheme")}</p>
+              </div>
+              <ThemeSwitcher />
+            </div>
+          </div>
+        </section>
+
+        <section>
+          <p className="theme-section-title text-xs font-semibold uppercase tracking-wide mb-2 px-1">{t("preferences")}</p>
+          <div className="glass squircle-md overflow-hidden divide-y divide-white/10">
+            <button type="button" aria-pressed={newsNotifications} onClick={() => { const next = !newsNotifications; setNewsNotifications(next); localStorage.setItem("newsNotifications", next ? "enabled" : "muted"); }} className="haptic-action theme-row w-full flex items-center justify-between px-4 py-4 text-left">
+              <span className="text-sm font-semibold text-white">{t("newsNotifications")}</span>
+              <span className={`text-xs ${newsNotifications ? "text-green-500" : "theme-muted"}`}>{newsNotifications ? t("enabled") : t("muted")}</span>
+            </button>
+            <button type="button" onClick={() => setShowLanguages((open) => !open)} className="haptic-action theme-row w-full flex items-center justify-between px-4 py-4 text-left">
+              <span className="text-sm font-semibold text-white">{t("language")}</span>
+              <span className="theme-muted flex items-center gap-2 text-xs">{languageNames[language]} <Chevron /></span>
+            </button>
+            {showLanguages && (
+              <div className="border-t border-white/10 p-2">
+                {(["EN", "KZ", "RU"] as Language[]).map((option) => (
+                  <button key={option} type="button" onClick={() => { setLanguage(option); setShowLanguages(false); }} className={`haptic-action theme-row w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm ${language === option ? "bg-blue-500/15 text-blue-500" : "text-white"}`}>
+                    <span>{languageNames[option]}</span>
+                    {language === option && <span aria-hidden="true">✓</span>}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </section>
+      </div>
+    </div>
+  );
+}
+
+function About({ onBack }: { onBack: () => void }) {
+  const t = useI18n();
+  return (
+    <div className="app-surface h-full overflow-y-auto">
+      <div className="px-4 pt-2 pb-32 space-y-4 animate-slide-up">
+        <BackButton onClick={onBack} />
+        <div className="flex flex-col items-center text-center pt-5 pb-3">
+          <div className="w-20 h-20 rounded-3xl flex items-center justify-center text-white text-xl font-bold" style={{ background: "linear-gradient(135deg, #0033A0, #007AFF)" }}>AB</div>
+          <h1 className="text-2xl font-bold text-white mt-4">KazNU Helper</h1>
+          <p className="theme-muted text-sm mt-1">{t("university")}</p>
+        </div>
+        <div className="glass squircle-md p-4 space-y-3">
+          <div className="flex items-center justify-between"><span className="theme-muted text-sm">{t("version")}</span><span className="text-sm font-semibold text-white">1.0.0</span></div>
+          <div className="flex items-center justify-between"><span className="theme-muted text-sm">{t("university")}</span><span className="text-sm font-semibold text-white">Al-Farabi KazNU</span></div>
+        </div>
+        <p className="theme-muted text-xs text-center leading-relaxed px-5">{t("aboutDescription")}</p>
+      </div>
+    </div>
+  );
+}
+
+export default function Profile({ onBack }: ProfileProps) {
+  const [subpage, setSubpage] = useState<"profile" | "settings" | "about">("profile");
+  const t = useI18n();
+
+  if (subpage === "settings") return <Settings onBack={() => setSubpage("profile")} />;
+  if (subpage === "about") return <About onBack={() => setSubpage("profile")} />;
+
+  return (
+    <div className="app-surface h-full overflow-y-auto">
+      <div className="px-4 pt-2 pb-32 space-y-4 animate-slide-up">
+        <BackButton onClick={onBack} />
+        <div className="flex items-center gap-4 pt-2 pb-2">
+          <div className="w-16 h-16 rounded-2xl flex items-center justify-center text-white text-lg font-bold" style={{ background: "linear-gradient(135deg, #0033A0, #007AFF)" }}>AB</div>
+          <div>
+            <h1 className="text-2xl font-bold text-white">Aisha Bekova</h1>
+            <p className="theme-muted text-sm mt-1">{t("computerScience")} · {t("year")}</p>
+            <p className="theme-muted text-xs mt-0.5">Student ID 20260001</p>
+          </div>
+        </div>
+
+        <div className="glass squircle-md overflow-hidden">
+          <button type="button" onClick={() => setSubpage("settings")} className="haptic-action theme-row w-full flex items-center justify-between px-4 py-4 text-left">
+            <div><p className="text-sm font-semibold text-white">{t("settings")}</p><p className="theme-muted text-xs mt-0.5">{t("appearance")} · {t("preferences")}</p></div>
+            <Chevron />
+          </button>
+          <button type="button" onClick={() => setSubpage("about")} className="haptic-action theme-row w-full flex items-center justify-between px-4 py-4 text-left border-t border-white/10">
+            <div><p className="text-sm font-semibold text-white">{t("about")}</p><p className="theme-muted text-xs mt-0.5">{t("version")} and app information</p></div>
+            <Chevron />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
