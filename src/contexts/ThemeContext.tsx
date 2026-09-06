@@ -1,6 +1,7 @@
-import React, { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import React, { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
+import { screenFade } from "../utils/screenFade";
 
-type Theme = "light" | "dark" | "system";
+export type Theme = "light" | "dark" | "system";
 
 interface ThemeContextType {
   theme: Theme;
@@ -22,21 +23,39 @@ function getInitialTheme(): Theme {
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [theme, setThemeState] = useState<Theme>(getInitialTheme);
+  const prevThemeRef = useRef(theme);
 
   const [resolvedTheme, setResolvedTheme] = useState<"light" | "dark">(() =>
     theme === "system" ? getSystemTheme() : theme,
   );
-  useEffect(() => {
+
+  /** 把主题实际应用到 <html>（同步改 class + 保存） */
+  const applyTheme = () => {
     const root = window.document.documentElement;
     const systemTheme = getSystemTheme();
     const resolved = theme === "system" ? systemTheme : theme;
 
     setResolvedTheme(resolved);
-
     root.classList.remove("light", "dark");
     root.classList.add(resolved);
-
     localStorage.setItem("theme", theme);
+  };
+
+  /** 带过渡地应用主题：记录旧背景色 → 切主题 → 整屏蒙层淡出揭开新画面 */
+  const applyThemeWithTransition = () => {
+    const isInitial = prevThemeRef.current === theme;
+    prevThemeRef.current = theme;
+
+    // 切之前先抓旧的页面背景色，用作蒙层颜色（纯 CSS，任何环境都能播）
+    const oldBackground = typeof window !== "undefined" ? getComputedStyle(document.body).backgroundColor : "";
+    applyTheme();
+    if (!isInitial) {
+      screenFade(oldBackground || "#000");
+    }
+  };
+
+  useEffect(() => {
+    applyThemeWithTransition();
   }, [theme]);
 
   useEffect(() => {

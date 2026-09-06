@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import { useI18n } from "../contexts/LanguageContext";
+import realNews from "../data/realNews.json";
+import { API_URLS } from "../utils/config";
 
 export interface NewsItem {
   id: string;
@@ -11,26 +13,8 @@ export interface NewsItem {
   accent: string;
 }
 
-const FALLBACK_NEWS: NewsItem[] = [
-  {
-    id: "fallback-1",
-    title: "ҚҰТТЫҚТАЙМЫЗ!!!",
-    summary: "Әл-Фараби атындағы Қазақ ұлттық университетінің 2025-2026 оқу жылының қысқы емтихан сессиясының қорытындылары бойынша бос білім беру гранттарына тағайындалған келесі студенттер мен магистранттарды құттықтаймыз!!!",
-    body: "Қазақстан Республикасы Ғылым және жоғары білім министрлігінің 2026 жылғы 20 наурыздағы бұйрығына сәйкес бос білім беру гранттары тағайындалды. Студент кеңсесі тізімде көрсетілген білім алушылардан келісім шартқа қол қоюларын сұрайды.",
-    published_at: "2026-07-23T14:35:00+05:00",
-    category: "University",
-    accent: "#007AFF",
-  },
-  {
-    id: "fallback-2",
-    title: "Құрметті білім алушылар!",
-    summary: "Жазғы семестрге тіркелу және оқу үдерісін жоспарлау туралы маңызды ақпарат.",
-    body: "Жазғы семестрге тіркелу Univer жүйесінде ашық. Пәндерді таңдаудан бұрын академиялық кеңесшіңізбен оқу жоспарын нақтылаңыз.",
-    published_at: "2026-07-23T10:20:00+05:00",
-    category: "Students",
-    accent: "#30D158",
-  },
-];
+/** 真实新闻回退数据（来自 univer.kaznu.kz 新闻页抓取；API 不可用时使用） */
+const FALLBACK_NEWS: NewsItem[] = realNews as NewsItem[];
 
 function formatDate(value: string) {
   return new Intl.DateTimeFormat("en-GB", { day: "2-digit", month: "short", year: "numeric" }).format(new Date(value));
@@ -48,9 +32,11 @@ function BackButton({ onClick }: { onClick: () => void }) {
 export function NewsDetail({ item, onBack }: { item: NewsItem; onBack: () => void }) {
   const t = useI18n();
   return (
-    <div className="app-surface h-full overflow-y-auto">
-      <div className="px-4 pt-2 pb-32 animate-slide-up">
+    <div className="app-surface h-full flex flex-col overflow-hidden">
+      <div className="screen-pin px-4 pt-1">
         <BackButton onClick={onBack} />
+      </div>
+      <div className="flex-1 min-h-0 overflow-y-auto px-4 pt-3 pb-28 animate-slide-up">
         <article className="news-article mt-6">
           <div className="p-1">
             <h1 className="text-2xl font-bold text-white mt-2 leading-tight">{item.title}</h1>
@@ -80,7 +66,7 @@ export default function News({ onOpenDetail }: { onOpenDetail: (item: NewsItem) 
     }
 
     const loadNews = () => {
-      fetch("http://127.0.0.1:8000/api/news")
+      fetch(API_URLS.news)
         .then((response) => response.ok ? response.json() : Promise.reject(new Error("News request failed")))
         .then((data) => {
           const nextItems = Array.isArray(data) ? data as NewsItem[] : FALLBACK_NEWS;
@@ -103,9 +89,11 @@ export default function News({ onOpenDetail }: { onOpenDetail: (item: NewsItem) 
   }, []);
 
   return (
-    <div className="app-surface h-full overflow-y-auto">
-      <div className="px-4 pt-2 pb-32 animate-slide-up">
-        <h1 className="text-2xl font-bold text-white mb-5">{t("news")}</h1>
+    <div className="app-surface h-full flex flex-col overflow-hidden">
+      <div className="screen-pin px-4 pt-1">
+        <h1 className="text-2xl font-bold text-white">{t("news")}</h1>
+      </div>
+      <div className="flex-1 min-h-0 overflow-y-auto px-4 pt-3 pb-28 animate-slide-up">
         <div className="space-y-2.5">
           {loading ? <div className="glass squircle-md p-5 theme-muted text-sm">{t("loadingNews")}</div> : items.map((item) => (
             <button key={item.id} type="button" onClick={() => onOpenDetail(item)} className="haptic-action news-card glass w-full text-left flex items-center gap-3.5 px-4 py-4">

@@ -4,12 +4,18 @@ import App from './App'
 import './index.css'
 import { ThemeProvider } from './contexts/ThemeContext'
 import { LanguageProvider } from './contexts/LanguageContext'
+import { ToastProvider } from './contexts/ToastContext'
+import { DevSimProvider } from './contexts/DevSimContext'
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <ThemeProvider>
       <LanguageProvider>
-        <App />
+        <ToastProvider>
+          <DevSimProvider>
+            <App />
+          </DevSimProvider>
+        </ToastProvider>
       </LanguageProvider>
     </ThemeProvider>
   </React.StrictMode>,

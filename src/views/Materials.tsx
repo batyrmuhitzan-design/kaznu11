@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { useI18n } from "../contexts/LanguageContext";
+import { useToast } from "../contexts/ToastContext";
+import { hapticSuccess } from "../utils/haptics";
 
 type DocFormat = "PDF" | "PPT" | "DOC" | "XLS" | "ZIP";
 
@@ -107,8 +109,10 @@ function DownloadIcon({ filled }: { filled: boolean }) {
 
 export default function Materials() {
   const t = useI18n();
+  const toast = useToast();
   const [query, setQuery] = useState("");
   const [saved, setSaved] = useState<Set<string>>(new Set());
+  const [active, setActive] = useState<{ id: string; progress: number } | null>(null);
 
   const q = query.trim().toLowerCase();
   const groups = COURSE_MATERIALS.map((section) => ({
@@ -118,41 +122,73 @@ export default function Materials() {
 
   const totalFiles = COURSE_MATERIALS.reduce((sum, s) => sum + s.files.length, 0);
 
+  const findFile = (fileId: string) => {
+    for (const s of COURSE_MATERIALS) {
+      const f = s.files.find((x) => x.id === fileId);
+      if (f) return f;
+    }
+    return undefined;
+  };
+
   const handleDownload = (fileId: string) => {
-    setSaved((prev) => {
-      const next = new Set(prev);
-      if (next.has(fileId)) next.delete(fileId);
-      else next.add(fileId);
-      return next;
-    });
+    // 已下载 → 点击移除（本地演示）
+    if (saved.has(fileId)) {
+      const file = findFile(fileId);
+      setSaved((prev) => {
+        const next = new Set(prev);
+        next.delete(fileId);
+        return next;
+      });
+      toast.push(file ? `《${file.name}》已从本地移除` : "Removed", "info");
+      return;
+    }
+    if (active) return; // 同一时间只模拟一个下载
+
+    const file = findFile(fileId);
+    let progress = 0;
+    setActive({ id: fileId, progress });
+    const timer = window.setInterval(() => {
+      progress += 6 + Math.random() * 16;
+      if (progress >= 100) {
+        window.clearInterval(timer);
+        setActive(null);
+        setSaved((prev) => new Set(prev).add(fileId));
+        toast.push(file ? `《${file.name}》已保存至本地` : "File saved", "success");
+        void hapticSuccess();
+      } else {
+        setActive({ id: fileId, progress: Math.min(100, Math.round(progress)) });
+      }
+    }, 130);
   };
 
   return (
-    <div className="app-surface h-full overflow-y-auto">
-      <div className="px-4 pt-2 pb-32 space-y-3 animate-slide-up">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-xs font-medium" style={{ color: "rgba(235,235,245,0.5)" }}>{t("fall")} 2026</p>
-            <h1 className="text-2xl font-bold text-white mt-0.5" style={{ letterSpacing: "-0.5px" }}>{t("courseMaterials")}</h1>
+    <div className="app-surface h-full flex flex-col overflow-hidden">
+      <div className="screen-pin px-4 pt-1 space-y-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs font-medium" style={{ color: "rgba(235,235,245,0.5)" }}>{t("fall")} 2026</p>
+              <h1 className="text-2xl font-bold text-white mt-0.5" style={{ letterSpacing: "-0.5px" }}>{t("courseMaterials")}</h1>
+            </div>
+            <span className="px-2.5 py-1.5 rounded-full text-xs font-bold" style={{ background: "rgba(0,122,255,0.14)", color: "#409CFF", border: "1px solid rgba(0,122,255,0.25)", fontFamily: "JetBrains Mono" }}>
+              {totalFiles}
+            </span>
           </div>
-          <span className="px-2.5 py-1.5 rounded-full text-xs font-bold" style={{ background: "rgba(0,122,255,0.14)", color: "#409CFF", border: "1px solid rgba(0,122,255,0.25)", fontFamily: "JetBrains Mono" }}>
-            {totalFiles}
-          </span>
-        </div>
 
-        {/* 搜索 */}
-        <div className="flex items-center gap-2 px-3.5 py-2.5 squircle-md" style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.08)" }}>
-          <svg viewBox="0 0 20 20" fill="none" className="w-4 h-4 shrink-0">
-            <circle cx="9" cy="9" r="6" stroke="rgba(235,235,245,0.5)" strokeWidth="1.6" />
-            <path d="m13.5 13.5 3.5 3.5" stroke="rgba(235,235,245,0.5)" strokeWidth="1.6" strokeLinecap="round" />
-          </svg>
-          <input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder={t("searchMaterials")}
-            className="flex-1 bg-transparent text-sm text-white outline-none placeholder:text-white/35"
-          />
+          {/* 搜索 */}
+          <div className="flex items-center gap-2 px-3.5 py-2.5 squircle-md" style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.08)" }}>
+            <svg viewBox="0 0 20 20" fill="none" className="w-4 h-4 shrink-0">
+              <circle cx="9" cy="9" r="6" stroke="rgba(235,235,245,0.5)" strokeWidth="1.6" />
+              <path d="m13.5 13.5 3.5 3.5" stroke="rgba(235,235,245,0.5)" strokeWidth="1.6" strokeLinecap="round" />
+            </svg>
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder={t("searchMaterials")}
+              className="flex-1 bg-transparent text-sm text-white outline-none placeholder:text-white/35"
+            />
+          </div>
         </div>
+        <div className="flex-1 min-h-0 overflow-y-auto px-4 pt-3 pb-28 space-y-3 animate-slide-up">
 
         {groups.length === 0 && (
           <div className="glass squircle-lg p-8 flex flex-col items-center gap-2">
@@ -188,19 +224,34 @@ export default function Materials() {
                         {file.pages ? ` · ${file.pages} pp` : ""} · {file.date}
                       </p>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => handleDownload(file.id)}
-                      className="haptic-action shrink-0 flex items-center gap-1.5 px-3 py-1.5 squircle-xs text-xs font-bold transition-all active:scale-95"
-                      style={{
-                        background: isSaved ? "rgba(48,209,88,0.16)" : "rgba(0,122,255,0.16)",
-                        color: isSaved ? "#30D158" : "#409CFF",
-                        border: `1px solid ${isSaved ? "rgba(48,209,88,0.3)" : "rgba(0,122,255,0.3)"}`,
-                      }}
-                    >
-                      <DownloadIcon filled={isSaved} />
-                      {isSaved ? t("downloaded") : t("download")}
-                    </button>
+                    {active && active.id === file.id ? (
+                      <span
+                        role="progressbar"
+                        aria-valuenow={active.progress}
+                        aria-label={`${active.progress}%`}
+                        className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 squircle-xs text-xs font-bold"
+                        style={{ background: "rgba(0,122,255,0.12)", color: "#409CFF", border: "1px solid rgba(0,122,255,0.3)" }}
+                      >
+                        <span className="inline-block w-3 h-3 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: "#409CFF", borderTopColor: "transparent" }} />
+                        {active.progress}%
+                      </span>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => handleDownload(file.id)}
+                        data-action="download"
+                        data-haptic="heavy"
+                        className="haptic-action shrink-0 flex items-center gap-1.5 px-3 py-1.5 squircle-xs text-xs font-bold transition-all active:scale-95"
+                        style={{
+                          background: isSaved ? "rgba(48,209,88,0.16)" : "rgba(0,122,255,0.16)",
+                          color: isSaved ? "#30D158" : "#409CFF",
+                          border: `1px solid ${isSaved ? "rgba(48,209,88,0.3)" : "rgba(0,122,255,0.3)"}`,
+                        }}
+                      >
+                        <DownloadIcon filled={isSaved} />
+                        {isSaved ? t("downloaded") : t("download")}
+                      </button>
+                    )}
                   </div>
                 );
               })}

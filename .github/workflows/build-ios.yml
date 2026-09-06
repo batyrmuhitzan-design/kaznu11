@@ -23,21 +23,15 @@ jobs:
     - name: Build Web App
       run: npx vite build
 
-    - name: Recreate iOS Native Project
-      run: |
-        rm -rf ios
-        npx cap add ios
-        npx cap sync ios
-        cd ios/App && pod install || true
+    - name: Sync Capacitor iOS
+      # 保留仓库内已提交的 ios 工程（含 Info.plist 定位权限、图标、
+      # SPM 插件依赖等原生定制），只做同步，避免生成工程丢失这些配置
+      run: npx cap sync ios
 
     - name: Build iOS App (Unsigned IPA)
       run: |
         cd ios/App
-        if [ -d "App.xcworkspace" ]; then
-          xcodebuild -workspace App.xcworkspace -scheme App -configuration Release -sdk iphoneos CODE_SIGNING_ALLOWED=NO CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO -derivedDataPath build
-        else
-          xcodebuild -project App.xcodeproj -scheme App -configuration Release -sdk iphoneos CODE_SIGNING_ALLOWED=NO CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO -derivedDataPath build
-        fi
+        xcodebuild -project App.xcodeproj -scheme App -configuration Release -sdk iphoneos CODE_SIGNING_ALLOWED=NO CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO -derivedDataPath build
         mkdir -p Payload
         cp -r build/Build/Products/Release-iphoneos/App.app Payload/
         zip -r KazNUHelper.ipa Payload

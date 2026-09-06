@@ -80,10 +80,10 @@ export default function ThemeSwitcher() {
     <div
       className="relative inline-flex p-1 rounded-xl"
       style={{
-        backgroundColor: "rgba(120, 120, 128, 0.16)",
+        backgroundColor: "var(--seg-track)",
         backdropFilter: "blur(20px) saturate(180%)",
         WebkitBackdropFilter: "blur(20px) saturate(180%)",
-        border: "1px solid rgba(255, 255, 255, 0.06)",
+        border: "1px solid var(--seg-border)",
       }}
       role="radiogroup"
       aria-label="主题切换"
@@ -94,7 +94,7 @@ export default function ThemeSwitcher() {
         style={{
           width: "calc((100% - 8px) / 3)",
           left: `calc(4px + ${activeIndex} * ((100% - 8px) / 3))`,
-          backgroundColor: "rgba(255, 255, 255, 0.95)",
+          background: "linear-gradient(135deg, #0033A0, #007AFF)",
           boxShadow: "0 2px 8px rgba(0, 0, 0, 0.15), 0 0.5px 0 rgba(0, 0, 0, 0.05)",
           transition: `transform 250ms ${IOS_EASE}, left 250ms ${IOS_EASE}, background-color 200ms ease`,
         }}
@@ -133,14 +133,16 @@ export default function ThemeSwitcher() {
               }
             }}
           >
-            <Icon
-              className="w-[14px] h-[14px] transition-all duration-200"
+            <span
               style={{
-                color: isActive ? "#000000" : "rgba(255, 255, 255, 0.6)",
+                color: isActive ? "#ffffff" : "var(--seg-inactive)",
                 opacity: isActive ? 1 : 0.8,
                 transform: isActive ? "scale(1.05)" : "scale(1)",
+                transition: "color 200ms ease, opacity 200ms ease, transform 200ms ease",
               }}
-            />
+            >
+              <Icon className="w-[14px] h-[14px] transition-all duration-200" />
+            </span>
           </button>
         );
       })}

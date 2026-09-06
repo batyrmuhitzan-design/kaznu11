@@ -1,8 +1,11 @@
 import { useEffect, useState } from "react";
 import { useI18n } from "../contexts/LanguageContext";
+import { useToast } from "../contexts/ToastContext";
+import { hapticSuccess } from "../utils/haptics";
 import { AnimatedNumber, AnimatedBar, useCountUp } from "../utils/motion";
+import { API_URLS } from "../utils/config";
 
-const GPA_API = "http://127.0.0.1:8001/api/gpa";
+const GPA_API = API_URLS.gpa;
 
 const TOTAL_ECTS = 240;
 const EARNED_ECTS = 88;
@@ -75,9 +78,12 @@ function GradeChip({ grade }: { grade: string }) {
 }
 
 /** 0→4.0 线性量尺：随动画从低处涨到 GPA 位置。 */
-function GpaMeter({ value, color = "#007AFF", height = 7, showLabels = true }: { value: number; color?: string; height?: number; showLabels?: boolean }) {
+function GpaMeter({ value, color: _color = "#007AFF", height = 7, showLabels = true }: { value: number; color?: string; height?: number; showLabels?: boolean }) {
   const pct = Math.min(100, Math.max(0, (value / 4) * 100));
   const w = useCountUp(pct, { duration: 1500, delay: 250 });
+  // 纯色进度：随增长整根填充条 红 → 橙 → 绿
+  const hue = Math.min(125, Math.max(0, w * 1.25));
+  const fillColor = `hsl(${hue}, 92%, 58%)`;
   return (
     <div>
       <div className="relative w-full rounded-full overflow-hidden meter-track" style={{ height }}>
@@ -85,8 +91,8 @@ function GpaMeter({ value, color = "#007AFF", height = 7, showLabels = true }: {
           className="h-full rounded-full"
           style={{
             width: `${w}%`,
-            background: `linear-gradient(90deg, #0033A0, ${color} 60%, #30D158)`,
-            boxShadow: "0 0 10px rgba(0,122,255,0.45)",
+            background: fillColor,
+            boxShadow: `0 0 10px ${fillColor}`,
           }}
         />
         <div
@@ -188,7 +194,24 @@ export default function Grades({ onBack }: { onBack?: () => void }) {
   const [target, setTarget] = useState<TargetId>("magna");
   const [gpaData, setGpaData] = useState<{ gpa: number; change: number; rank: string }>({ gpa: CUM_GPA, change: 0.04, rank: "top 5%" });
   const [ects, setEcts] = useState({ earned: EARNED_ECTS, total: TOTAL_ECTS });
+  const [exporting, setExporting] = useState(false);
   const t = useI18n();
+  const toast = useToast();
+
+  const handleExportPdf = () => {
+    if (exporting) return;
+    setExporting(true);
+    toast.push("正在生成 PDF…", "info");
+    window.setTimeout(() => {
+      setExporting(false);
+      toast.push("成绩单 PDF 已导出 · transcript.pdf", "success");
+      void hapticSuccess();
+    }, 1600);
+  };
+
+  const handleRadar = () => {
+    toast.push("雷达图分析即将上线", "info");
+  };
 
   useEffect(() => {
     fetch(GPA_API)
@@ -211,17 +234,17 @@ export default function Grades({ onBack }: { onBack?: () => void }) {
     gpaData.gpa >= 3.9 ? t("summa") : gpaData.gpa >= 3.7 ? t("magna") : gpaData.gpa >= 3.5 ? "Cum Laude" : t("justGraduate");
 
   return (
-    <div className="app-surface h-full overflow-y-auto">
-      <div className="px-4 pt-2 pb-32 animate-slide-up">
-
-        {/* Header */}
-        {onBack && (
-          <button type="button" onClick={onBack} className="haptic-action theme-secondary flex items-center gap-1 text-sm font-semibold mb-3">
-            <svg viewBox="0 0 20 20" fill="none" className="w-4 h-4"><path d="m12.5 4-5 6 5 6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>
-            {t("back")}
-          </button>
-        )}
-        <h1 className="text-2xl font-bold text-white mb-4" style={{ letterSpacing: "-0.5px" }}>{t("academicRecord")}</h1>
+    <div className="app-surface h-full flex flex-col overflow-hidden">
+      <div className="screen-pin px-4 pt-1">
+          {onBack && (
+            <button type="button" onClick={onBack} className="haptic-action theme-secondary flex items-center gap-1 text-sm font-semibold mb-2">
+              <svg viewBox="0 0 20 20" fill="none" className="w-4 h-4"><path d="m12.5 4-5 6 5 6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>
+              {t("back")}
+            </button>
+          )}
+          <h1 className="text-2xl font-bold text-white mt-0.5" style={{ letterSpacing: "-0.5px" }}>{t("academicRecord")}</h1>
+        </div>
+        <div className="flex-1 min-h-0 overflow-y-auto px-4 pt-3 pb-28 animate-slide-up">
 
         {/* GPA Hero Card */}
         <div className="glass squircle-lg p-5 mb-3 card-shadow inner-glow-blue">
@@ -229,7 +252,7 @@ export default function Grades({ onBack }: { onBack?: () => void }) {
             <div className="min-w-0">
               <p className="text-xs font-medium mb-1" style={{ color: "rgba(235,235,245,0.5)" }}>{t("cumulativeGpa")}</p>
               <div className="flex items-baseline gap-2">
-                <AnimatedNumber value={gpaData.gpa} decimals={2} duration={1600} className="text-5xl font-bold text-white" style={{ fontFamily: "JetBrains Mono", letterSpacing: "-2px" }} />
+                <AnimatedNumber value={gpaData.gpa} decimals={2} duration={1600} className="gpa-grow text-5xl font-bold text-white" style={{ fontFamily: "JetBrains Mono", letterSpacing: "-2px" }} />
                 <span className="text-lg font-medium" style={{ color: "rgba(235,235,245,0.4)" }}>/4.0</span>
               </div>
               <div className="flex flex-wrap items-center gap-2 mt-2">
@@ -427,13 +450,20 @@ export default function Grades({ onBack }: { onBack?: () => void }) {
 
         {/* Floating Action Row */}
         <div className="flex gap-2.5 mt-4">
-          <button type="button" className="haptic-action flex-1 flex items-center justify-center gap-2 py-3.5 squircle-md font-semibold text-sm transition-opacity active:opacity-70" style={{ background: "rgba(0,122,255,0.15)", color: "#409CFF", border: "1px solid rgba(0,122,255,0.25)" }}>
-            <svg viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
-              <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd" />
-            </svg>
-            {t("exportPdf")}
+          <button type="button" onClick={handleExportPdf} disabled={exporting} data-action="export" data-haptic="heavy" className="haptic-action flex-1 flex items-center justify-center gap-2 py-3.5 squircle-md font-semibold text-sm transition-opacity active:opacity-70 disabled:opacity-50" style={{ background: "rgba(0,122,255,0.15)", color: "#409CFF", border: "1px solid rgba(0,122,255,0.25)" }}>
+            {exporting ? (
+              <>
+                <span className="inline-block w-3.5 h-3.5 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: "#409CFF", borderTopColor: "transparent" }} />
+                ……
+              </>
+            ) : (
+              <svg viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
+                <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd" />
+              </svg>
+            )}
+            {exporting ? "Generating…" : t("exportPdf")}
           </button>
-          <button type="button" className="haptic-action flex-1 flex items-center justify-center gap-2 py-3.5 squircle-md font-semibold text-sm transition-opacity active:opacity-70" style={{ background: "rgba(94,92,230,0.15)", color: "#7B79F7", border: "1px solid rgba(94,92,230,0.25)" }}>
+          <button type="button" onClick={handleRadar} className="haptic-action flex-1 flex items-center justify-center gap-2 py-3.5 squircle-md font-semibold text-sm transition-opacity active:opacity-70" style={{ background: "rgba(94,92,230,0.15)", color: "#7B79F7", border: "1px solid rgba(94,92,230,0.25)" }}>
             <svg viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
               <path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zM14 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z" />
             </svg>

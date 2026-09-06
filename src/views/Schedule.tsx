@@ -1,10 +1,12 @@
 import { useState, useEffect } from "react";
 import { useTheme } from "../contexts/ThemeContext";
 import { useI18n } from "../contexts/LanguageContext";
+import { API_URLS, STUDENT_ID } from "../utils/config";
+import { useDevSim } from "../contexts/DevSimContext";
+import { academicWeekOf, datesOfThisWeek, nowMinutes, todayWeekdayIndex, ACADEMIC_YEAR } from "../utils/calendar";
+import { scheduleClassReminders, type ClassLessonInput } from "../native/notifications";
 
 const DAYS = ["mon", "tue", "wed", "thu", "fri", "sat"] as const;
-const DATES = [1, 2, 3, 4, 5, 6];
-const TODAY = 1; // Monday
 
 type CourseType = "lecture" | "lab" | "exam" | "seminar";
 
@@ -128,12 +130,44 @@ export default function Schedule() {
   const { resolvedTheme } = useTheme();
   const t = useI18n();
   const isDark = resolvedTheme === "dark";
-  const [selectedDay, setSelectedDay] = useState(0);
+  const [selectedDay, setSelectedDay] = useState<number>(0);
   const [coursesByDay, setCoursesByDay] = useState<Record<number, Course[]>>({});
   const [loading, setLoading] = useState(true);
 
+  // 时间感知：真实时钟 + Dev Console 模拟；自动聚焦到“今天”
+  const sim = useDevSim();
+  const now = sim.simulatedNow(new Date());
+  const todayIdx = Math.min(todayWeekdayIndex(now), DAYS.length - 1);
+  const weekDates = datesOfThisWeek(now);
+  const academicWeek = sim.weekOverride ?? academicWeekOf(now);
+  const { h: nowH, m: nowM } = nowMinutes(now);
+
   useEffect(() => {
-    fetch("http://127.0.0.1:8000/api/v1/schedule?student_id=20260001")
+    setSelectedDay((prev) => (prev === todayIdx ? prev : todayIdx));
+  }, [todayIdx]);
+
+  const flattenLessons = (data: Record<string, unknown>): ClassLessonInput[] => {
+    const lessons: ClassLessonInput[] = [];
+    Object.entries(data ?? {}).forEach(([key, list]) => {
+      const wd = Number(key);
+      const arr = Array.isArray(list) ? list : [];
+      arr.forEach((c) => {
+        const course = c as { name?: string; room?: string; startH?: number; startM?: number };
+        if (!course.name) return;
+        lessons.push({
+          weekday: Number.isInteger(wd) && wd >= 0 && wd <= 6 ? wd : 0,
+          name: course.name,
+          room: course.room,
+          startH: course.startH ?? 9,
+          startM: course.startM ?? 0,
+        });
+      });
+    });
+    return lessons;
+  };
+
+  useEffect(() => {
+    fetch(`${API_URLS.schedule}?student_id=${STUDENT_ID}`)
       .then((res) => res.json())
       .then((data) => {
         if (data && typeof data === "object" && !Array.isArray(data) && data.schedule) {
@@ -143,17 +177,22 @@ export default function Schedule() {
         } else {
           setCoursesByDay(MOCK_FALLBACK);
         }
+        // 原生本地通知：每周按课表自动提醒（仅原生端生效）
+        if (data && typeof data === "object" && !Array.isArray(data)) {
+          void scheduleClassReminders(flattenLessons(data as Record<string, unknown>), 30);
+        }
         setLoading(false);
       })
       .catch((err) => {
         console.warn("未连接到 API 后端，使用本地备用课表:", err);
         setCoursesByDay(MOCK_FALLBACK);
+        void scheduleClassReminders(flattenLessons(MOCK_FALLBACK as unknown as Record<string, unknown>), 30);
         setLoading(false);
       });
   }, []);
 
   const courses = coursesByDay[selectedDay] || [];
-  const nowY = timeToY(NOW_H, NOW_M);
+  const nowY = timeToY(nowH, nowM);
 
   const theme = {
     bg: isDark ? "#000000" : "#F2F2F7",
@@ -175,6 +214,9 @@ export default function Schedule() {
           <h1 className={`text-2xl font-bold ${theme.headerText}`} style={{ letterSpacing: "-0.5px" }}>
             {t("schedule")}
           </h1>
+          <span className="text-xs font-semibold shrink-0 px-2 py-1 squircle-xs" style={{ background: isDark ? "rgba(255,255,255,0.07)" : "rgba(0,0,0,0.05)", color: theme.hourText }}>
+            {t("week")} {academicWeek} · {t("fall")} {ACADEMIC_YEAR}
+          </span>
 
         </div>
 
@@ -182,7 +224,7 @@ export default function Schedule() {
         <div className="flex gap-1.5">
           {DAYS.map((day, i) => {
             const active = i === selectedDay;
-            const isToday = i === TODAY;
+            const isToday = i === todayIdx;
             return (
               <button
                 key={day}
@@ -195,7 +237,7 @@ export default function Schedule() {
                 }}
               >
                 <span className="text-xs font-medium" style={{ color: active ? "rgba(255,255,255,0.8)" : theme.weekBtnText, fontSize: 10 }}>{t(day)}</span>
-                <span className="text-sm font-bold mt-0.5" style={{ color: active ? "white" : isToday ? "#007AFF" : theme.weekBtnNum }}>{DATES[i]}</span>
+                <span className="text-sm font-bold mt-0.5" style={{ color: active ? "white" : isToday ? "#007AFF" : theme.weekBtnNum }}>{weekDates[i]}</span>
                 {(coursesByDay[i]?.length || 0) > 0 && (
                   <div className="mt-1 w-1 h-1 rounded-full" style={{ background: active ? "rgba(255,255,255,0.8)" : "#007AFF" }} />
                 )}
@@ -219,7 +261,7 @@ export default function Schedule() {
           ))}
 
           {/* Current time needle */}
-          {selectedDay === TODAY && (
+          {selectedDay === todayIdx && (
             <div className="absolute left-0 right-0 flex items-center gap-2 z-20" style={{ top: nowY }}>
               <span className="text-xs w-11 text-right shrink-0 font-semibold" style={{ color: "#FF453A", fontFamily: "JetBrains Mono", fontSize: 10 }}>NOW</span>
               <div className="flex-1 h-0.5 bg-red-500" />

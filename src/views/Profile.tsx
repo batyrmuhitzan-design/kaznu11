@@ -1,6 +1,9 @@
 import { useState } from "react";
 import ThemeSwitcher from "../components/ThemeSwitcher";
 import { useLanguage, useI18n, type Language } from "../contexts/LanguageContext";
+import { clearSession } from "../utils/session";
+import { screenFadeOut } from "../utils/screenFade";
+import { APP_VERSION } from "../utils/update";
 
 interface ProfileProps {
   onBack: () => void;
@@ -34,10 +37,12 @@ function Settings({ onBack }: { onBack: () => void }) {
   const languageNames: Record<Language, string> = { EN: "English", KZ: "Қазақша", RU: "Русский" };
 
   return (
-    <div className="app-surface h-full overflow-y-auto">
-      <div className="px-4 pt-2 pb-32 space-y-4 animate-slide-up">
+    <div className="app-surface h-full flex flex-col overflow-hidden">
+      <div className="screen-pin px-4 pt-1">
         <BackButton onClick={onBack} />
-        <h1 className="text-2xl font-bold text-white">{t("settings")}</h1>
+        <h1 className="text-2xl font-bold text-white mt-3">{t("settings")}</h1>
+      </div>
+      <div className="flex-1 min-h-0 overflow-y-auto px-4 pt-3 pb-28 space-y-4 animate-slide-up">
 
         <section>
           <p className="theme-section-title text-xs font-semibold uppercase tracking-wide mb-2 px-1">{t("appearance")}</p>
@@ -75,6 +80,22 @@ function Settings({ onBack }: { onBack: () => void }) {
             )}
           </div>
         </section>
+
+        {/* 退出登录：清掉本地会话，下次启动要求重新验证 */}
+        <button
+          type="button"
+          onClick={() => {
+            // 先整屏淡出成底色，再清会话并回到登录页
+            screenFadeOut(undefined, () => {
+              clearSession();
+              window.location.reload();
+            });
+          }}
+          className="haptic-action w-full py-3.5 squircle-md text-sm font-bold"
+          style={{ background: "rgba(255,69,58,0.14)", color: "#FF453A", border: "1px solid rgba(255,69,58,0.28)" }}
+        >
+          {t("logout")}
+        </button>
       </div>
     </div>
   );
@@ -83,16 +104,18 @@ function Settings({ onBack }: { onBack: () => void }) {
 function About({ onBack }: { onBack: () => void }) {
   const t = useI18n();
   return (
-    <div className="app-surface h-full overflow-y-auto">
-      <div className="px-4 pt-2 pb-32 space-y-4 animate-slide-up">
+    <div className="app-surface h-full flex flex-col overflow-hidden">
+      <div className="screen-pin px-4 pt-1">
         <BackButton onClick={onBack} />
-        <div className="flex flex-col items-center text-center pt-5 pb-3">
+      </div>
+      <div className="flex-1 min-h-0 overflow-y-auto px-4 pt-3 pb-28 space-y-4 animate-slide-up">
+        <div className="flex flex-col items-center text-center pt-2 pb-3">
           <div className="w-20 h-20 rounded-3xl flex items-center justify-center text-white text-xl font-bold" style={{ background: "linear-gradient(135deg, #0033A0, #007AFF)" }}>AB</div>
           <h1 className="text-2xl font-bold text-white mt-4">KazNU Helper</h1>
           <p className="theme-muted text-sm mt-1">{t("university")}</p>
         </div>
         <div className="glass squircle-md p-4 space-y-3">
-          <div className="flex items-center justify-between"><span className="theme-muted text-sm">{t("version")}</span><span className="text-sm font-semibold text-white">1.0.0</span></div>
+          <div className="flex items-center justify-between"><span className="theme-muted text-sm">{t("version")}</span><span className="text-sm font-semibold text-white">{APP_VERSION}</span></div>
           <div className="flex items-center justify-between"><span className="theme-muted text-sm">{t("university")}</span><span className="text-sm font-semibold text-white">Al-Farabi KazNU</span></div>
         </div>
         <p className="theme-muted text-xs text-center leading-relaxed px-5">{t("aboutDescription")}</p>

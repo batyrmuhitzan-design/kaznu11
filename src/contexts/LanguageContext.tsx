@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, type ReactNode } from "react";
+import { screenFade } from "../utils/screenFade";
 
 export type Language = "EN" | "KZ" | "RU";
 type TranslationKey =
@@ -21,8 +22,17 @@ type ExtraTranslationKey =
   | "noMoreToday" | "degreePlan" | "targetStandard" | "justGraduate" | "magna" | "summa"
   | "futureAvg" | "ectsLeft" | "degreeProgress" | "avgPerSem" | "reachable" | "needsPerfect"
   | "perSemLabel" | "breakLabel" | "nextLabel" | "liveActivityHint"
-  | "materials" | "courseMaterials" | "searchMaterials" | "download" | "downloaded" | "noMaterials";
-type AllTranslationKey = TranslationKey | ExtendedTranslationKey | NewsTranslationKey | ExtraTranslationKey;
+  | "materials" | "courseMaterials" | "searchMaterials" | "download" | "downloaded" | "noMaterials"
+  | "alarmCourses" | "alarmHint" | "payDorm" | "payWithKaspi" | "studentId" | "monthlyFee" | "openKaspi" | "cancel" | "dormBlock"
+  | "daysLeft" | "overdue" | "paid" | "pleasePay"
+  | "serviceAttestation" | "serviceJournal" | "servicePlan" | "serviceTranscript" | "serviceOnlineTest" | "serviceDebt" | "serviceFx" | "serviceStudentAnketa"
+  | "statusPass" | "statusNotPass" | "statusInProgress" | "statusPlanned" | "statusOpen" | "statusDue" | "statusRetake"
+  | "actionStart" | "actionRegister" | "comingSoon" | "univerNote"
+  | "fullName" | "birthDate" | "iin" | "citizenship" | "faculty" | "specialty" | "groupName" | "address" | "phone" | "email"
+  | "signIn" | "usernameLabel" | "passwordLabel" | "loginHint" | "logout"
+  | "rememberMe" | "autoLoginNote" | "reverifyHint" | "themeLight" | "themeDark" | "themeAuto"
+  | "loginError";
+export type AllTranslationKey = TranslationKey | ExtendedTranslationKey | NewsTranslationKey | ExtraTranslationKey;
 
 interface LanguageContextType {
   language: Language;
@@ -67,6 +77,14 @@ const ADDITIONAL_TRANSLATIONS: Record<Language, Record<ExtraTranslationKey, stri
     avgPerSem: "avg / sem.", reachable: "On track — keep the pace!", needsPerfect: "Needs near-perfect grades",
     perSemLabel: "per sem.", breakLabel: "Break", nextLabel: "Next", liveActivityHint: "Lock screen live activity",
     materials: "Materials", courseMaterials: "Course Materials", searchMaterials: "Search by course or file name", download: "Download", downloaded: "Saved", noMaterials: "No materials yet",
+    alarmCourses: "All courses", alarmHint: "Bell on — I remind you 30 min before class", payDorm: "Pay dorm fee", payWithKaspi: "Pay via Kaspi", studentId: "Student ID", monthlyFee: "Monthly fee", openKaspi: "Open Kaspi", cancel: "Cancel", dormBlock: "Dorm",
+    daysLeft: "days left", overdue: "Overdue", paid: "Fee paid", pleasePay: "Please pay the dorm fee",
+    serviceAttestation: "Attestation", serviceJournal: "Attendance & progress journal", servicePlan: "Individual study plan", serviceTranscript: "Transcript (grade book)", serviceOnlineTest: "Online test", serviceDebt: "Academic debt", serviceFx: "FX retake",
+    statusPass: "Passed", statusNotPass: "Not passed", statusInProgress: "In progress", statusPlanned: "Planned", statusOpen: "Open", statusDue: "Due", statusRetake: "Retake",
+    actionStart: "Start test", actionRegister: "Register", comingSoon: "Coming soon", univerNote: "Live data will load from Univer.kz",
+    serviceStudentAnketa: "Student questionnaire", fullName: "Full name", birthDate: "Date of birth", iin: "IIN", citizenship: "Citizenship", faculty: "Faculty", specialty: "Specialty", groupName: "Group", address: "Address", phone: "Phone", email: "Email",
+    signIn: "Sign in", usernameLabel: "Username / student ID", passwordLabel: "Password", loginHint: "Demo: any username · password 123456", logout: "Log out",
+    rememberMe: "Remember me & auto sign-in", autoLoginNote: "No password needed for the next 15 days", reverifyHint: "If off, you'll enter your password again next time", themeLight: "Light", themeDark: "Dark", themeAuto: "Auto", loginError: "Incorrect password — try again",
   },
   KZ: {
     noMoreToday: "Бүгінгі сабақтар аяқталды 🎉", degreePlan: "Бітіру жоспары", targetStandard: "Мақсат",
@@ -75,6 +93,14 @@ const ADDITIONAL_TRANSLATIONS: Record<Language, Record<ExtraTranslationKey, stri
     avgPerSem: "сем./орташа", reachable: "Жолындасыз — солай жалғастырыңыз!", needsPerfect: "Өте жоғары баға қажет",
     perSemLabel: "сем./", breakLabel: "Үзіліс", nextLabel: "Келесі", liveActivityHint: "Құлыптау экранындағы белсенділік",
     materials: "Материалдар", courseMaterials: "Оқу материалдары", searchMaterials: "Курс немесе файл атымен іздеу", download: "Жүктеу", downloaded: "Сақталды", noMaterials: "Әзірге материал жоқ",
+    alarmCourses: "Барлық пәндер", alarmHint: "Қоңырау — сабаққа 30 мин қалғанда еске саламын", payDorm: "Жатақхана ақысын төлеу", payWithKaspi: "Kaspi арқылы төлеу", studentId: "Студент ID", monthlyFee: "Айлық төлем", openKaspi: "Kaspi ашу", cancel: "Болдырмау", dormBlock: "Жатақхана",
+    daysLeft: "күн қалды", overdue: "Мерзімі өтті", paid: "Төленді", pleasePay: "Жатақхана ақысын төлеңіз",
+    serviceAttestation: "Аттестация", serviceJournal: "Қатысу және үлгерім журналы", servicePlan: "Жеке оқу жоспары", serviceTranscript: "Транскрипт (Сынақ кітапшасы)", serviceOnlineTest: "Онлайн тест", serviceDebt: "Оқу қарызы", serviceFx: "FX қайта тапсыру",
+    statusPass: "Өтілді", statusNotPass: "Өтілмеді", statusInProgress: "Жүріп жатыр", statusPlanned: "Жоспарланған", statusOpen: "Ашық", statusDue: "Мерзімі өтті", statusRetake: "Қайта тапсыру",
+    actionStart: "Тестті бастау", actionRegister: "Тіркелу", comingSoon: "Жақында", univerNote: "Тірі деректер Univer.kz-тен жүктеледі",
+    serviceStudentAnketa: "Студент анкетасы", fullName: "Толық аты-жөні", birthDate: "Туған күні", iin: "ЖСН", citizenship: "Азаматтығы", faculty: "Факультет", specialty: "Мамандық", groupName: "Топ", address: "Мекенжайы", phone: "Телефон", email: "Email",
+    signIn: "Кіру", usernameLabel: "Логин / студент ID", passwordLabel: "Құпиясөз", loginHint: "Демо: кез келген логин · құпиясөз 123456", logout: "Шығу",
+    rememberMe: "Есте сақтау және автоматты кіру", autoLoginNote: "Келесі 15 күнде құпиясөз қажет емес", reverifyHint: "Өшірсеңіз, келесі жолы құпиясөзді қайта енгізесіз", themeLight: "Ашық", themeDark: "Қараңғы", themeAuto: "Авто", loginError: "Құпиясөз қате — қайта көріңіз",
   },
   RU: {
     noMoreToday: "На сегодня занятий больше нет 🎉", degreePlan: "План до диплома", targetStandard: "Цель",
@@ -83,6 +109,14 @@ const ADDITIONAL_TRANSLATIONS: Record<Language, Record<ExtraTranslationKey, stri
     avgPerSem: "средн./сем.", reachable: "Всё по плану — продолжайте!", needsPerfect: "Нужны почти отличные оценки",
     perSemLabel: "сем./", breakLabel: "Перемена", nextLabel: "Далее", liveActivityHint: "Активность на экране блокировки",
     materials: "Материалы", courseMaterials: "Учебные материалы", searchMaterials: "Поиск по курсу или файлу", download: "Скачать", downloaded: "Сохранено", noMaterials: "Материалов пока нет",
+    alarmCourses: "Все предметы", alarmHint: "Колокольчик — напомню за 30 мин до пары", payDorm: "Оплатить общежитие", payWithKaspi: "Оплатить через Kaspi", studentId: "ID студента", monthlyFee: "Ежемесячная плата", openKaspi: "Открыть Kaspi", cancel: "Отмена", dormBlock: "Общежитие",
+    daysLeft: "дней осталось", overdue: "Просрочено", paid: "Оплачено", pleasePay: "Оплатите общежитие",
+    serviceAttestation: "Аттестация", serviceJournal: "Журнал посещаемости и успеваемости", servicePlan: "Индивидуальный учебный план", serviceTranscript: "Транскрипт (зачётка)", serviceOnlineTest: "Онлайн-тест", serviceDebt: "Академическая задолженность", serviceFx: "Пересдача FX",
+    statusPass: "Зачтено", statusNotPass: "Не зачтено", statusInProgress: "В процессе", statusPlanned: "Запланировано", statusOpen: "Открыт", statusDue: "Просрочено", statusRetake: "Пересдача",
+    actionStart: "Начать тест", actionRegister: "Записаться", comingSoon: "Скоро", univerNote: "Данные загрузятся с Univer.kz",
+    serviceStudentAnketa: "Анкета студента", fullName: "ФИО", birthDate: "Дата рождения", iin: "ИИН", citizenship: "Гражданство", faculty: "Факультет", specialty: "Специальность", groupName: "Группа", address: "Адрес", phone: "Телефон", email: "Email",
+    signIn: "Войти", usernameLabel: "Логин / ID студента", passwordLabel: "Пароль", loginHint: "Демо: любой логин · пароль 123456", logout: "Выйти",
+    rememberMe: "Запомнить меня и входить автоматически", autoLoginNote: "Без пароля в течение следующих 15 дней", reverifyHint: "Если выключено, пароль придётся ввести снова в следующий раз", themeLight: "Светлая", themeDark: "Тёмная", themeAuto: "Авто", loginError: "Неверный пароль — попробуйте ещё раз",
   },
 };
 
@@ -96,6 +130,8 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
   const [language, setLanguageState] = useState<Language>(getInitialLanguage);
 
   function setLanguage(nextLanguage: Language) {
+    // 任何入口切语言（登录页/设置页）都会先盖一层当前底色，再淡出揭开新文案
+    screenFade();
     setLanguageState(nextLanguage);
     window.localStorage.setItem("language", nextLanguage);
   }

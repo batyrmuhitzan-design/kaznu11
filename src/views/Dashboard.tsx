@@ -1,6 +1,11 @@
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { useI18n } from "../contexts/LanguageContext";
+import { API_URLS } from "../utils/config";
 import { buildLiveActivityPayload, syncLiveActivity } from "../native/liveActivity";
+import { motorHaptic } from "../utils/haptics";
+import { playAlarmSound } from "../utils/alarm";
+import { useDevSim, useLongPressOpen, SIM_NEWS_EVENT } from "../contexts/DevSimContext";
+import { academicWeekOf, ACADEMIC_YEAR } from "../utils/calendar";
 
 const RADIUS = 36;
 const CIRC = 2 * Math.PI * RADIUS;
@@ -8,11 +13,20 @@ const CIRC = 2 * Math.PI * RADIUS;
 // 课前/课间倒计时窗口（分钟）：每节课开始前 30 分钟进入倒计时
 const PRE_CLASS_WINDOW_MIN = 30;
 
-/** 倒计时颜色：剩余过半绿色 → 中途橙色 → 最后四分之一红色 */
+/** 倒计时颜色：随时间连续渐变 绿 → 橘 → 红（remaining 越大越绿，越小越红） */
 function countdownTone(pct: number) {
-  if (pct > 0.5) return "#30D158";
-  if (pct > 0.25) return "#FF9F0A";
-  return "#FF453A";
+  const green = [48, 209, 88];
+  const orange = [255, 159, 10];
+  const red = [255, 69, 58];
+  const pos = 1 - Math.min(1, Math.max(0, pct));
+  let a: number[], b: number[], t: number;
+  if (pos <= 0.5) {
+    a = green; b = orange; t = pos / 0.5;
+  } else {
+    a = orange; b = red; t = (pos - 0.5) / 0.5;
+  }
+  const rgb = a.map((v, i) => Math.round(v + (b[i] - v) * t));
+  return `rgb(${rgb[0]}, ${rgb[1]}, ${rgb[2]})`;
 }
 
 type CourseType = "lecture" | "lab" | "seminar";
@@ -250,30 +264,60 @@ function CountdownRing({ remaining, total, ringColor = "#007AFF" }: { remaining:
   const angle = ((remaining % 60) / 60) * 360;
 
   return (
-    <svg width="88" height="88" viewBox="0 0 88 88" className="absolute right-4 top-4">
-      <circle cx="44" cy="44" r={RADIUS} fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="5" />
+    <svg width="116" height="116" viewBox="0 0 88 88" className="absolute right-3 top-3">
+      <circle cx="44" cy="44" r={RADIUS} fill="none" strokeWidth="8" className="ring-track" />
       <circle
         cx="44"
         cy="44"
         r={RADIUS}
         fill="none"
         stroke={ringColor}
-        strokeWidth="5"
+        strokeWidth="8"
         strokeLinecap="round"
         strokeDasharray={CIRC}
         strokeDashoffset={offset}
         className="progress-ring"
-        style={{ transition: "stroke-dashoffset 1s cubic-bezier(0.16, 1, 0.3, 1)" }}
+        style={{ transition: "stroke-dashoffset 1s cubic-bezier(0.16, 1, 0.3, 1), stroke 500ms ease" }}
       />
       {/* 中间放大显示剩余时间 */}
-      <text x="44" y="47" textAnchor="middle" fill="white" fontSize="15" fontWeight="800" fontFamily="Inter" style={{ fontVariantNumeric: "tabular-nums", letterSpacing: "-0.5px" }}>
+      <text x="44" y="47" textAnchor="middle" fontSize="15" fontWeight="800" fontFamily="Inter" className="ring-time" style={{ fontVariantNumeric: "tabular-nums", letterSpacing: "-0.5px" }}>
         {formatCountdown(remaining)}
       </text>
       <text x="44" y="60" textAnchor="middle" fill={ringColor} fontSize="7.5" fontWeight="700" fontFamily="Inter" style={{ letterSpacing: "1.2px" }}>
-        {ringColor === "#FF453A" ? "· LAST" : ringColor === "#FF9F0A" ? "· HALF" : "· LIVE"}
+        {pct <= 0.25 ? "· LAST" : pct <= 0.5 ? "· HALF" : "· LIVE"}
       </text>
     </svg>
   );
+}
+
+/** 宿舍 2GIS 导航短链（去 go.2gis 直达） */
+const DORM_NAV_URL = "https://go.2gis.com/9d1D2";
+
+/**
+ * 楼栋 → 2GIS 地址（先写死模拟；之后改成从 Univer/学校官网抓取的教室地址，
+ * 存进课程数据里，跳转时动态组装即可）
+ */
+const BUILDING_2GIS_ADDRESS: Record<string, string> = {
+  "Main Building": "Алматы, Әл-Фараби даңғылы, 71",
+  "Physics Block": "Алматы, Әл-Фараби даңғылы, 71/9",
+  "IT Block": "Алматы, Әл-Фараби даңғылы, 71/5",
+};
+
+/** 打开外部链接：优先新窗口，若被浏览器拦截则当前页打开（真机/原生会唤起 2GIS） */
+function openExternal(url: string) {
+  try {
+    const win = window.open(url, "_blank", "noopener");
+    if (!win) window.location.href = url;
+  } catch {
+    window.location.href = url;
+  }
+}
+
+/** 打开 2GIS 并自动搜索教室所在楼栋地址（类似抓包里 catalog.api.2gis.ru 的 q 参数） */
+function open2gisClassroom(building: string, room: string) {
+  const address = BUILDING_2GIS_ADDRESS[building] ?? `${building} ${room}`;
+  const query = address;
+  openExternal(`https://2gis.kz/search/${encodeURIComponent(query)}`);
 }
 
 const QUICK = [
@@ -289,10 +333,13 @@ const QUICK = [
 function GpaScale({ value }: { value: number }) {
   const pct = Math.min(100, Math.max(0, (value / 4) * 100));
   const w = useCountUp(pct, 1400);
+  // 纯色进度：整根填充条随“从 0 → GPA”的增长，颜色同步 红 → 橙 → 绿
+  const hue = Math.min(125, Math.max(0, w * 1.25));
+  const fillColor = `hsl(${hue}, 92%, 58%)`;
   return (
     <div className="mt-2.5">
       <div className="relative h-1.5 rounded-full overflow-hidden meter-track">
-        <div className="h-full rounded-full" style={{ width: `${w}%`, background: "linear-gradient(90deg, #0033A0, #007AFF 70%, #30D158)", boxShadow: "0 0 8px rgba(0,122,255,0.55)" }} />
+        <div className="h-full rounded-full" style={{ width: `${w}%`, background: fillColor, boxShadow: `0 0 8px ${fillColor}` }} />
       </div>
       <div className="flex justify-between mt-1">
         <span className="text-[8px]" style={{ color: "rgba(235,235,245,0.35)", fontFamily: "JetBrains Mono" }}>0.0</span>
@@ -305,10 +352,10 @@ function GpaScale({ value }: { value: number }) {
 /** 空闲/待机圆环：无实时倒计时时卡片右侧仍保留圆环，环中显示下一节开始时间或完成记号。 */
 function IdleRing({ label, color = "rgba(255,255,255,0.45)", fontSize = 16 }: { label: string; color?: string; fontSize?: number }) {
   return (
-    <svg width="88" height="88" viewBox="0 0 88 88" className="absolute right-4 top-4">
-      <circle cx="44" cy="44" r={RADIUS} fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="5" />
-      <circle cx="44" cy="44" r={RADIUS} fill="none" stroke={color} strokeWidth="5" strokeLinecap="round" strokeDasharray={CIRC} strokeDashoffset={0} opacity={0.85} />
-      <text x="44" y={fontSize > 20 ? 51 : 49} textAnchor="middle" fill="white" fontSize={fontSize} fontWeight="800" fontFamily="Inter" style={{ fontVariantNumeric: "tabular-nums", letterSpacing: "-0.5px" }}>
+    <svg width="116" height="116" viewBox="0 0 88 88" className="absolute right-3 top-3">
+      <circle cx="44" cy="44" r={RADIUS} fill="none" strokeWidth="8" className="ring-track" />
+      <circle cx="44" cy="44" r={RADIUS} fill="none" stroke={color} strokeWidth="8" strokeLinecap="round" strokeDasharray={CIRC} strokeDashoffset={0} opacity={0.85} />
+      <text x="44" y={fontSize > 20 ? 51 : 49} textAnchor="middle" fontSize={fontSize} fontWeight="800" fontFamily="Inter" className="ring-time" style={{ fontVariantNumeric: "tabular-nums", letterSpacing: "-0.5px" }}>
         {label}
       </text>
     </svg>
@@ -320,7 +367,7 @@ function GpaCard({ onNavigate }: { onNavigate: (tab: string) => void }) {
   const [data, setData] = useState<{ gpa: number; change: number; rank: string; history: number[] } | null>(null);
 
   useEffect(() => {
-    fetch("http://127.0.0.1:8001/api/gpa")
+    fetch(API_URLS.gpa)
       .then((res) => res.json())
       .then((d) => setData(d))
       .catch(() => setData({ gpa: 3.82, change: 0.04, rank: "top 5%", history: [3.55, 3.62, 3.7, 3.75, 3.78, 3.82] }));
@@ -335,7 +382,7 @@ function GpaCard({ onNavigate }: { onNavigate: (tab: string) => void }) {
       {data ? (
         <>
           <div className="mt-1">
-            <AnimatedNumber value={data.gpa} decimals={2} duration={1400} className="text-3xl font-bold text-white" style={{ fontFamily: "JetBrains Mono", letterSpacing: "-1px" }} />
+            <AnimatedNumber value={data.gpa} decimals={2} duration={1400} className="gpa-grow text-3xl font-bold text-white" style={{ fontFamily: "JetBrains Mono", letterSpacing: "-1px" }} />
           </div>
           <GpaScale value={data.gpa} />
           <p className="text-xs mt-1.5" style={{ color: "rgba(235,235,245,0.4)", fontFamily: "JetBrains Mono" }}>
@@ -353,10 +400,21 @@ function GpaCard({ onNavigate }: { onNavigate: (tab: string) => void }) {
 
 export default function Dashboard({ onOpenProfile, onNavigate }: { onOpenProfile: () => void; onNavigate: (tab: string) => void }) {
   const [pressed, setPressed] = useState<string | null>(null);
-  const [unreadNotifications] = useState(() => Math.max(0, 3 - (JSON.parse(localStorage.getItem("readNotificationIds") || "[]") as string[]).length));
+  const [unreadNotifications, setUnreadNotifications] = useState(() => Math.max(0, 3 - (JSON.parse(localStorage.getItem("readNotificationIds") || "[]") as string[]).length));
   const t = useI18n();
-  const now = useNow(1000);
+  const sim = useDevSim();
+  const longPress = useLongPressOpen();
+  const realNow = useNow(1000);
+  const now = sim.simulatedNow(realNow);
+  const week = sim.weekOverride ?? academicWeekOf(now);
   const countdown = computeCountdown(TODAY_COURSES, now);
+
+  // Dev 模拟新通知 → 铃铛红点 +1
+  useEffect(() => {
+    const inc = () => setUnreadNotifications((n) => n + 1);
+    window.addEventListener(SIM_NEWS_EVENT, inc);
+    return () => window.removeEventListener(SIM_NEWS_EVENT, inc);
+  }, []);
 
   const hasCountdown = countdown.mode !== "idle";
   const noMoreToday = countdown.mode === "idle" && !countdown.next;
@@ -375,27 +433,40 @@ export default function Dashboard({ onOpenProfile, onNavigate }: { onOpenProfile
   const lastSyncRef = useRef(-1);
   const notifiedRef = useRef(new Set<string>());
 
-  // 锁屏/通知提醒：只有用户允许网页通知后才会触发（安卓会显示在锁屏与通知中心）。
+  // 上课闹钟：只有在 Course Radar 里开了铃铛的课程才提醒；
+  // 提前 30 分钟触发系统通知 + 马达震动 + 铃声；后续 iOS 原生直接接本地通知/闹钟。
   useEffect(() => {
-    if (!("Notification" in window) || Notification.permission !== "granted") return;
     if (countdown.mode === "idle") return;
+    let alarmIds: Set<string> = new Set();
+    try {
+      const arr = JSON.parse(localStorage.getItem("courseAlarms") || "[]") as string[];
+      alarmIds = new Set(Array.isArray(arr) ? arr : []);
+    } catch {
+      alarmIds = new Set();
+    }
     const { course, remaining } = countdown;
+    if (!alarmIds.has(course.id)) return;
     if (remaining <= 0 || remaining > 30 * 60) return;
     const fire = (key: string, title: string, body: string) => {
       const nk = `${course.id}:${key}`;
       if (notifiedRef.current.has(nk)) return;
       notifiedRef.current.add(nk);
-      try {
-        new Notification(title, { body, tag: nk, requireInteraction: false });
-      } catch {
-        /* 忽略通知错误 */
+      if ("Notification" in window && Notification.permission === "granted") {
+        try {
+          new Notification(title, { body, tag: nk, requireInteraction: true });
+        } catch {
+          /* 忽略通知错误 */
+        }
       }
     };
     const mins = remaining / 60;
     const room = `${t("room")} ${course.room}`;
     if (countdown.mode === "pre-class") {
-      if (mins <= 30 && mins > 29.8) fire("t30", `${course.name} · ${t("startsIn")} 30 ${t("minutes")}`, room);
-      else if (mins <= 15 && mins > 14.8) fire("t15", `${course.name} · ${t("startsIn")} 15 ${t("minutes")}`, room);
+      if (mins <= 30 && mins > 29.8) {
+        fire("t30", `${course.name} · ${t("startsIn")} 30 ${t("minutes")}`, room);
+        motorHaptic();
+        playAlarmSound();
+      } else if (mins <= 15 && mins > 14.8) fire("t15", `${course.name} · ${t("startsIn")} 15 ${t("minutes")}`, room);
       else if (mins <= 5 && mins > 4.8) fire("t5", `${course.name} · ${t("startsIn")} 5 ${t("minutes")}`, room);
       else if (mins <= 1 && mins > 0.8) fire("t1", `${course.name} · ${t("startsIn")} 1 ${t("minutes")}`, room);
     } else if (countdown.mode === "in-class") {
@@ -452,14 +523,13 @@ export default function Dashboard({ onOpenProfile, onNavigate }: { onOpenProfile
   }, [countdown, hasCountdown, activeCourse, countdownStatus]);
 
   return (
-    <div className="app-surface h-full overflow-y-auto">
-      <div className="px-4 pt-2 pb-32 space-y-3 animate-slide-up">
-
-        {/* Header */}
-        <div className="flex items-center justify-between pt-1">
+    <div className="app-surface h-full flex flex-col overflow-hidden">
+        {/* Header — 固定顶栏，列表在下方独立滚动 */}
+        <div className="screen-pin px-4 pt-1">
+          <div className="flex items-center justify-between pt-1">
           <div>
             <p className="text-xs font-medium" style={{ color: "rgba(235,235,245,0.5)" }}>
-              {t("week")} 6 · {t("fall")} 2026
+              {t("week")} {week} · {t("fall")} {ACADEMIC_YEAR}
             </p>
             <h1 className="text-2xl font-bold text-white mt-0.5" style={{ letterSpacing: "-0.5px" }}>
               {t("goodMorning")}, Aisha 👋
@@ -477,14 +547,23 @@ export default function Dashboard({ onOpenProfile, onNavigate }: { onOpenProfile
             <button
               type="button"
               aria-label="Open profile"
-              onClick={onOpenProfile}
-              className="haptic-action w-9 h-9 rounded-full flex items-center justify-center text-white font-bold text-sm transition-transform active:scale-95"
-              style={{ background: "linear-gradient(135deg, #0033A0, #007AFF)", fontSize: 13 }}
+              onClick={() => {
+                if (!sim.open) onOpenProfile();
+              }}
+              onPointerDown={longPress.onPointerDown}
+              onPointerUp={longPress.onPointerUp}
+              onPointerLeave={longPress.onPointerLeave}
+              title="Profile · 长按打开 Dev Console"
+              data-haptic="light"
+              className="haptic-action w-9 h-9 rounded-full flex items-center justify-center text-white font-bold text-sm transition-transform active:scale-95 select-none"
+              style={{ background: "linear-gradient(135deg, #0033A0, #007AFF)", fontSize: 13, touchAction: "manipulation" }}
             >
               AB
             </button>
           </div>
         </div>
+        </div>
+        <div className="flex-1 min-h-0 overflow-y-auto px-4 pt-3 pb-28 space-y-3 animate-slide-up">
 
         {/* Main Course Card (2x2) */}
         <div className="glass squircle-lg p-5 relative overflow-hidden card-shadow" style={{ minHeight: 160 }}>
@@ -498,7 +577,7 @@ export default function Dashboard({ onOpenProfile, onNavigate }: { onOpenProfile
               fontSize={noMoreToday ? 22 : 16}
             />
           )}
-          <div className="pr-24">
+          <div className="pr-[132px]">
             <div className="flex items-center gap-2 mb-2">
               {noMoreToday ? (
                 <div className="px-2 py-0.5 rounded-full text-xs font-semibold" style={{ background: "rgba(48,209,88,0.15)", color: "#30D158" }}>✓ {hhmm(lastToday.endH, lastToday.endM)}</div>
@@ -528,7 +607,7 @@ export default function Dashboard({ onOpenProfile, onNavigate }: { onOpenProfile
                     {hhmm(activeCourse.startH, activeCourse.startM)}–{hhmm(activeCourse.endH, activeCourse.endM)}
                   </p>
                 )}
-                <button className="haptic-action mt-3 px-3 py-1.5 rounded-full text-xs font-semibold flex items-center gap-1.5 transition-opacity active:opacity-70" style={{ background: "rgba(0,122,255,0.2)", color: "#409CFF", border: "1px solid rgba(0,122,255,0.3)" }}>
+                <button type="button" onClick={() => open2gisClassroom(activeCourse.building, activeCourse.room)} className="haptic-action mt-3 px-3 py-1.5 rounded-full text-xs font-semibold flex items-center gap-1.5 transition-opacity active:opacity-70" style={{ background: "rgba(0,122,255,0.2)", color: "#409CFF", border: "1px solid rgba(0,122,255,0.3)" }}>
                   <svg viewBox="0 0 20 20" fill="currentColor" className="w-3 h-3">
                     <path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z" />
                   </svg>
@@ -566,7 +645,14 @@ export default function Dashboard({ onOpenProfile, onNavigate }: { onOpenProfile
               <button
                 key={q.label}
                 type="button"
-                onClick={() => onNavigate(q.label === "Materials" ? "materials" : q.label === "Calendar" ? "schedule" : "services")}
+                onClick={() => {
+                  if (q.label === "Dorm") {
+                    // 快速导航：用宿舍 2GIS 短链直达（iOS 原生里这串链接会自动唤起 2GIS）
+                    openExternal(DORM_NAV_URL);
+                    return;
+                  }
+                  onNavigate(q.label === "Materials" ? "materials" : q.label === "Calendar" ? "schedule" : "services");
+                }}
                 onMouseDown={() => setPressed(q.label)}
                 onMouseUp={() => setPressed(null)}
                 onMouseLeave={() => setPressed(null)}

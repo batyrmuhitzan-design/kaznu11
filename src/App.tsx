@@ -8,8 +8,17 @@ import Profile from "./views/Profile";
 import { useI18n } from "./contexts/LanguageContext";
 import News, { NewsDetail, type NewsItem } from "./views/News";
 import Notifications from "./views/Notifications";
-import { triggerHaptic } from "./utils/haptics";
-import kaznuLogo from "./assets/kaznu-logo.png";
+import { isSessionValid, touchSession } from "./utils/session";
+import LoginScreen from "./views/LoginScreen";
+import { useTheme } from "./contexts/ThemeContext";
+import { syncNativeStatusBar } from "./native/statusBar";
+import { attachHapticDelegate } from "./utils/haptics";
+import UpdateDialog, { type UpdateDialogKind } from "./components/UpdateDialog";
+import { DevPanel } from "./components/DevPanel";
+import { SIM_UPDATE_EVENT } from "./contexts/DevSimContext";
+import { APP_VERSION, classifyUpdate, fetchUpdateInfo, isOptionalSkipped, skipOptional, type UpdateInfo } from "./utils/update";
+import { captureDeviceContext } from "./native/device";
+import { requestNotificationPermission } from "./native/notifications";
 
 const TABS = [
   { id: "dashboard", label: "Home", icon: "house.fill" },
@@ -57,47 +66,76 @@ function TabIcon({ icon, active }: { icon: string; active: boolean }) {
 
 export default function App() {
   const [activeTab, setActiveTab] = useState("dashboard");
+  const [authed, setAuthed] = useState(() => isSessionValid());
   const [selectedNews, setSelectedNews] = useState<NewsItem | null>(null);
+  const { resolvedTheme } = useTheme();
   const t = useI18n();
   const tabLabels = { dashboard: t("home"), news: t("news"), materials: t("materials"), schedule: t("schedule"), services: t("services") };
 
+  const [updateState, setUpdateState] = useState<{ kind: Exclude<UpdateDialogKind, "none">; info: UpdateInfo } | null>(null);
+
+  const closeUpdateDialog = () => setUpdateState(null);
+
+  useEffect(() => attachHapticDelegate(), []);
+
+  // 已登录状态下每次打开 App 都刷新“最近活跃”，15 天内回来就不用重新验证
   useEffect(() => {
-    const handlePointerDown = (event: PointerEvent) => {
-      if ((event.target as HTMLElement).closest(".haptic-action")) triggerHaptic(8);
+    if (authed) touchSession();
+  }, [authed]);
+
+  // 原生状态栏：保持覆盖模式，文字颜色跟随深浅主题（浏览器环境自动跳过）
+  useEffect(() => {
+    void syncNativeStatusBar(resolvedTheme);
+  }, [resolvedTheme]);
+
+  // 自动更新检查（登录后执行一次）：可选更新可“暂不更新”（仅本次启动不再提示）
+  useEffect(() => {
+    if (!authed) return;
+    let cancelled = false;
+    void (async () => {
+      const info = await fetchUpdateInfo();
+      if (cancelled || !info) return;
+      const kind = classifyUpdate(APP_VERSION, info);
+      if (kind === "none") return;
+      if (kind === "optional" && isOptionalSkipped(info.latest_version)) return;
+      setUpdateState({ kind, info });
+    })();
+    return () => {
+      cancelled = true;
     };
-    document.addEventListener("pointerdown", handlePointerDown);
-    return () => document.removeEventListener("pointerdown", handlePointerDown);
+  }, [authed]);
+
+  // Dev Console：手动触发“可选更新 / 强制更新”弹窗
+  useEffect(() => {
+    const onTest = (e: Event) => {
+      const detail = (e as CustomEvent<{ kind?: "optional" | "forced" }>).detail;
+      const kind = detail?.kind === "forced" ? "forced" : "optional";
+      const info: UpdateInfo = {
+        latest_version: "2.0.0",
+        min_supported_version: kind === "forced" ? "2.0.0" : "1.0.0",
+        update_url: "https://github.com/batyrmuhitzan-design/kaznu11/releases",
+        notes: ["Dev Console 测试更新", "用于验证更新弹窗交互"],
+      };
+      setUpdateState({ kind, info });
+    };
+    window.addEventListener(SIM_UPDATE_EVENT, onTest);
+    return () => window.removeEventListener(SIM_UPDATE_EVENT, onTest);
   }, []);
+
+  // 启动时采集定位/时区 + 提前申请本地通知权限（失败都不阻塞）
+  useEffect(() => {
+    if (!authed) return;
+    void captureDeviceContext();
+    void requestNotificationPermission();
+  }, [authed]);
 
   return (
     <div
-      className="relative w-full h-full flex flex-col overflow-hidden"
+      className="app-root relative w-full h-full flex flex-col overflow-hidden"
       style={{ fontFamily: "Inter, system-ui, sans-serif", maxWidth: 430, margin: "0 auto" }}
     >
-      {/* Status Bar */}
-      <div className="app-status-bar px-6 pb-1 shrink-0">
-        <div className="status-bar flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <img className="brand-mark" src={kaznuLogo} alt="Al-Farabi KazNU" />
-            <span className="brand-mark-fallback" hidden aria-hidden="true">K</span>
-            <span className="text-white text-sm font-semibold" style={{ fontFamily: "Inter" }}>9:41</span>
-          </div>
-          <svg viewBox="0 0 24 10" fill="white" className="w-4 h-3 opacity-90">
-            <rect x="0" y="4" width="3" height="6" rx="0.5" />
-            <rect x="4.5" y="3" width="3" height="7" rx="0.5" />
-            <rect x="9" y="1" width="3" height="9" rx="0.5" />
-            <rect x="13.5" y="0" width="3" height="10" rx="0.5" />
-          </svg>
-          <svg viewBox="0 0 16 12" fill="white" className="w-4 h-3 opacity-90">
-            <path d="M8 2C5.4 2 3.1 3.1 1.5 4.8L0 3.3C2 1.2 4.9 0 8 0s6 1.2 8 3.3L14.5 4.8C12.9 3.1 10.6 2 8 2zm0 4c-1.5 0-2.8.6-3.8 1.5L2.8 6.1C4.2 4.8 6 4 8 4s3.8.8 5.2 2.1l-1.4 1.4C10.8 6.6 9.5 6 8 6zm0 4a2 2 0 110 4 2 2 0 010-4z" />
-          </svg>
-          <div className="flex items-center gap-0.5">
-            <div className="rounded-sm" style={{ width: 22, height: 11, background: "rgba(255,255,255,0.15)", border: "1px solid rgba(255,255,255,0.4)", padding: "1.5px 2px" }}>
-              <div className="h-full rounded-sm" style={{ width: "80%", background: "#30D158" }} />
-            </div>
-          </div>
-        </div>
-      </div>
+      {/* 首次启动 / 会话过期：先登录一次 */}
+      {!authed && <LoginScreen onSuccess={() => setAuthed(true)} />}
 
       {/* Main Content */}
       <div className="flex-1 overflow-hidden relative">
@@ -113,7 +151,7 @@ export default function App() {
       </div>
 
       {/* Tab Bar */}
-      <div className="tab-bar shrink-0 flex items-start justify-around pt-2 pb-5 px-2" style={{ height: 83 }}>
+      <div className="tab-bar shrink-0 flex items-start justify-around pt-2 pb-5 px-2">
         {TABS.map((tab) => {
           const active = activeTab === tab.id;
           return (
@@ -136,6 +174,15 @@ export default function App() {
           );
         })}
       </div>
+
+      {/* 自动更新弹窗（可选/强制）与后台状态模拟面板 */}
+      <UpdateDialog
+        kind={updateState?.kind ?? "none"}
+        info={updateState?.info ?? null}
+        onClose={closeUpdateDialog}
+        onDismissOptional={updateState?.info ? () => skipOptional(updateState!.info!.latest_version) : undefined}
+      />
+      <DevPanel />
     </div>
   );
 }

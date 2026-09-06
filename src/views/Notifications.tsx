@@ -40,13 +40,15 @@ export default function Notifications({ onBack, onNavigate }: { onBack: () => vo
   }
 
   return (
-    <div className="app-surface h-full overflow-y-auto">
-      <div className="px-4 pt-2 pb-32 animate-slide-up">
-        <div className="flex items-center justify-between mb-5">
-          <BackButton onClick={onBack} />
-          <button type="button" onClick={markAllRead} disabled={!unreadCount} className="haptic-action theme-secondary text-xs font-semibold disabled:opacity-40">{readAllLabel}</button>
+    <div className="app-surface h-full flex flex-col overflow-hidden">
+      <div className="screen-pin px-4 pt-1">
+          <div className="flex items-center justify-between mb-2.5">
+            <BackButton onClick={onBack} />
+            <button type="button" onClick={markAllRead} disabled={!unreadCount} className="haptic-action theme-secondary text-xs font-semibold disabled:opacity-40">{readAllLabel}</button>
+          </div>
+          <div className="flex items-end justify-between"><div><p className="theme-muted text-xs font-semibold uppercase tracking-wide">KazNU Helper</p><h1 className="text-2xl font-bold text-white mt-1">{t("notifications")}</h1></div><span className="notification-count">{unreadCount} {newMessagesLabel}</span></div>
         </div>
-        <div className="flex items-end justify-between mb-4"><div><p className="theme-muted text-xs font-semibold uppercase tracking-wide">KazNU Helper</p><h1 className="text-2xl font-bold text-white mt-1">{t("notifications")}</h1></div><span className="notification-count">{unreadCount} {newMessagesLabel}</span></div>
+        <div className="flex-1 min-h-0 overflow-y-auto px-4 pt-3 pb-28 animate-slide-up">
         <div className="space-y-2.5">
           {NOTIFICATIONS.map((item) => {
             const isRead = readIds.includes(item.id);

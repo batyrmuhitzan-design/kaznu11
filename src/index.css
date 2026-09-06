@@ -11,12 +11,24 @@ body,
 
 :root {
   color-scheme: dark;
+  /* iOS 安全区：灵动岛/刘海/Home 指示条/横屏圆角 */
+  --sat: env(safe-area-inset-top, 0px);
+  --sab: env(safe-area-inset-bottom, 0px);
+  --sal: env(safe-area-inset-left, 0px);
+  --sar: env(safe-area-inset-right, 0px);
   --app-bg: #000;
   --app-text: #f5f5f7;
   --app-muted: rgba(235,235,245,0.55);
   --glass-bg: rgba(28, 28, 30, 0.72);
   --glass-light-bg: rgba(44, 44, 46, 0.6);
   --tab-bg: rgba(18, 18, 18, 0.92);
+  /* 登录页字段/控件跟随深浅主题 */
+  --field-bg: rgba(255, 255, 255, 0.08);
+  --field-border: rgba(255, 255, 255, 0.14);
+  --seg-track: rgba(120, 120, 128, 0.16);
+  --seg-border: rgba(255, 255, 255, 0.08);
+  --seg-inactive: rgba(235, 235, 245, 0.68);
+  --seg-active-fg: #ffffff;
 }
 
 .light {
@@ -27,6 +39,13 @@ body,
   --glass-bg: rgba(255, 255, 255, 0.82);
   --glass-light-bg: rgba(255, 255, 255, 0.68);
   --tab-bg: rgba(255, 255, 255, 0.9);
+  /* 登录页字段/控件跟随深浅主题 */
+  --field-bg: rgba(120, 120, 128, 0.12);
+  --field-border: rgba(0, 0, 0, 0.14);
+  --seg-track: rgba(120, 120, 128, 0.18);
+  --seg-border: rgba(0, 0, 0, 0.10);
+  --seg-inactive: rgba(60, 60, 67, 0.72);
+  --seg-active-fg: #ffffff;
 }
 
 .app-surface { background: var(--app-bg); color: var(--app-text); }
@@ -56,7 +75,6 @@ body,
 .light [style*="0033A0"] .text-white { color: #fff !important; }
 .light .live-activity [style*="255, 255, 255"],
 .light [style*="0033A0"] [style*="255, 255, 255"] { color: rgba(255,255,255,0.8) !important; }
-.light .status-bar > svg { filter: invert(1); }
 
 .news-card { border-radius: 22px; border: 0; box-shadow: none; transition: transform 220ms cubic-bezier(0.16, 1, 0.3, 1), background-color 180ms ease, opacity 180ms ease; }
 .news-card:hover { transform: translateY(-1px); box-shadow: none; background-color: rgba(255,255,255,0.06); }
@@ -65,7 +83,7 @@ body,
 .light .news-card { background: rgba(255,255,255,0.78); border: 0; box-shadow: none; }
 .light .news-card:hover { box-shadow: none; background: rgba(255,255,255,0.95); }
 .light .news-card:active { background: rgba(0,0,0,0.05); }
-.news-body p { max-width: 62ch; }
+.news-body p { max-width: 62ch; white-space: pre-line; overflow-wrap: anywhere; }
 .interactive-card { text-align: left; transition: transform 180ms cubic-bezier(0.16, 1, 0.3, 1), background-color 180ms ease; }
 .interactive-card:active { transform: scale(0.985); }
 .notification-popover { animation: slide-up 180ms ease-out; }
@@ -108,7 +126,14 @@ button:focus-visible { outline: 2px solid rgba(0,122,255,0.8); outline-offset: 2
 .past-course-title { color: rgba(235,235,245,0.58); }
 .light .past-course { background: rgba(225,227,234,0.72); }
 .light .past-course-title { color: rgba(60,60,67,0.62); }
-.app-status-bar { height: calc(44px + env(safe-area-inset-top, 0px)); padding-top: max(12px, env(safe-area-inset-top, 0px)); }
+/* ===== 原生状态栏适配（不再渲染假状态栏 DOM）=====
+   状态栏悬浮在 WebView 上方（StatusBar overlaysWebView=true），
+   顶层 .app-root 用 env(safe-area-inset-top) 让出刘海/灵动岛高度，
+   保证各页面 Header（如 Good morning / Week 6）不与真实系统状态栏重叠。 */
+.app-root {
+  box-sizing: border-box;
+  padding-top: env(safe-area-inset-top, 0px);
+}
 
 button { position: relative; overflow: hidden; }
 button::after {
@@ -196,6 +221,49 @@ button:active::after { opacity: 0.85; animation: button-sweep 520ms cubic-bezier
   border-top: 0.5px solid rgba(255,255,255,0.1);
 }
 
+/* 刷新/操作提示（toast）：深浅主题都保证白字，淡入下滑更丝滑 */
+.toast-pop {
+  position: fixed;
+  left: 50%;
+  top: 20px;
+  z-index: 70;
+  padding: 10px 16px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #ffffff;
+  background: rgba(30, 30, 32, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  box-shadow: 0 6px 22px rgba(0, 0, 0, 0.28);
+  transform: translateX(-50%);
+  animation: toast-in 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+  pointer-events: none;
+}
+.light .toast-pop {
+  color: #1c1c1e !important;
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  box-shadow: 0 6px 22px rgba(0, 0, 0, 0.14);
+}
+@keyframes toast-in {
+  from { opacity: 0; transform: translateX(-50%) translateY(-10px) scale(0.94); }
+  to { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+}
+.toast-pop.toast-out { animation: toast-out 0.28s ease-in both; }
+@keyframes toast-out {
+  from { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+  to { opacity: 0; transform: translateX(-50%) translateY(-8px) scale(0.95); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .toast-pop { animation: none; }
+}
+
+/* 倒计时圆环：轨道与中间时间跟随深浅主题 */
+.ring-track { stroke: rgba(255, 255, 255, 0.12); }
+.light .ring-track { stroke: rgba(0, 0, 0, 0.15); }
+.ring-time { fill: #fff; }
+.light .ring-time { fill: #1c1c1e; }
+
 /* 导航键不要“一闪而过”的扫光特效，和其它普通按键保持一致 */
 .tab-bar button { overflow: visible; }
 .tab-bar button::after { content: none; }
@@ -280,3 +348,274 @@ button:active::after { opacity: 0.85; animation: button-sweep 520ms cubic-bezier
 }
 
 .course-seminar { background: rgba(255,159,10,0.12); border-left: 3px solid #FF9F0A; }
+/* ===== 全局主题切换过渡 ===== */
+
+
+
+/* 登录失败：整卡左右抖动 */
+.animate-shake {
+  animation: shake-x 480ms cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+}
+@keyframes shake-x {
+  10%, 90% { transform: translateX(-2px); }
+  20%, 80% { transform: translateX(5px); }
+  30%, 50%, 70% { transform: translateX(-8px); }
+  40%, 60% { transform: translateX(8px); }
+}
+
+/* 登录成功后整页退场 */
+.login-leave {
+  animation: login-out 420ms cubic-bezier(0.4, 0, 0.2, 1) both;
+  pointer-events: none;
+}
+@keyframes login-out {
+  from { opacity: 1; transform: scale(1); }
+  to { opacity: 0; transform: scale(1.045); }
+}
+/* 登录主按钮：深浅主题下都保持鲜明高对比 */
+.login-cta {
+  position: relative;
+  overflow: hidden;
+  color: #fff !important;
+  background: linear-gradient(135deg, #1a56db 0%, #0066ff 40%, #00a2ff 100%);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  box-shadow: 0 10px 26px rgba(0, 102, 255, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.18);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+}
+.light .login-cta {
+  border-color: rgba(0, 102, 255, 0.35);
+  box-shadow: 0 10px 26px rgba(0, 102, 255, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+}
+.login-cta::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.20) 0%, rgba(255, 255, 255, 0) 48%);
+}
+.login-cta:active {
+  transform: scale(0.985);
+  filter: brightness(1.08) saturate(1.1);
+}
+.login-cta:disabled {
+  opacity: 0.45;
+  box-shadow: none;
+}
+/* ===== App 式吸顶头部：内容下滚时顶部信息保持不动 ===== */
+.screen-pin {
+  position: sticky;
+  top: 0;
+  z-index: 45;
+  background: rgba(9, 9, 13, 0.96);
+  padding-top: 8px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+.light .screen-pin {
+  background: rgba(246, 246, 250, 0.97);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.09);
+}
+/* ===== 更像原生 App：滚动不带动浏览器、不选中文本 ===== */
+html,
+body {
+  overscroll-behavior: none;
+}
+.app-surface {
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
+  scroll-behavior: smooth;
+}
+#root,
+#root button,
+#root label {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+input,
+textarea {
+  -webkit-user-select: text;
+  user-select: text;
+}
+/* 全局按钮手感：轻按回弹 + 微调亮度（iOS 弹簧感） */
+.haptic-action {
+  transition:
+    scale 160ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    transform 160ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    color 140ms ease,
+    background-color 140ms ease,
+    border-color 140ms ease,
+    opacity 140ms ease,
+    box-shadow 140ms ease,
+    filter 140ms ease;
+}
+.haptic-action:active {
+  scale: 0.965;
+  filter: brightness(0.95) saturate(1.04);
+}
+/* 所有原生按钮统一 iOS 按压反馈（头像同款） */
+button:not(:disabled) {
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    scale 160ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    transform 160ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    color 140ms ease,
+    background-color 140ms ease,
+    border-color 140ms ease,
+    opacity 140ms ease,
+    filter 140ms ease;
+}
+button:not(:disabled):active {
+  scale: 0.97;
+  filter: brightness(0.95) saturate(1.04);
+}
+/* GPA 数字：从内部放大浮出的入场动画 */
+.gpa-grow {
+  animation: gpa-grow 900ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+@keyframes gpa-grow {
+  0% { opacity: 0; transform: scale(0.7); }
+  60% { opacity: 1; transform: scale(1.04); }
+  100% { opacity: 1; transform: scale(1); }
+}
+/* ===== Capacitor / iOS 原生适配 ===== */
+html {
+  -webkit-text-size-adjust: 100%;
+}
+.tab-bar {
+  box-sizing: border-box;
+  padding-bottom: max(18px, var(--sab));
+  padding-left: max(12px, var(--sal));
+  padding-right: max(12px, var(--sar));
+  min-height: calc(58px + max(18px, var(--sab)));
+}
+
+/* iPhone 8 / SE 等小屏 (375×667)：收紧字号与间距，避免溢出 */
+@media (max-width: 390px), (max-height: 700px) {
+  .text-5xl { font-size: 2.5rem; }
+  .text-3xl { font-size: 1.55rem; }
+  .text-2xl { font-size: 1.3rem; }
+  .screen-pin { padding-top: 6px; padding-bottom: 10px; }
+  .tab-bar { padding-bottom: max(14px, var(--sab)); }
+}
+
+/* 更小的屏（如 320px 老机型）：卡片内边距再收紧 */
+@media (max-width: 360px) {
+  .glass.squircle-lg.p-5 { padding: 1rem; }
+  .app-surface { font-size: 15px; }
+}
+
+
+/* ===== Toast 轻提示 ===== */
+.toast-viewport {
+  position: fixed;
+  top: calc(env(safe-area-inset-top, 0px) + 14px);
+  left: 0;
+  right: 0;
+  z-index: 9000;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 0 20px;
+  pointer-events: none;
+}
+.toast-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 360px;
+  padding: 10px 14px;
+  border-radius: 14px;
+  background: rgba(28, 28, 30, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #f5f5f7;
+  font-size: 13px;
+  font-weight: 600;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.35);
+  animation: toast-in 220ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+}
+.light .toast-item {
+  background: rgba(255, 255, 255, 0.94);
+  color: #1c1c1e;
+  border-color: rgba(0, 0, 0, 0.08);
+}
+.toast-icon {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 800;
+  flex-shrink: 0;
+}
+.toast-text { line-height: 1.35; }
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(-8px) scale(0.96); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* ===== Dev Simulation Console ===== */
+.dev-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 8000;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  animation: fade-in 180ms ease both;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+.dev-sheet {
+  width: 100%;
+  max-width: 430px;
+  margin: 0 auto;
+  padding: 18px 18px calc(env(safe-area-inset-bottom, 0px) + 18px);
+  border-radius: 24px 24px 0 0;
+  background: rgba(22, 22, 26, 0.98);
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 -18px 48px rgba(0, 0, 0, 0.45);
+  animation: sheet-up 260ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  max-height: 82vh;
+}
+.light .dev-sheet {
+  background: rgba(246, 246, 250, 0.98);
+  border-top-color: rgba(0, 0, 0, 0.1);
+}
+@keyframes sheet-up {
+  from { transform: translateY(40px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* ===== 更新弹窗（可选 / 强制） ===== */
+.update-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 9500;
+  background: rgba(0, 0, 0, 0.62);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  animation: fade-in 200ms ease both;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+.update-card {
+  animation: toast-in 240ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  background: rgba(28, 28, 30, 0.96);
+}
+.light .update-card {
+  background: rgba(255, 255, 255, 0.98);
+}
