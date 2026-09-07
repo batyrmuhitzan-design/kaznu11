@@ -13,6 +13,7 @@ import {
   shareNativeFile,
   downloadBase64OnWeb,
 } from "../native/fileExport";
+import { trf } from "../utils/locale";
 
 type DocFormat = "PDF" | "PPT" | "DOC" | "XLS" | "ZIP";
 
@@ -162,7 +163,15 @@ export default function Materials() {
         next.delete(fileId);
         return next;
       });
-      toast.push(file ? `《${file.name}》已从本地移除` : "Removed", "info");
+      toast.push(
+        file
+          ? trf(
+              { en: "Removed from this iPhone: {name}", kz: "{name} құрылғыдан жойылды", ru: "{name} удалён с устройства" },
+              { name: file.name },
+            )
+          : "Removed",
+        "info",
+      );
       return;
     }
     if (active) return; // 同一时间只处理一个下载
@@ -195,7 +204,17 @@ export default function Materials() {
         setActive(null);
         setSaved((prev) => new Set(prev).add(fileId));
         void hapticSuccess();
-        toast.push(`《${file.name}》已保存到本机 ${APP_DOCS_FOLDER}`, "success");
+        toast.push(
+          trf(
+            {
+              en: `Saved on this iPhone · KazNU Helper/Downloads`,
+              kz: `Мына iPhone-ға сақталды · KazNU Helper/Downloads`,
+              ru: `Сохранено на этом iPhone · KazNU Helper/Downloads`,
+            },
+            { name: file.name },
+          ),
+          "success",
+        );
 
         // 3) 原生 Action Sheet：在“文件”中查看 / 发送分享（不再只弹 Toast）
         const choice = await askAfterSave(fileName);
@@ -210,7 +229,17 @@ export default function Materials() {
             /* 用户取消系统分享，文件仍保留在本机 */
           }
         } else if (choice === "view") {
-          toast.push("已保存到 文件 App → 我的 iPhone → KazNU Helper", "success");
+          toast.push(
+            trf(
+              {
+                en: "Saved · Files app → On My iPhone → KazNU Helper",
+                kz: "Сақталды · Файлдар → Менің iPhone-ым → KazNU Helper",
+                ru: "Сохранено · Файлы → На моём iPhone → KazNU Helper",
+              },
+              { name: file.name },
+            ),
+            "success",
+          );
         }
         return;
       }
@@ -222,11 +251,29 @@ export default function Materials() {
       setActive(null);
       setSaved((prev) => new Set(prev).add(fileId));
       void hapticSuccess();
-      toast.push(`《${file.name}》已生成并开始下载`, "success");
+      toast.push(
+        trf(
+          {
+            en: "Download started: {name}",
+            kz: "Жүктеу басталды: {name}",
+            ru: "Скачивание началось: {name}",
+          },
+          { name: file.name },
+        ),
+        "success",
+      );
     } catch {
       setActive(null);
       void hapticError();
-      toast.push(file ? `《${file.name}》下载失败，请重试` : "Download failed", "error");
+      toast.push(
+        file
+          ? trf(
+              { en: "Could not download: {name}. Try again.", kz: "{name} жүктелмеді. Қайталаңыз.", ru: "Не удалось скачать: {name}. Попробуйте ещё раз." },
+              { name: file.name },
+            )
+          : "Download failed",
+        "error",
+      );
     }
   };
 

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useI18n, type AllTranslationKey } from "../contexts/LanguageContext";
 import { motorHaptic, triggerHaptic } from "../utils/haptics";
 import ServiceDetail, { type ServiceId } from "./ServiceDetail";
+import SwipeBack from "../components/SwipeBack";
 
 interface ServiceEntry {
   id?: ServiceId;
@@ -201,7 +202,11 @@ export default function Services() {
   ];
 
   if (activeService) {
-    return <ServiceDetail id={activeService} onBack={() => setActiveService(null)} />;
+    return (
+      <SwipeBack onBack={() => setActiveService(null)}>
+        <ServiceDetail id={activeService} onBack={() => setActiveService(null)} />
+      </SwipeBack>
+    );
   }
 
   return (

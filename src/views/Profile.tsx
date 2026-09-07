@@ -3,6 +3,7 @@ import ThemeSwitcher from "../components/ThemeSwitcher";
 import { useLanguage, useI18n, type Language } from "../contexts/LanguageContext";
 import { clearSession } from "../utils/session";
 import { applyCourseAlertsPreference } from "../services/CourseReminderService";
+import SwipeBack from "../components/SwipeBack";
 import { screenFadeOut } from "../utils/screenFade";
 import { APP_VERSION } from "../utils/update";
 
@@ -77,8 +78,20 @@ function Settings({ onBack }: { onBack: () => void }) {
               className="haptic-action theme-row w-full flex items-center justify-between px-4 py-4 text-left"
             >
               <div>
-                <span className="text-sm font-semibold text-white">⏰ 上课与成绩提醒 · Class &amp; grades</span>
-                <p className="theme-muted text-xs mt-0.5">T-60 / T-30 / T-0 reminders · always on by default</p>
+                <span className="text-sm font-semibold text-white">
+                  {language === "KZ"
+                    ? "⏰ Сабақ пен бағалар туралы ескертулер"
+                    : language === "RU"
+                      ? "⏰ Напоминания о занятиях и оценках"
+                      : "⏰ Class & grade alerts"}
+                </span>
+                <p className="theme-muted text-xs mt-0.5">
+                  {language === "KZ"
+                    ? "T-60 / T-30 / T-0 ескертулер · әдепкі бойынша қосулы"
+                    : language === "RU"
+                      ? "Напоминания T-60 / T-30 / T-0 · включено по умолчанию"
+                      : "T-60 / T-30 / T-0 reminders · always on by default"}
+                </p>
               </div>
               <span className={`text-xs ${classAlerts ? "text-green-500" : "theme-muted"}`}>{classAlerts ? t("enabled") : t("muted")}</span>
             </button>
@@ -121,7 +134,14 @@ function Settings({ onBack }: { onBack: () => void }) {
 
 function About({ onBack }: { onBack: () => void }) {
   const t = useI18n();
+  const { language } = useLanguage();
   const [openPolicy, setOpenPolicy] = useState<number | null>(null);
+
+  const policyTitles: Record<string, string[]> = {
+    EN: ["Disclaimer", "Privacy notice", "Terms of use", "No official affiliation"],
+    KZ: ["Жауапкершіліктен бас тарту", "Құпиялылық туралы хабарлама", "Пайдалану шарттары", "Ресми қатысы жоқ"],
+    RU: ["Дисклеймер", "Уведомление о конфиденциальности", "Условия использования", "Не является официальным"],
+  };
 
   const policies: Array<{ title: string; body: string }> = [
     {
@@ -174,10 +194,17 @@ function About({ onBack }: { onBack: () => void }) {
                   onClick={() => setOpenPolicy(open ? null : index)}
                   className="haptic-action theme-row w-full flex items-center justify-between px-4 py-3.5 text-left"
                 >
-                  <span className="text-sm font-semibold text-white">{policy.title}</span>
+                  <span className="text-sm font-semibold text-white">{policyTitles[language][index]}</span>
                   <Chevron />
                 </button>
-                {open && <p className="theme-secondary text-xs leading-relaxed px-4 pb-4">{policy.body}</p>}
+                {open && (
+                  <>
+                    <p className="theme-secondary text-xs leading-relaxed px-4 pb-4">{policy.body}</p>
+                    <p className="theme-muted text-[10px] px-4 pb-4">
+                      {language === "KZ" ? "Толық мәтін: LEGAL.md (EN · KZ · RU)" : language === "RU" ? "Полный текст: LEGAL.md (EN · KZ · RU)" : "Full text: LEGAL.md (EN · KZ · RU)"}
+                    </p>
+                  </>
+                )}
               </div>
             );
           })}
@@ -191,8 +218,8 @@ export default function Profile({ onBack }: ProfileProps) {
   const [subpage, setSubpage] = useState<"profile" | "settings" | "about">("profile");
   const t = useI18n();
 
-  if (subpage === "settings") return <Settings onBack={() => setSubpage("profile")} />;
-  if (subpage === "about") return <About onBack={() => setSubpage("profile")} />;
+  if (subpage === "settings") return <SwipeBack onBack={() => setSubpage("profile")}><Settings onBack={() => setSubpage("profile")} /></SwipeBack>;
+  if (subpage === "about") return <SwipeBack onBack={() => setSubpage("profile")}><About onBack={() => setSubpage("profile")} /></SwipeBack>;
 
   return (
     <div className="app-surface h-full overflow-y-auto">

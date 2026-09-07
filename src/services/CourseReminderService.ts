@@ -23,6 +23,7 @@ import {
   initialsOfCourse,
   type LiveActivityControl,
 } from "../native/liveActivity";
+import { tr, trf } from "../utils/locale";
 
 export interface CourseReminderLesson {
   /** 课程唯一 key（如 la / c1） */
@@ -49,7 +50,10 @@ const REMINDER_ID_SPAN = 10_000;
 /** Live Activity 持久化 key：记录当前已经启动的倒计时，避免重复启动/漏结束 */
 const LA_STORAGE_KEY = "kaznu:liveActivity";
 
-const NAVIGATION = { label: "Open Schedule", url: "kaznuhelper://schedule" };
+const NAVIGATION_URL = "kaznuhelper://schedule";
+function navigationPayload(): { label: string; url: string } {
+  return { label: tr("Open Schedule", "Кестені ашу", "Открыть расписание"), url: NAVIGATION_URL };
+}
 
 /** 上课提醒通知 Category（Interactive Notifications）。 */
 const CLASS_REMINDER_CATEGORY = "KZNU_CLASS_REMINDER";
@@ -173,19 +177,46 @@ export async function scheduleUpcomingClassReminders(
   const notifications: LocalNotificationSchema[] = [];
   for (const lesson of lessons) {
     const startAt = nextOccurrence(lesson.weekday, lesson.startH, lesson.startM, now);
-    const roomLabel = lesson.room ? `[${lesson.room}]` : "";
     const candidates: Array<{ marker: "t60" | "t0"; at: Date; title: string; body: string }> = [
       {
         marker: "t60",
         at: new Date(startAt.getTime() - HOUR_MS),
-        title: `⏰ 1小时后有课：《${lesson.name}》`,
-        body: `${roomLabel} · 提前 1 小时提醒`,
+        title: trf(
+          {
+            en: "⏰ Class in 1 hour: {name}",
+            kz: "⏰ 1 сағаттан кейін сабақ: {name}",
+            ru: "⏰ Через 1 час занятие: {name}",
+          },
+          { name: lesson.name },
+        ),
+        body: trf(
+          {
+            en: "{room} · reminder 1 hour before",
+            kz: "{room} · сабаққа 1 сағат қалды",
+            ru: "{room} · напоминание за 1 час",
+          },
+          { room: lesson.room ?? "—" },
+        ),
       },
       {
         marker: "t0",
         at: startAt,
-        title: `🔔 上课提醒：《${lesson.name}》`,
-        body: `${roomLabel} · 现在开始上课`,
+        title: trf(
+          {
+            en: "🔔 Class starting: {name}",
+            kz: "🔔 Сабақ басталады: {name}",
+            ru: "🔔 Занятие начинается: {name}",
+          },
+          { name: lesson.name },
+        ),
+        body: trf(
+          {
+            en: "{room} · now",
+            kz: "{room} · қазір",
+            ru: "{room} · сейчас",
+          },
+          { room: lesson.room ?? "—" },
+        ),
       },
     ];
     for (const c of candidates) {
@@ -294,7 +325,7 @@ function dispatchCourseControl(
     total: totalSeconds,
     kind: "pre-class",
     statusLabel: minutesLeft > 0 ? `Starts in ${minutesLeft} min` : "Now",
-    navigation: NAVIGATION,
+    navigation: navigationPayload(),
   });
   syncLiveActivity(payload);
 }
@@ -380,7 +411,7 @@ export function startCourseLiveActivityInClass(lesson: CourseReminderLesson, now
     total: totalSeconds,
     kind: "in-class",
     statusLabel: minutesLeft > 0 ? `Ends in ${minutesLeft} min` : "Class ending",
-    navigation: NAVIGATION,
+    navigation: navigationPayload(),
   });
   syncLiveActivity(payload);
   writeActive({
@@ -491,7 +522,7 @@ async function ensureClassReminderActionsRegistered(): Promise<void> {
           actions: [
             {
               id: CLASS_REMINDER_ACTION_ID,
-              title: "开启灵动岛 / Start Live Activity",
+              title: tr("Start Live Activity", "Live Activity қосу", "Запустить Live Activity"),
               // iOS：按下按钮就回到 App 前台处理，从而立刻调用原生启动
               foreground: true,
             },

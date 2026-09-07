@@ -15,6 +15,7 @@ import { syncNativeStatusBar } from "./native/statusBar";
 import { attachHapticDelegate } from "./utils/haptics";
 import UpdateDialog, { type UpdateDialogKind } from "./components/UpdateDialog";
 import { DevPanel } from "./components/DevPanel";
+import SwipeBack from "./components/SwipeBack";
 import { SIM_UPDATE_EVENT, useDevSim } from "./contexts/DevSimContext";
 import { installQuickActionListener, type QuickActionTarget } from "./native/quickActions";
 import { APP_VERSION, classifyUpdate, fetchUpdateInfo, isOptionalSkipped, skipOptional, type UpdateInfo } from "./utils/update";
@@ -180,14 +181,30 @@ export default function App() {
       {/* Main Content */}
       <div className="flex-1 overflow-hidden relative">
         {activeTab === "dashboard" && <Dashboard onOpenProfile={() => setActiveTab("profile")} onNavigate={setActiveTab} />}
-        {activeTab === "notifications" && <Notifications onBack={() => setActiveTab("dashboard")} onNavigate={setActiveTab} />}
-        {activeTab === "grades" && <Grades onBack={() => setActiveTab("dashboard")} />}
+        {activeTab === "notifications" && (
+          <SwipeBack onBack={() => setActiveTab("dashboard")}>
+            <Notifications onBack={() => setActiveTab("dashboard")} onNavigate={setActiveTab} />
+          </SwipeBack>
+        )}
+        {activeTab === "grades" && (
+          <SwipeBack onBack={() => setActiveTab("dashboard")}>
+            <Grades onBack={() => setActiveTab("dashboard")} />
+          </SwipeBack>
+        )}
         {activeTab === "materials" && <Materials />}
         {activeTab === "schedule" && <Schedule />}
         {activeTab === "services" && <Services />}
-        {activeTab === "profile" && <Profile onBack={() => setActiveTab("dashboard")} />}
+        {activeTab === "profile" && (
+          <SwipeBack onBack={() => setActiveTab("dashboard")}>
+            <Profile onBack={() => setActiveTab("dashboard")} />
+          </SwipeBack>
+        )}
         {activeTab === "news" && <News onOpenDetail={(item) => { setSelectedNews(item); setActiveTab("news-detail"); }} />}
-        {activeTab === "news-detail" && selectedNews && <NewsDetail item={selectedNews} onBack={() => setActiveTab("news")} />}
+        {activeTab === "news-detail" && selectedNews && (
+          <SwipeBack onBack={() => setActiveTab("news")}>
+            <NewsDetail item={selectedNews} onBack={() => setActiveTab("news")} />
+          </SwipeBack>
+        )}
       </div>
 
       {/* Tab Bar */}

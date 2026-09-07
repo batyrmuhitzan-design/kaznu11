@@ -12,6 +12,7 @@ import { Filesystem, Directory } from "@capacitor/filesystem";
 import { Share } from "@capacitor/share";
 import { ActionSheet, ActionSheetButtonStyle } from "@capacitor/action-sheet";
 import { jsPDF } from "jspdf";
+import { tr, trf } from "../utils/locale";
 
 export const isNative = () => Capacitor.isNativePlatform();
 
@@ -363,12 +364,16 @@ export type AfterSaveChoice = "view" | "share" | "dismiss";
 export async function askAfterSave(fileName: string): Promise<AfterSaveChoice> {
   if (!isNative()) return "dismiss";
   const result = await ActionSheet.showActions({
-    title: `${fileName} 已完成`,
-    message: "已保存到本地：文件 App → 我的 iPhone → KazNU Helper → Downloads",
+    title: trf({ en: "{name} is ready", kz: "{name} дайын", ru: "{name} готов" }, { name: fileName }),
+    message: tr(
+      "Saved locally · Files → On My iPhone → KazNU Helper → Downloads",
+      "Жергілікті сақталды · Файлдар → Менің iPhone-ым → KazNU Helper → Downloads",
+      "Сохранено локально · Файлы → На моём iPhone → KazNU Helper → Downloads",
+    ),
     options: [
-      { title: "在“文件”中查看", style: ActionSheetButtonStyle.Default },
-      { title: "发送 / 分享…", style: ActionSheetButtonStyle.Default },
-      { title: "取消", style: ActionSheetButtonStyle.Cancel },
+      { title: tr("View in Files", "Файлдарда қарау", "Открыть в «Файлах»"), style: ActionSheetButtonStyle.Default },
+      { title: tr("Send / Share…", "Жіберу / Бөлісу…", "Отправить / Поделиться…"), style: ActionSheetButtonStyle.Default },
+      { title: tr("Cancel", "Болдырмау", "Отмена"), style: ActionSheetButtonStyle.Cancel },
     ],
   });
   if (result.canceled || result.index < 0) return "dismiss";
