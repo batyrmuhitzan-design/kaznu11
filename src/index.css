@@ -611,3 +611,38 @@ html {
 .light .update-card {
   background: rgba(255, 255, 255, 0.98);
 }
+
+/* ===== Legal / About 条款卡片：深色与浅色下均保持高对比（v1.2.2） ===== */
+.legal-card {
+  background: rgba(28, 28, 30, 0.98);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  color: #ffffff;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.18);
+}
+.legal-card .lm-title {
+  color: #ffffff;
+}
+.legal-card .lm-sub {
+  color: rgba(235, 235, 245, 0.7);
+}
+.legal-card svg {
+  color: rgba(255, 255, 255, 0.92);
+}
+.legal-card svg path {
+  stroke: currentColor;
+}
+.light .legal-card {
+  background: rgba(255, 255, 255, 0.98);
+  border: 1px solid rgba(0, 0, 0, 0.14);
+  color: #111827;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.08);
+}
+.light .legal-card .lm-title {
+  color: #111827;
+}
+.light .legal-card .lm-sub {
+  color: #6b7280;
+}
+.light .legal-card svg {
+  color: #111827;
+}

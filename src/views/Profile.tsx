@@ -5,6 +5,7 @@ import { clearSession } from "../utils/session";
 import { applyCourseAlertsPreference } from "../services/CourseReminderService";
 import SwipeBack from "../components/SwipeBack";
 import LegalModal from "../components/LegalModal";
+import { openLegalPdf } from "../native/legalPdf";
 import { screenFadeOut } from "../utils/screenFade";
 import { APP_VERSION } from "../utils/update";
 
@@ -189,26 +190,26 @@ function About({ onBack }: { onBack: () => void }) {
         <button
           type="button"
           onClick={() => setShowLegalTerms(true)}
-          className="haptic-action glass squircle-md w-full flex items-center justify-between px-4 py-3.5 text-left"
+          className="haptic-action glass squircle-md legal-card w-full flex items-center justify-between px-4 py-3.5 text-left"
         >
           <div>
-            <p className="text-sm font-semibold text-white">
+            <p className="lm-title text-sm font-semibold">
               {language === "KZ" ? "Құқықтық ақпарат" : language === "RU" ? "Правовая информация" : "Terms of Service & Privacy Policy"}
             </p>
-            <p className="theme-muted text-[11px] mt-0.5">KK · EN · RU</p>
+            <p className="lm-sub text-[11px] mt-0.5">KK · EN · RU</p>
           </div>
           <Chevron />
         </button>
         <button
           type="button"
-          onClick={() => window.open("/KazNU_Helper_Legal_Notice_3Lang.pdf", "_blank")}
-          className="haptic-action glass squircle-md w-full flex items-center justify-between px-4 py-3.5 text-left"
+          onClick={() => { void openLegalPdf(); }}
+          className="haptic-action glass squircle-md legal-card w-full flex items-center justify-between px-4 py-3.5 text-left"
         >
           <div>
-            <p className="text-sm font-semibold text-white">
+            <p className="lm-title text-sm font-semibold">
               {language === "KZ" ? "📄 Толық PDF ашу" : language === "RU" ? "📄 Открыть полный PDF" : "📄 Open Full PDF Legal Notice"}
             </p>
-            <p className="theme-muted text-[11px] mt-0.5">KK · EN · RU · PDF</p>
+            <p className="lm-sub text-[11px] mt-0.5">KK · EN · RU · PDF</p>
           </div>
           <Chevron />
         </button>
