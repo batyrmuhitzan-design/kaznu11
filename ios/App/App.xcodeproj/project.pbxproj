@@ -16,6 +16,14 @@
 		504EC3121FED79650016851F /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 504EC3101FED79650016851F /* LaunchScreen.storyboard */; };
 		50B271D11FEDC1A000F3C39B /* public in Resources */ = {isa = PBXBuildFile; fileRef = 50B271D01FEDC1A000F3C39B /* public */; };
 		9582B6832FE993A70072D4E8 /* SceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9582B6822FE993A50072D4E8 /* SceneDelegate.swift */; };
+		9A0000000000000000000011 /* KaznuBridgeViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A0000000000000000000001 /* KaznuBridgeViewController.swift */; };
+		9A0000000000000000000012 /* TimetableActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A0000000000000000000002 /* TimetableActivityAttributes.swift */; };
+		9A0000000000000000000013 /* TimetableLiveActivityController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A0000000000000000000003 /* TimetableLiveActivityController.swift */; };
+		9A0000000000000000000014 /* BackgroundReminderScheduler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A0000000000000000000004 /* BackgroundReminderScheduler.swift */; };
+		9A0000000000000000000015 /* TimetableActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A0000000000000000000005 /* TimetableActivityAttributes.swift */; };
+		9A0000000000000000000016 /* TimetableLiveActivityWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A0000000000000000000006 /* TimetableLiveActivityWidget.swift */; };
+		9A0000000000000000000017 /* TimetableLiveActivityViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A0000000000000000000007 /* TimetableLiveActivityViews.swift */; };
+		9A0000000000000000000018 /* KazNUHelperWidget.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = 9A0000000000000000000009 /* KazNUHelperWidget.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -29,6 +37,15 @@
 		504EC3131FED79650016851F /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		50B271D01FEDC1A000F3C39B /* public */ = {isa = PBXFileReference; lastKnownFileType = folder; path = public; sourceTree = "<group>"; };
 		9582B6822FE993A50072D4E8 /* SceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneDelegate.swift; sourceTree = "<group>"; };
+		9A0000000000000000000001 /* KaznuBridgeViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KaznuBridgeViewController.swift; sourceTree = "<group>"; };
+		9A0000000000000000000002 /* TimetableActivityAttributes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimetableActivityAttributes.swift; sourceTree = "<group>"; };
+		9A0000000000000000000003 /* TimetableLiveActivityController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimetableLiveActivityController.swift; sourceTree = "<group>"; };
+		9A0000000000000000000004 /* BackgroundReminderScheduler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackgroundReminderScheduler.swift; sourceTree = "<group>"; };
+		9A0000000000000000000005 /* TimetableActivityAttributes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimetableActivityAttributes.swift; sourceTree = "<group>"; };
+		9A0000000000000000000006 /* TimetableLiveActivityWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimetableLiveActivityWidget.swift; sourceTree = "<group>"; };
+		9A0000000000000000000007 /* TimetableLiveActivityViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimetableLiveActivityViews.swift; sourceTree = "<group>"; };
+		9A0000000000000000000008 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		9A0000000000000000000009 /* KazNUHelperWidget.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = KazNUHelperWidget.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		958DCC722DB07C7200EA8C5F /* debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = debug.xcconfig; path = ../debug.xcconfig; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
@@ -41,6 +58,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		9A00000000000000000000A3 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -49,6 +73,7 @@
 			children = (
 				958DCC722DB07C7200EA8C5F /* debug.xcconfig */,
 				504EC3061FED79650016851F /* App */,
+				9A00000000000000000000A0 /* KazNUHelperWidget */,
 				504EC3051FED79650016851F /* Products */,
 			);
 			sourceTree = "<group>";
@@ -57,6 +82,7 @@
 			isa = PBXGroup;
 			children = (
 				504EC3041FED79650016851F /* App.app */,
+				9A0000000000000000000009 /* KazNUHelperWidget.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -67,6 +93,10 @@
 				9582B6822FE993A50072D4E8 /* SceneDelegate.swift */,
 				50379B222058CBB4000EE86E /* capacitor.config.json */,
 				504EC3071FED79650016851F /* AppDelegate.swift */,
+				9A0000000000000000000001 /* KaznuBridgeViewController.swift */,
+				9A0000000000000000000002 /* TimetableActivityAttributes.swift */,
+				9A0000000000000000000003 /* TimetableLiveActivityController.swift */,
+				9A0000000000000000000004 /* BackgroundReminderScheduler.swift */,
 				504EC30B1FED79650016851F /* Main.storyboard */,
 				504EC30E1FED79650016851F /* Assets.xcassets */,
 				504EC3101FED79650016851F /* LaunchScreen.storyboard */,
@@ -75,6 +105,17 @@
 				50B271D01FEDC1A000F3C39B /* public */,
 			);
 			path = App;
+			sourceTree = "<group>";
+		};
+		9A00000000000000000000A0 /* KazNUHelperWidget */ = {
+			isa = PBXGroup;
+			children = (
+				9A0000000000000000000005 /* TimetableActivityAttributes.swift */,
+				9A0000000000000000000006 /* TimetableLiveActivityWidget.swift */,
+				9A0000000000000000000007 /* TimetableLiveActivityViews.swift */,
+				9A0000000000000000000008 /* Info.plist */,
+			);
+			path = KazNUHelperWidget;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -87,10 +128,12 @@
 				504EC3001FED79650016851F /* Sources */,
 				504EC3011FED79650016851F /* Frameworks */,
 				504EC3021FED79650016851F /* Resources */,
+				9A00000000000000000000A7 /* Embed App Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				9A00000000000000000000A6 /* PBXTargetDependency */,
 			);
 			name = App;
 			packageProductDependencies = (
@@ -99,6 +142,22 @@
 			productName = App;
 			productReference = 504EC3041FED79650016851F /* App.app */;
 			productType = "com.apple.product-type.application";
+		};
+		9A00000000000000000000A1 /* KazNUHelperWidget */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 9A00000000000000000000A9 /* Build configuration list for PBXNativeTarget "KazNUHelperWidget" */;
+			buildPhases = (
+				9A00000000000000000000A2 /* Sources */,
+				9A00000000000000000000A3 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = KazNUHelperWidget;
+			productName = KazNUHelperWidget;
+			productReference = 9A0000000000000000000009 /* KazNUHelperWidget.appex */;
+			productType = "com.apple.product-type.app-extension";
 		};
 /* End PBXNativeTarget section */
 
@@ -112,6 +171,10 @@
 					504EC3031FED79650016851F = {
 						CreatedOnToolsVersion = 9.2;
 						LastSwiftMigration = 1100;
+						ProvisioningStyle = Automatic;
+					};
+					9A00000000000000000000A1 = {
+						CreatedOnToolsVersion = 15.0;
 						ProvisioningStyle = Automatic;
 					};
 				};
@@ -133,9 +196,28 @@
 			projectRoot = "";
 			targets = (
 				504EC3031FED79650016851F /* App */,
+				9A00000000000000000000A1 /* KazNUHelperWidget */,
 			);
 		};
 /* End PBXProject section */
+
+/* Begin PBXContainerItemProxy section */
+		9A00000000000000000000A5 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 504EC2FC1FED79650016851F /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 9A00000000000000000000A1;
+			remoteInfo = KazNUHelperWidget;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXTargetDependency section */
+		9A00000000000000000000A6 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 9A00000000000000000000A1 /* KazNUHelperWidget */;
+			targetProxy = 9A00000000000000000000A5 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin PBXResourcesBuildPhase section */
 		504EC3021FED79650016851F /* Resources */ = {
@@ -153,6 +235,20 @@
 		};
 /* End PBXResourcesBuildPhase section */
 
+/* Begin PBXCopyFilesBuildPhase section */
+		9A00000000000000000000A7 /* Embed App Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				9A0000000000000000000018 /* KazNUHelperWidget.appex in Embed App Extensions */,
+			);
+			name = "Embed App Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXSourcesBuildPhase section */
 		504EC3001FED79650016851F /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
@@ -160,6 +256,20 @@
 			files = (
 				504EC3081FED79650016851F /* AppDelegate.swift in Sources */,
 				9582B6832FE993A70072D4E8 /* SceneDelegate.swift in Sources */,
+				9A0000000000000000000011 /* KaznuBridgeViewController.swift in Sources */,
+				9A0000000000000000000012 /* TimetableActivityAttributes.swift in Sources */,
+				9A0000000000000000000013 /* TimetableLiveActivityController.swift in Sources */,
+				9A0000000000000000000014 /* BackgroundReminderScheduler.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		9A00000000000000000000A2 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				9A0000000000000000000015 /* TimetableActivityAttributes.swift in Sources */,
+				9A0000000000000000000016 /* TimetableLiveActivityWidget.swift in Sources */,
+				9A0000000000000000000017 /* TimetableLiveActivityViews.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -338,6 +448,54 @@
 			};
 			name = Release;
 		};
+		9A00000000000000000000AA /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+			APPLICATION_EXTENSION_API_ONLY = YES;
+			CODE_SIGN_STYLE = Automatic;
+			CURRENT_PROJECT_VERSION = 2;
+			GENERATE_INFOPLIST_FILE = NO;
+			INFOPLIST_FILE = KazNUHelperWidget/Info.plist;
+			IPHONEOS_DEPLOYMENT_TARGET = 16.2;
+			LD_RUNPATH_SEARCH_PATHS = (
+				"$(inherited)",
+				"@executable_path/Frameworks",
+				"@executable_path/../../Frameworks",
+			);
+			MARKETING_VERSION = 1.2.0;
+			PRODUCT_BUNDLE_IDENTIFIER = com.kaznu.helper.widget;
+			PRODUCT_NAME = "$(TARGET_NAME)";
+			SKIP_INSTALL = YES;
+			SWIFT_EMIT_LOC_STRINGS = YES;
+			SWIFT_VERSION = 5.0;
+			TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		9A00000000000000000000AB /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+			APPLICATION_EXTENSION_API_ONLY = YES;
+			CODE_SIGN_STYLE = Automatic;
+			CURRENT_PROJECT_VERSION = 2;
+			GENERATE_INFOPLIST_FILE = NO;
+			INFOPLIST_FILE = KazNUHelperWidget/Info.plist;
+			IPHONEOS_DEPLOYMENT_TARGET = 16.2;
+			LD_RUNPATH_SEARCH_PATHS = (
+				"$(inherited)",
+				"@executable_path/Frameworks",
+				"@executable_path/../../Frameworks",
+			);
+			MARKETING_VERSION = 1.2.0;
+			PRODUCT_BUNDLE_IDENTIFIER = com.kaznu.helper.widget;
+			PRODUCT_NAME = "$(TARGET_NAME)";
+			SKIP_INSTALL = YES;
+			SWIFT_EMIT_LOC_STRINGS = YES;
+			SWIFT_VERSION = 5.0;
+			TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -355,6 +513,15 @@
 			buildConfigurations = (
 				504EC3171FED79650016851F /* Debug */,
 				504EC3181FED79650016851F /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		9A00000000000000000000A9 /* Build configuration list for PBXNativeTarget "KazNUHelperWidget" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				9A00000000000000000000AA /* Debug */,
+				9A00000000000000000000AB /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
