@@ -297,9 +297,15 @@ button { position: relative; }
 .course-lab { background: rgba(48,209,88,0.12); border-left: 3px solid #30D158; }
 .course-exam { background: rgba(255,69,58,0.12); border-left: 3px solid #FF453A; }
 
-/* 主题自适应的量尺轨道 */
-.meter-track { background: rgba(255, 255, 255, 0.12); }
-.light .meter-track { background: rgba(0, 0, 0, 0.09); }
+/* 主题自适应的量尺轨道：统一磨砂渐变 + 内阴影，让填充条更精致 */
+.meter-track {
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0.05));
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.32), inset 0 -1px 0 rgba(255, 255, 255, 0.05);
+}
+.light .meter-track { background: linear-gradient(90deg, rgba(0, 0, 0, 0.10), rgba(0, 0, 0, 0.04)); box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.12); }
+.meter-track > div {
+  box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.25), 0 0 8px rgba(0, 0, 0, 0.08);
+}
 
 /* 学年展开的缓冲动画：先轻微弹开再落定 */
 .collapsible {

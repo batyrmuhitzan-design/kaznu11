@@ -3,6 +3,8 @@ import { useI18n, type AllTranslationKey } from "../contexts/LanguageContext";
 import { motorHaptic, triggerHaptic } from "../utils/haptics";
 import ServiceDetail, { type ServiceId } from "./ServiceDetail";
 import SwipeBack from "../components/SwipeBack";
+import { enableCoursePush, disableCoursePush, listManagedCourseIds } from "../native/coursePush";
+import { tr } from "../utils/locale";
 
 interface ServiceEntry {
   id?: ServiceId;
@@ -117,6 +119,29 @@ export default function Services() {
   }, []);
   const [barcode, setBarcode] = useState(false);
   const [alarms, setAlarms] = useState<Set<string>>(readAlarms);
+  const [deniedOpen, setDeniedOpen] = useState(false);
+
+  // 与 iOS 系统 Pending 通知 100% 同步：启动/回前台读取系统已注册的课程通知
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const ids = await listManagedCourseIds();
+      if (cancelled || ids.length === 0) return;
+      setAlarms((prev) => {
+        const next = new Set(prev);
+        ids.forEach((id) => next.add(id));
+        try {
+          localStorage.setItem("courseAlarms", JSON.stringify([...next]));
+        } catch {
+          /* ignore */
+        }
+        return next;
+      });
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
   const [payOpen, setPayOpen] = useState(false);
   const [paying, setPaying] = useState(false);
   const [toast, setToast] = useState("");
@@ -158,15 +183,37 @@ export default function Services() {
     }, 900);
   };
 
-  const toggleAlarm = (courseId: string) => {
-    motorHaptic();
+  const applyAlarmSet = (courseId: string, on: boolean) => {
     setAlarms((prev) => {
       const next = new Set(prev);
-      if (next.has(courseId)) next.delete(courseId);
-      else next.add(courseId);
-      localStorage.setItem("courseAlarms", JSON.stringify([...next]));
+      if (on) next.add(courseId);
+      else next.delete(courseId);
+      try {
+        localStorage.setItem("courseAlarms", JSON.stringify([...next]));
+      } catch {
+        /* ignore */
+      }
       return next;
     });
+  };
+
+  const toggleAlarm = async (course: AlarmCourse) => {
+    motorHaptic();
+    const spec = { id: course.id, name: course.name, when: course.when, room: course.room };
+    const currentlyOn = alarms.has(course.id);
+    if (currentlyOn) {
+      // 关：从系统通知队列按 Course ID 移除
+      await disableCoursePush(spec);
+      applyAlarmSet(course.id, false);
+      return;
+    }
+    // 开：请求权限 → 注册每周重复提醒（课程开始前 30 分钟）
+    const enabled = await enableCoursePush(spec);
+    if (!enabled) {
+      setDeniedOpen(true); // 引导去系统设置开启通知
+      return;
+    }
+    applyAlarmSet(course.id, true);
   };
 
   const openPay = () => {
@@ -379,7 +426,7 @@ export default function Services() {
           <div className="flex items-center justify-between mb-1">
             <div>
               <p className="text-sm font-bold text-white">{t("courseRadar")}</p>
-              <p className="text-[11px] mt-0.5" style={{ color: "rgba(235,235,245,0.45)" }}>{t("alarmCourses")} · ⏰ 提前 30 分钟提醒</p>
+              <p className="text-[11px] mt-0.5" style={{ color: "rgba(235,235,245,0.45)" }}>{t("alarmCourses")} · 30′</p>
             </div>
             <span className="px-2 py-1 squircle-xs flex items-center gap-1.5 text-xs font-bold" style={{ background: alarmCount > 0 ? "rgba(255,159,10,0.14)" : "rgba(255,255,255,0.05)", color: alarmCount > 0 ? "#FF9F0A" : "rgba(235,235,245,0.45)" }}>
               <svg viewBox="0 0 20 20" fill="currentColor" className="w-3.5 h-3.5"><path d="M10 2a6 6 0 00-6 6v3l-1.5 2.5A1 1 0 003.4 15h13.2a1 1 0 00.9-1.5L16 11V8a6 6 0 00-6-6zM8 16a2 2 0 004 0H8z" /></svg>
@@ -390,31 +437,39 @@ export default function Services() {
           <div className="space-y-2 mt-2.5">
             {ALARM_COURSES.map((c) => {
               const on = alarms.has(c.id);
+              const accent = on ? c.color : "rgba(235,235,245,0.15)";
               return (
-                <div key={c.id} className="flex items-center gap-2.5 px-3 py-2.5 squircle-sm" style={{ background: "rgba(255,255,255,0.04)", borderLeft: `3px solid ${on ? c.color : "rgba(255,255,255,0.12)"}` }}>
-                  <span className="w-[92px] shrink-0 text-[10px] font-semibold" style={{ color: "rgba(235,235,245,0.5)", fontFamily: "JetBrains Mono" }}>{c.when}</span>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-white truncate">{c.name}</p>
-                    <p className="text-[11px] mt-0.5 truncate" style={{ color: "rgba(235,235,245,0.45)" }}>{c.prof} · {t("room")} {c.room}</p>
+                <div key={c.id} className="rounded-2xl px-3.5 py-3" style={{ background: "rgba(255,255,255,0.04)", borderLeft: `3px solid ${accent}` }}>
+                  <div className="flex items-start gap-3">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[10px] font-semibold" style={{ color: on ? c.color : "rgba(235,235,245,0.5)", fontFamily: "JetBrains Mono" }}>{c.when}</p>
+                      <p className="text-sm font-semibold text-white mt-1 leading-snug" style={{ overflowWrap: "anywhere", wordBreak: "break-word" }}>{c.name}</p>
+                      <p className="text-[11px] mt-1 truncate" style={{ color: "rgba(235,235,245,0.45)" }}>{c.prof} · {t("room")} {c.room}</p>
+                    </div>
+                    <button
+                      type="button"
+                      aria-pressed={on}
+                      aria-label={on ? tr("Turn off reminder", "Ескертуді өшіру", "Выключить напоминание") : tr("Remind 30 min before", "Сабаққа 30 мин бұрын ескерту", "Напоминать за 30 мин")}
+                      onClick={() => void toggleAlarm(c)}
+                      className="haptic-action shrink-0 mt-0.5 w-11 h-11 rounded-full flex items-center justify-center transition-all active:scale-90"
+                      style={{
+                        background: on ? `${c.color}22` : "rgba(255,255,255,0.06)",
+                        color: on ? c.color : "rgba(235,235,245,0.55)",
+                        border: `1px solid ${on ? `${c.color}55` : "rgba(255,255,255,0.1)"}`,
+                      }}
+                    >
+                      {on ? (
+                        <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5"><path d="M12 3a6 6 0 00-6 6v3l-1.6 2.6A1 1 0 005.2 16h13.6a1 1 0 00.8-1.4L18 12V9a6 6 0 00-6-6zM10 18a2 2 0 004 0h-4z" /></svg>
+                      ) : (
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="w-5 h-5"><path d="M6 9.5V8.2M6 12v-1M18 12v-3a6 6 0 00-6-6 5.9 5.9 0 00-2.3.46M12 3a6 6 0 016 6v3l1.6 2.6A1 1 0 0118.8 16h-9M5.2 16l-1.2 0m0 0h1.2m12.2 0h-1.2M10 18a2 2 0 004 0" /><path d="M3 3l18 18" strokeWidth="1.8" /></svg>
+                      )}
+                    </button>
                   </div>
-                  <button
-                    type="button"
-                    aria-pressed={on}
-                    onClick={() => toggleAlarm(c.id)}
-                    className="haptic-action flex items-center gap-1 px-2.5 py-1.5 squircle-xs text-xs font-bold transition-all active:scale-90"
-                    style={{
-                      background: on ? "rgba(255,159,10,0.2)" : "rgba(255,255,255,0.07)",
-                      color: on ? "#FF9F0A" : "rgba(235,235,245,0.55)",
-                      border: `1px solid ${on ? "rgba(255,159,10,0.4)" : "rgba(255,255,255,0.08)"}`,
-                    }}
-                  >
-                    {on ? "🔔" : "🔕"} 30&apos;
-                  </button>
                 </div>
               );
             })}
           </div>
-          <p className="text-[10px] mt-2" style={{ color: "rgba(235,235,245,0.35)" }}>{t("alarmHint")}</p>
+          <p className="text-[10px] mt-2 leading-relaxed" style={{ color: "rgba(235,235,245,0.35)" }}>{t("alarmHint")}</p>
         </div>
         {/* All Services Grid */}
         <div>
@@ -450,6 +505,27 @@ export default function Services() {
       {/* Toast */}
       {toast && (
         <div className={`toast-pop${toastOut ? " toast-out" : ""}`}>{toast}</div>
+      )}
+
+      {/* 通知权限被拒 → 引导去系统设置 */}
+      {deniedOpen && (
+        <div className="fixed inset-0 z-[55] flex items-end justify-center" style={{ background: "rgba(0,0,0,0.45)", backdropFilter: "blur(2px)" }} onClick={() => setDeniedOpen(false)}>
+          <div className="w-full max-w-[430px] glass squircle-lg p-5 animate-slide-up" style={{ borderBottomLeftRadius: 0, borderBottomRightRadius: 0, margin: "0 auto" }} onClick={(e) => e.stopPropagation()}>
+            <p className="text-base font-bold text-white">🔕 {tr("Notifications are off", "Хабарландырулар өшірулі", "Уведомления выключены")}</p>
+            <p className="theme-secondary text-xs mt-3 leading-relaxed">
+              {tr(
+                "To receive class reminders, please enable notifications for KazNU Helper in iOS Settings → KazNU Helper → Notifications → Allow Notifications.",
+                "Сабақ ескертулерін алу үшін iOS Баптаулар → KazNU Helper → Хабарландырулар → «Хабарландыруларға рұқсат ету» бөлімінде рұқсат беріңіз.",
+                "Чтобы получать напоминания о занятиях, включите уведомления в Настройках iOS → KazNU Helper → Уведомления.",
+              )}
+            </p>
+            <div className="flex gap-2.5 mt-5">
+              <button type="button" onClick={() => setDeniedOpen(false)} className="haptic-action flex-1 py-3 squircle-sm text-sm font-bold" style={{ background: "rgba(0,122,255,0.16)", color: "#409CFF", border: "1px solid rgba(0,122,255,0.3)" }}>
+                {tr("OK", "Жарайды", "OK")}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Kaspi 交住宿费 Sheet */}
