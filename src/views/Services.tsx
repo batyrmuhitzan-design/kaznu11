@@ -243,9 +243,9 @@ export default function Services() {
   const statusColor = univerStatus === "ok" ? "#30D158" : "#FF9F0A";
   const statusLabel = univerStatus === "ok" ? t("allSystems") : t("degradedCache");
   const tiles = [
-    { id: "schedule", accent: "#10B981", ok: true, label: t("schedule"), meta: "Tomorrow 09:00 Data Structures · 2 sessions synced" },
-    { id: "grades", accent: "#409CFF", ok: true, label: t("grades"), meta: "GPA 3.82 · updated 2 min ago" },
-    { id: "registration", accent: "#F59E0B", ok: false, label: t("registration"), meta: "Registration opens Sep 1 · 5/6 selected" },
+    { id: "schedule", accent: "#10B981", ok: true, label: t("schedule"), meta: tr("Tomorrow 09:00 Data Structures · 2 sessions synced", "Ертең 09:00 Data Structures · 2 сабақ синхрондалды", "Завтра 09:00 Data Structures · синхронизировано 2 занятия") },
+    { id: "grades", accent: "#409CFF", ok: true, label: t("grades"), meta: tr("GPA 3.82 · updated 2 min ago", "GPA 3.82 · 2 минут бұрын жаңартылды", "GPA 3.82 · обновлено 2 мин назад") },
+    { id: "registration", accent: "#F59E0B", ok: false, label: t("registration"), meta: tr("Registration opens Sep 1 · 5/6 selected", "Тіркелу 1 қыркүйекте басталады · 5/6 таңдалды", "Регистрация с 1 сентября · выбрано 5/6") },
   ];
 
   if (activeService) {
