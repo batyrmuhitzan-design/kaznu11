@@ -116,6 +116,8 @@ enum BackgroundReminderScheduler {
         if let data = try? JSONEncoder().encode(lessons) {
             UserDefaults.standard.set(data, forKey: scheduleKey)
         }
+    }
+
     // MARK: - 数据 / 时间工具
 
     private static func loadLessons() -> [Lesson]? {
