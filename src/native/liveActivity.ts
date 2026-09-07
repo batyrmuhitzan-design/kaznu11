@@ -13,7 +13,7 @@
  * 无需改动 Web 侧 UI 代码。
  */
 
-import { Capacitor } from "@capacitor/core";
+import { Capacitor, registerPlugin } from "@capacitor/core";
 
 export type LiveActivityPhase = "green" | "orange" | "red";
 export type LiveActivityKind = "pre-class" | "in-class" | "none";
@@ -124,23 +124,77 @@ declare global {
   }
 }
 
+/** Capacitor 官方插件的解析结果 */
+export interface KaznuLiveActivityNativeResult {
+  ok: boolean;
+  authorized: boolean;
+  message: string;
+}
+
+interface KaznuLiveActivityNativePlugin {
+  start(payload: LiveActivityPayload): Promise<KaznuLiveActivityNativeResult>;
+  update(payload: LiveActivityPayload): Promise<KaznuLiveActivityNativeResult>;
+  end(payload: LiveActivityPayload): Promise<KaznuLiveActivityNativeResult>;
+}
+
+/** 官方注册表：native 端由 KaznuLiveActivityPlugin（App target）在 viewDidLoad 注册 */
+const KaznuLiveActivity = registerPlugin<KaznuLiveActivityNativePlugin>("KaznuLiveActivity");
+
 /**
- * 原生桥可能晚于 JS 首帧注入（WKWebView atDocumentStart 一般更快，但极冷启动/重载时
- * React 可能比注入更早开始）。这里做一次缓冲：原生平台若桥暂缺，先缓存最新 payload，
- * 每 1s 重试投递（最多 15s），桥就绪后先补发，避免“信息栏一直没有卡片”。
+ * 原生桥可能晚于 JS 首帧注入。这里做统一缓冲：优先走 Capacitor 官方插件通道
+ * （与 LocalNotifications 同机制），官方插件未就绪时退回 WKScriptMessage 桥，再不行缓存重试。
  */
 let pendingBridgePayload: LiveActivityPayload | null = null;
 let bridgeRetryTimer: number | undefined;
 
-function hasLiveActivityBridge(): boolean {
-  return typeof window !== "undefined" && typeof window.__KAZNU_LIVE_ACTIVITY_BRIDGE__ === "function";
+function hasCapacitorLiveActivityPlugin(): boolean {
+  const root = window as unknown as { Capacitor?: { Plugins?: Record<string, unknown> } };
+  return !!root.Capacitor?.Plugins?.["KaznuLiveActivity"];
 }
 
-function flushPendingBridgePayload(): boolean {
-  if (!pendingBridgePayload || !hasLiveActivityBridge()) return false;
+function hasLiveActivityBridge(): boolean {
+  return typeof window.__KAZNU_LIVE_ACTIVITY_BRIDGE__ === "function";
+}
+
+function hasAnyChannel(): boolean {
+  return hasCapacitorLiveActivityPlugin() || hasLiveActivityBridge();
+}
+
+function emitResult(result: KaznuLiveActivityNativeResult): void {
+  window.dispatchEvent(
+    new CustomEvent("kaznu:nativeLiveActivityResult", { detail: result }),
+  );
+}
+
+async function sendViaCapacitorPlugin(payload: LiveActivityPayload): Promise<void> {
+  try {
+    const control = payload.control ?? "update";
+    const result =
+      control === "start"
+        ? await KaznuLiveActivity.start(payload)
+        : control === "end"
+          ? await KaznuLiveActivity.end(payload)
+          : await KaznuLiveActivity.update(payload);
+    emitResult(result);
+  } catch (error) {
+    emitResult({
+      ok: false,
+      authorized: false,
+      message: error instanceof Error ? error.message : String(error),
+    });
+  }
+}
+
+function flushPendingPayload(): boolean {
+  if (!pendingBridgePayload) return false;
+  if (!hasAnyChannel()) return false;
   const payload = pendingBridgePayload;
   pendingBridgePayload = null;
-  window.__KAZNU_LIVE_ACTIVITY_BRIDGE__!(payload);
+  if (hasCapacitorLiveActivityPlugin()) {
+    void sendViaCapacitorPlugin(payload);
+  } else {
+    window.__KAZNU_LIVE_ACTIVITY_BRIDGE__!(payload);
+  }
   return true;
 }
 
@@ -149,9 +203,9 @@ function scheduleBridgeRetry(): void {
   let attempts = 0;
   const tick = () => {
     bridgeRetryTimer = undefined;
-    if (flushPendingBridgePayload()) return;
+    if (flushPendingPayload()) return;
     attempts += 1;
-    if (attempts < 15 && !hasLiveActivityBridge()) {
+    if (attempts < 20 && !hasAnyChannel()) {
       bridgeRetryTimer = window.setTimeout(tick, 1000);
     } else {
       pendingBridgePayload = null;
@@ -161,18 +215,22 @@ function scheduleBridgeRetry(): void {
 }
 
 /**
- * 同步到原生桥。
- * - 原生包（WKWebView/ActivityKit）会注入 window.__KAZNU_LIVE_ACTIVITY_BRIDGE__。
- * - 纯 Web 预览里这里什么都不做 —— App 内不显示任何悬浮小部件。
+ * 同步到原生 Live Activity。
+ * 优先级：Capacitor 官方插件 → WKScriptMessage 桥 → 缓存重试（原生平台）。
+ * 纯 Web 预览里什么都不做 —— App 内不显示任何悬浮小部件。
  */
 export function syncLiveActivity(payload: LiveActivityPayload) {
   if (typeof window === "undefined") return;
+  if (Capacitor.isNativePlatform() && hasCapacitorLiveActivityPlugin()) {
+    void sendViaCapacitorPlugin(payload);
+    return;
+  }
   if (hasLiveActivityBridge()) {
     window.__KAZNU_LIVE_ACTIVITY_BRIDGE__!(payload);
     return;
   }
   if (!Capacitor.isNativePlatform()) return;
-  // 原生桥暂缺：缓存“start/update/end”最新一条，等注入后再补发
+  // 双通道都暂缺：缓存最新一条，等任一通道就绪后补发
   pendingBridgePayload = payload;
   scheduleBridgeRetry();
 }

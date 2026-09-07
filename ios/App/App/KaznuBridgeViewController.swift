@@ -7,6 +7,12 @@ import WebKit
 ///  - 注入 `window.__KAZNU_LIVE_ACTIVITY_BRIDGE__`（把 Web payload 投递到原生）；
 ///  - 收到后交给 `TimetableLiveActivityController` 启动 / 刷新 / 结束 Live Activity。
 final class KaznuBridgeViewController: CAPBridgeViewController, WKScriptMessageHandler {
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        // 注册本地 Capacitor 插件（官方 Bridge 通道，可靠性远高于手写 WKScriptMessage）
+        self.bridge?.registerPluginInstance(KaznuLiveActivityPlugin())
+    }
+
     override func webViewConfiguration(for instanceConfiguration: InstanceConfiguration) -> WKWebViewConfiguration {
         let configuration = super.webViewConfiguration(for: instanceConfiguration)
 

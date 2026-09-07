@@ -20,6 +20,7 @@
 		9A0000000000000000000012 /* TimetableActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A0000000000000000000002 /* TimetableActivityAttributes.swift */; };
 		9A0000000000000000000013 /* TimetableLiveActivityController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A0000000000000000000003 /* TimetableLiveActivityController.swift */; };
 		9A0000000000000000000014 /* BackgroundReminderScheduler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A0000000000000000000004 /* BackgroundReminderScheduler.swift */; };
+		9A0000000000000000000019 /* KaznuLiveActivityPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A000000000000000000001A /* KaznuLiveActivityPlugin.swift */; };
 		9A0000000000000000000015 /* TimetableActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A0000000000000000000005 /* TimetableActivityAttributes.swift */; };
 		9A0000000000000000000016 /* TimetableLiveActivityWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A0000000000000000000006 /* TimetableLiveActivityWidget.swift */; };
 		9A0000000000000000000017 /* TimetableLiveActivityViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A0000000000000000000007 /* TimetableLiveActivityViews.swift */; };
@@ -41,6 +42,7 @@
 		9A0000000000000000000002 /* TimetableActivityAttributes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimetableActivityAttributes.swift; sourceTree = "<group>"; };
 		9A0000000000000000000003 /* TimetableLiveActivityController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimetableLiveActivityController.swift; sourceTree = "<group>"; };
 		9A0000000000000000000004 /* BackgroundReminderScheduler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackgroundReminderScheduler.swift; sourceTree = "<group>"; };
+		9A000000000000000000001A /* KaznuLiveActivityPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KaznuLiveActivityPlugin.swift; sourceTree = "<group>"; };
 		9A0000000000000000000005 /* TimetableActivityAttributes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimetableActivityAttributes.swift; sourceTree = "<group>"; };
 		9A0000000000000000000006 /* TimetableLiveActivityWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimetableLiveActivityWidget.swift; sourceTree = "<group>"; };
 		9A0000000000000000000007 /* TimetableLiveActivityViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimetableLiveActivityViews.swift; sourceTree = "<group>"; };
@@ -97,6 +99,7 @@
 				9A0000000000000000000002 /* TimetableActivityAttributes.swift */,
 				9A0000000000000000000003 /* TimetableLiveActivityController.swift */,
 				9A0000000000000000000004 /* BackgroundReminderScheduler.swift */,
+				9A000000000000000000001A /* KaznuLiveActivityPlugin.swift */,
 				504EC30B1FED79650016851F /* Main.storyboard */,
 				504EC30E1FED79650016851F /* Assets.xcassets */,
 				504EC3101FED79650016851F /* LaunchScreen.storyboard */,
@@ -260,6 +263,7 @@
 				9A0000000000000000000012 /* TimetableActivityAttributes.swift in Sources */,
 				9A0000000000000000000013 /* TimetableLiveActivityController.swift in Sources */,
 				9A0000000000000000000014 /* BackgroundReminderScheduler.swift in Sources */,
+				9A0000000000000000000019 /* KaznuLiveActivityPlugin.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -410,7 +414,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 10;
+				CURRENT_PROJECT_VERSION = 11;
 				INFOPLIST_FILE = App/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -433,7 +437,7 @@ CODE_SIGN_ENTITLEMENTS = App/App.entitlements;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 10;
+				CURRENT_PROJECT_VERSION = 11;
 				INFOPLIST_FILE = App/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -455,7 +459,7 @@ CODE_SIGN_ENTITLEMENTS = App/App.entitlements;
 			buildSettings = {
 			APPLICATION_EXTENSION_API_ONLY = YES;
 			CODE_SIGN_STYLE = Automatic;
-			CURRENT_PROJECT_VERSION = 10;
+			CURRENT_PROJECT_VERSION = 11;
 			GENERATE_INFOPLIST_FILE = NO;
 			INFOPLIST_FILE = KazNUWidgets/Info.plist;
 			IPHONEOS_DEPLOYMENT_TARGET = 16.2;
@@ -480,7 +484,7 @@ CODE_SIGN_ENTITLEMENTS = KazNUWidgets/KazNUWidgets.entitlements;
 			buildSettings = {
 			APPLICATION_EXTENSION_API_ONLY = YES;
 			CODE_SIGN_STYLE = Automatic;
-			CURRENT_PROJECT_VERSION = 10;
+			CURRENT_PROJECT_VERSION = 11;
 			GENERATE_INFOPLIST_FILE = NO;
 			INFOPLIST_FILE = KazNUWidgets/Info.plist;
 			IPHONEOS_DEPLOYMENT_TARGET = 16.2;
