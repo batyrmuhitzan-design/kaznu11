@@ -70,8 +70,8 @@ export default function LegalModal({
         role="dialog"
         aria-modal="true"
         aria-label={doc.docTitle}
-        className="relative w-full max-w-[560px] h-[82vh] max-h-[760px] flex flex-col squircle-lg overflow-hidden"
-        style={{ background: "rgba(28,28,30,1)", border: "1px solid rgba(255,255,255,0.18)", color: "#FFFFFF", boxShadow: "0 18px 60px rgba(0,0,0,0.5)" }}
+        className="relative bg-[#1C1C1E] w-full max-w-[560px] h-[82vh] max-h-[760px] flex flex-col squircle-lg overflow-hidden"
+        style={{ border: "1px solid rgba(255,255,255,0.18)", color: "#FFFFFF", boxShadow: "0 18px 60px rgba(0,0,0,0.5)" }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* 标题 + 语言切换 */}

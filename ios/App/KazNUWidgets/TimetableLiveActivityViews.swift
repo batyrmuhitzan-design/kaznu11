@@ -37,6 +37,8 @@ struct CountdownRingView: View {
     var size: CGFloat = 54
     var lineWidth: CGFloat = 5
     var showDigits = true
+    /// 传入则数字区改用系统 .timer 自走时（锁屏无需逐秒 content update）
+    var endDate: Date? = nil
 
     var body: some View {
         let fraction = TimetableActivityStyle.fraction(total: total, remaining: remaining)
@@ -54,11 +56,19 @@ struct CountdownRingView: View {
                 .animation(.linear(duration: 0.4), value: fraction)
 
             if showDigits {
-                Text(TimetableActivityStyle.countdownText(seconds: remaining))
-                    .font(.system(size: size * 0.24, weight: .semibold, design: .monospaced))
-                    .monospacedDigit()
-                    .foregroundColor(.white)
-                    .minimumScaleFactor(0.6)
+                if let endDate = endDate {
+                    Text(endDate, style: .timer)
+                        .font(.system(size: size * 0.24, weight: .semibold, design: .monospaced))
+                        .monospacedDigit()
+                        .foregroundColor(.white)
+                        .minimumScaleFactor(0.6)
+                } else {
+                    Text(TimetableActivityStyle.countdownText(seconds: remaining))
+                        .font(.system(size: size * 0.24, weight: .semibold, design: .monospaced))
+                        .monospacedDigit()
+                        .foregroundColor(.white)
+                        .minimumScaleFactor(0.6)
+                }
             }
         }
         .frame(width: size, height: size)
@@ -111,7 +121,8 @@ struct TimetableLiveActivityLockView: View {
                 remaining: context.state.remainingSeconds,
                 size: 56,
                 lineWidth: 6,
-                showDigits: true
+                showDigits: true,
+                endDate: context.attributes.countdownEndDate
             )
         }
         .padding(.horizontal, 20)

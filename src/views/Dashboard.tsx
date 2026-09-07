@@ -246,7 +246,7 @@ function formatCountdown(seconds: number) {
 }
 
 /** 大卡片右上角的倒计时环：外环消耗 + 中心时钟（指针随秒旋转）+ 时间数字。 */
-function CountdownRing({ remaining, total, ringColor }: { remaining: number; total: number; ringColor?: string }) {
+function CountdownRing({ remaining, total, ringColor, urgent = false }: { remaining: number; total: number; ringColor?: string; urgent?: boolean }) {
   const pct = total > 0 ? remaining / total : 0;
   const [entered, setEntered] = useState(false);
   useEffect(() => {
@@ -260,7 +260,7 @@ function CountdownRing({ remaining, total, ringColor }: { remaining: number; tot
   const angle = ((remaining % 60) / 60) * 360;
 
   return (
-    <svg width="116" height="116" viewBox="0 0 88 88" className="absolute right-3 top-3">
+    <svg width="116" height="116" viewBox="0 0 88 88" className={`absolute right-3 top-3${urgent ? " animate-breathing-glow" : ""}`}>
       <circle cx="44" cy="44" r={RADIUS} fill="none" strokeWidth="8" className="ring-track" />
       <circle
         cx="44"
@@ -416,6 +416,7 @@ export default function Dashboard({ onOpenProfile, onNavigate }: { onOpenProfile
   const lastToday = TODAY_COURSES[TODAY_COURSES.length - 1];
   const activeCourse = hasCountdown ? countdown.course : countdown.next ?? lastToday;
   const countdownPct = hasCountdown && countdown.total > 0 ? countdown.remaining / countdown.total : 0;
+  const urgent = hasCountdown && countdownPct <= 0.2;
   const ringColor = !hasCountdown ? "rgba(255,255,255,0.5)" : countdownTone(countdownPct);
   const hhmm = (h: number, m: number) => `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}`;
   // “Today / Бүгін” 课程行状态：由系统当前时间动态算出（每 1s 刷新，跨过开始/结束节点自动切换）
@@ -597,7 +598,7 @@ export default function Dashboard({ onOpenProfile, onNavigate }: { onOpenProfile
         <div className="glass squircle-lg p-5 relative overflow-hidden card-shadow" style={{ minHeight: 160 }}>
           <div className="absolute inset-0 opacity-10" style={{ background: "linear-gradient(135deg, #0033A0 0%, transparent 60%)" }} />
           {hasCountdown ? (
-            <CountdownRing remaining={countdown.remaining} total={countdown.total} ringColor={ringColor} />
+            <CountdownRing remaining={countdown.remaining} total={countdown.total} ringColor={ringColor} urgent={urgent} />
           ) : (
             <IdleRing
               label={noMoreToday ? "🎉" : hhmm(activeCourse.startH, activeCourse.startM)}

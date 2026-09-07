@@ -52,9 +52,16 @@ export function DevSimProvider({ children }: { children: ReactNode }) {
   const simulatedNow = useCallback(
     (real: Date): Date => {
       if (mode === "off") return real;
-      const d = new Date(real.getFullYear(), real.getMonth(), real.getDate());
-      if (mode === "pre5") d.setHours(8, 55, 0, 0); // 距 9:00 《线性代数》 5 分钟
-      else d.setHours(10, 28, 0, 0); // 9:00–10:30 课上剩 2 分钟
+      // 保留真实“秒 + 毫秒”只改 小时/分钟：模拟模式同样实时倒数（04:59 → 04:58…），
+      // 否则每次返回整秒固定值会把首页倒计时“卡死”在 5:00 / 2:00。
+      const sec = real.getSeconds();
+      const ms = real.getMilliseconds();
+      const d = new Date(real.getFullYear(), real.getMonth(), real.getDate(), 0, 0, sec, ms);
+      if (mode === "pre5") {
+        d.setHours(8, 55, sec, ms); // 距 9:00《线性代数》约 5 分钟
+      } else {
+        d.setHours(10, 28, sec, ms); // 9:00–10:30 课上约剩 2 分钟
+      }
       return d;
     },
     [mode],

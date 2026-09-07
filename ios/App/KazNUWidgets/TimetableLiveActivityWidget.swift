@@ -52,9 +52,11 @@ struct TimetableLiveActivity: Widget {
                                 .font(.system(size: 11, weight: .medium))
                                 .foregroundColor(.white.opacity(0.75))
                             Spacer()
-                            Text(TimetableActivityStyle.countdownText(seconds: context.state.remainingSeconds))
+                            Text(context.attributes.countdownEndDate, style: .timer)
                                 .font(.system(size: 17, weight: .semibold, design: .monospaced))
                                 .monospacedDigit()
+                                .multilineTextAlignment(.trailing)
+                                .frame(width: 78, alignment: .trailing)
                                 .foregroundColor(
                                     TimetableActivityStyle.phaseColor(
                                         total: context.state.totalSeconds,

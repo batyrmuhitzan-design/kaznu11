@@ -19,9 +19,9 @@
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
-	<string>1.2.3</string>
+	<string>1.2.4</string>
 	<key>CFBundleVersion</key>
-	<string>5</string>
+	<string>6</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSLocationWhenInUseUsageDescription</key>
@@ -80,7 +80,7 @@
 			<key>UIApplicationShortcutItemType</key>
 			<string>com.kaznu.helper.shortcut.schedule</string>
 			<key>UIApplicationShortcutItemTitle</key>
-			<string>📅 今日课表 (Today&apos;s Schedule)</string>
+			<string>Кесте · Today&apos;s Schedule</string>
 			<key>UIApplicationShortcutItemIconType</key>
 			<string>UIApplicationShortcutIconTypeDate</string>
 		</dict>
@@ -88,7 +88,7 @@
 			<key>UIApplicationShortcutItemType</key>
 			<string>com.kaznu.helper.shortcut.student-id</string>
 			<key>UIApplicationShortcutItemTitle</key>
-			<string>🆔 电子学生证 (Student ID Card)</string>
+			<string>Student ID · Студенттік куәлік</string>
 			<key>UIApplicationShortcutItemIconType</key>
 			<string>UIApplicationShortcutIconTypeContact</string>
 		</dict>
@@ -96,7 +96,7 @@
 			<key>UIApplicationShortcutItemType</key>
 			<string>com.kaznu.helper.shortcut.dev-console</string>
 			<key>UIApplicationShortcutItemTitle</key>
-			<string>🔔 开发者控制台 (Dev Console)</string>
+			<string>Dev Console · Әзірлеуші консолі</string>
 			<key>UIApplicationShortcutItemIconType</key>
 			<string>UIApplicationShortcutIconTypeTask</string>
 		</dict>

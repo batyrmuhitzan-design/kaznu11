@@ -645,3 +645,23 @@ html {
 .light .legal-card svg {
   color: #111827;
 }
+
+/* ===== 紧急倒计时：红色呼吸发光（<20% 或最后 5 分钟挂到首页圆环 SVG 上） ===== */
+@keyframes breathing-glow {
+  0%,
+  100% {
+    opacity: 1;
+    filter: drop-shadow(0 0 8px rgba(239, 68, 68, 0.8));
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.55;
+    filter: drop-shadow(0 0 2px rgba(239, 68, 68, 0.2));
+    transform: scale(0.985);
+  }
+}
+.animate-breathing-glow {
+  animation: breathing-glow 1.5s ease-in-out infinite;
+  will-change: opacity, filter, transform;
+  transform-origin: center;
+}
