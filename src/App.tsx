@@ -5,6 +5,7 @@ import Materials from "./views/Materials";
 import Schedule from "./views/Schedule";
 import Services from "./views/Services";
 import Profile from "./views/Profile";
+import ProfReviews, { type RmpDeepLink } from "./views/ProfReviews";
 import { useI18n } from "./contexts/LanguageContext";
 import News, { NewsDetail, type NewsItem } from "./views/News";
 import Notifications from "./views/Notifications";
@@ -72,6 +73,18 @@ export default function App() {
   const { resolvedTheme } = useTheme();
   const t = useI18n();
   const tabLabels = { dashboard: t("home"), news: t("news"), materials: t("materials"), schedule: t("schedule"), services: t("services") };
+
+  // Prof Reviews 路由：从 Home Quick Access / Services 卡片 / 课表深链进入。
+  const [rmpDeepLink, setRmpDeepLink] = useState<RmpDeepLink | null>(null);
+  const reviewsReturnRef = useRef("dashboard");
+  const openReviews = useCallback(
+    (professorName?: string, courseName?: string) => {
+      reviewsReturnRef.current = activeTab === "prof-reviews" ? reviewsReturnRef.current : activeTab;
+      setRmpDeepLink(professorName ? { professorName } : courseName ? { courseName } : null);
+      setActiveTab("prof-reviews");
+    },
+    [activeTab],
+  );
 
   const [updateState, setUpdateState] = useState<{ kind: Exclude<UpdateDialogKind, "none">; info: UpdateInfo } | null>(null);
 
@@ -158,7 +171,9 @@ export default function App() {
 
       {/* Main Content */}
       <div className="flex-1 overflow-hidden relative">
-        {activeTab === "dashboard" && <Dashboard onOpenProfile={() => setActiveTab("profile")} onNavigate={setActiveTab} />}
+        {activeTab === "dashboard" && (
+          <Dashboard onOpenProfile={() => setActiveTab("profile")} onNavigate={setActiveTab} onOpenReviews={openReviews} />
+        )}
         {activeTab === "notifications" && (
           <SwipeBack onBack={() => setActiveTab("dashboard")}>
             <Notifications onBack={() => setActiveTab("dashboard")} onNavigate={setActiveTab} />
@@ -170,8 +185,9 @@ export default function App() {
           </SwipeBack>
         )}
         {activeTab === "materials" && <Materials />}
-        {activeTab === "schedule" && <Schedule />}
-        {activeTab === "services" && <Services />}
+        {activeTab === "schedule" && <Schedule onOpenReviews={openReviews} />}
+        {activeTab === "services" && <Services onOpenReviews={openReviews} />}
+        {activeTab === "prof-reviews" && <ProfReviews onBack={() => setActiveTab(reviewsReturnRef.current)} deepLink={rmpDeepLink} />}
         {activeTab === "profile" && (
           <SwipeBack onBack={() => setActiveTab("dashboard")}>
             <Profile onBack={() => setActiveTab("dashboard")} />

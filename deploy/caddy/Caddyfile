@@ -1,0 +1,34 @@
+# KazNU Helper — Caddy 反向代理（统一域名 1losion.me）
+# 自动申请/续期 Let's Encrypt 证书。
+{
+	email admin@1losion.me
+}
+
+{$SITE_ADDRESS} {
+	encode gzip zstd
+
+	# ---- 后端 API ----
+	@api path /api /api/*
+	handle @api {
+		reverse_proxy api:8000
+	}
+
+	# ---- FastAPI 文档 / SQLAdmin 后台 / 健康检查 ----
+	@backend path /admin /admin/* /docs /docs/* /redoc /openapi.json /healthz /version.json
+	handle @backend {
+		reverse_proxy api:8000
+	}
+
+	# ---- 其它：前端静态文件（deploy/www）----
+	handle {
+		root * /srv/www
+		try_files {path} /index.html
+		file_server
+	}
+
+	header {
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+	}
+	log
+}

@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { useTheme } from "../contexts/ThemeContext";
 import { useI18n } from "../contexts/LanguageContext";
+import { tr } from "../utils/locale";
 import { API_URLS, STUDENT_ID } from "../utils/config";
 import { academicWeekOf, datesOfThisWeek, nowMinutes, todayWeekdayIndex, ACADEMIC_YEAR } from "../utils/calendar";
 import { courseStatusFromTime } from "../utils/courseStatus";
@@ -110,12 +111,14 @@ function CourseCard({
   isToday,
   nowH,
   nowM,
+  onOpen,
 }: {
   course: Course;
   isDark: boolean;
   isToday: boolean;
   nowH: number;
   nowM: number;
+  onOpen: (course: Course) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   const t = useI18n();
@@ -150,7 +153,10 @@ function CourseCard({
         cursor: "pointer",
         zIndex: expanded ? 10 : 1,
       }}
-      onClick={() => setExpanded(!expanded)}
+      onClick={() => {
+        setExpanded((x) => !x);
+        onOpen(course);
+      }}
     >
       <div className="px-2.5 py-1.5 h-full flex flex-col justify-between">
         <div>
@@ -183,13 +189,14 @@ function CourseCard({
   );
 }
 
-export default function Schedule() {
+export default function Schedule({ onOpenReviews }: { onOpenReviews?: (professorName?: string, courseName?: string) => void }) {
   const { resolvedTheme } = useTheme();
   const t = useI18n();
   const isDark = resolvedTheme === "dark";
   const [selectedDay, setSelectedDay] = useState<number>(0);
   const [coursesByDay, setCoursesByDay] = useState<Record<number, Course[]>>({});
   const [loading, setLoading] = useState(true);
+  const [detailCourse, setDetailCourse] = useState<Course | null>(null);
 
   // 每分钟刷新一次：让“现在线”与课程状态在跨过上下课时间节点时自动切换
   const [, setMinuteTick] = useState(0);
@@ -360,7 +367,7 @@ export default function Schedule() {
             </div>
           ) : (
             courses.map((c) => (
-              <CourseCard key={c.id} course={c} isDark={isDark} isToday={selectedDay === todayIdx} nowH={nowH} nowM={nowM} />
+              <CourseCard key={c.id} course={c} isDark={isDark} isToday={selectedDay === todayIdx} nowH={nowH} nowM={nowM} onOpen={setDetailCourse} />
             ))
           )}
 
@@ -372,6 +379,54 @@ export default function Schedule() {
           )}
         </div>
       </div>
+
+      {/* 课程详情弹窗：一键跳转 Prof Reviews 查看任课老师评分 */}
+      {detailCourse && (
+        <div className="fixed inset-0 z-[55] flex items-end justify-center" style={{ background: "rgba(0,0,0,0.5)", backdropFilter: "blur(2px)" }} onClick={() => setDetailCourse(null)}>
+          <div className="w-full max-w-[430px] glass squircle-lg p-5 animate-slide-up" style={{ borderBottomLeftRadius: 0, borderBottomRightRadius: 0 }} onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-start justify-between gap-2 mb-3">
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide" style={{ background: "rgba(94,92,230,0.18)", color: "#8E8CE9" }}>
+                {detailCourse.type === "lecture" ? t("lecture") : detailCourse.type === "lab" ? t("lab") : detailCourse.type === "exam" ? t("exam") : t("seminar")}
+              </span>
+              <button type="button" onClick={() => setDetailCourse(null)} className="w-7 h-7 flex items-center justify-center rounded-full" style={{ background: "rgba(255,255,255,0.08)", color: "rgba(235,235,245,0.7)" }}>✕</button>
+            </div>
+            <h2 className="text-xl font-bold text-white" style={{ letterSpacing: "-0.4px" }}>{detailCourse.name}</h2>
+            <div className="mt-3 space-y-2 text-sm">
+              <div className="flex items-center justify-between">
+                <span className="theme-muted">{t("calendar")}</span>
+                <span className="font-semibold text-white" style={{ fontFamily: "JetBrains Mono", fontSize: 12 }}>
+                  {`${detailCourse.startH.toString().padStart(2, "0")}:${detailCourse.startM.toString().padStart(2, "0")}–${detailCourse.endH.toString().padStart(2, "0")}:${detailCourse.endM.toString().padStart(2, "0")}`}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="theme-muted">{t("room")}</span>
+                <span className="font-semibold text-white">📍 {detailCourse.room}</span>
+              </div>
+              {detailCourse.prof && (
+                <div className="flex items-center justify-between gap-3">
+                  <span className="theme-muted">👨‍🏫</span>
+                  <span className="font-semibold text-white text-right">{detailCourse.prof}</span>
+                </div>
+              )}
+            </div>
+            {detailCourse.prof && (
+              <button
+                type="button"
+                onClick={() => {
+                  const course = detailCourse;
+                  setDetailCourse(null);
+                  onOpenReviews?.(course.prof, course.name);
+                }}
+                className="haptic-action w-full mt-5 py-3.5 squircle-sm text-sm font-bold flex items-center justify-center gap-2"
+                style={{ background: "linear-gradient(135deg,#FF9F0A,#FFD60A)", color: "#1c1c1e", boxShadow: "0 8px 22px rgba(255,159,10,0.35)" }}
+              >
+                ⭐ {tr("View Professor Rating", "Оқытушы бағасын қарау", "Рейтинг преподавателя")}
+              </button>
+            )}
+            <button type="button" onClick={() => setDetailCourse(null)} className="theme-muted w-full mt-2 py-2 text-xs font-semibold">{t("cancel")}</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

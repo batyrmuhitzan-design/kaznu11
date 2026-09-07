@@ -92,7 +92,7 @@ function feeColor(pct: number) {
 }
 
 
-export default function Services() {
+export default function Services({ onOpenReviews }: { onOpenReviews?: () => void }) {
   const t = useI18n();
   const [univerStatus, setUniverStatus] = useState<"ok" | "slow">("slow");
   const [syncing, setSyncing] = useState(false);
@@ -267,6 +267,25 @@ export default function Services() {
         </div>
       </div>
       <div className="flex-1 min-h-0 overflow-y-auto px-4 pt-3 pb-28 space-y-4 animate-slide-up">
+
+        {/* Course & Professor Ratings —— 2.0 新服务卡片 */}
+        <button
+          type="button"
+          onClick={() => onOpenReviews?.()}
+          className="haptic-action w-full squircle-lg p-4 relative overflow-hidden text-left card-shadow"
+          style={{ background: "linear-gradient(135deg, rgba(94,92,230,0.28), rgba(255,159,10,0.2))", border: "1px solid rgba(94,92,230,0.35)" }}
+        >
+          <div className="flex items-center gap-3">
+            <span className="w-12 h-12 squircle-lg flex items-center justify-center text-2xl shrink-0" style={{ background: "rgba(255,255,255,0.12)" }}>⭐</span>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-bold text-white">{tr("Course & Professor Ratings", "Курс және оқытушы рейтингі", "Рейтинги курсов и преподавателей")}</p>
+              <p className="text-[11px] mt-1 leading-relaxed" style={{ color: "rgba(235,235,245,0.6)" }}>
+                {tr("Rate your professors anonymously — insights from real students.", "Оқытушыларды анонимді бағалаңыз — нақты студенттердің пікірі.", "Анонимно оценивайте преподавателей — мнения реальных студентов.")}
+              </p>
+            </div>
+            <svg viewBox="0 0 20 20" fill="none" className="w-5 h-5 shrink-0"><path d="m7.5 4 5 6-5 6" stroke="rgba(255,255,255,0.6)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>
+          </div>
+        </button>
 
         {/* Univer System —— 补全成可操作的门户面板 */}
         <div className="glass squircle-lg p-4 card-shadow" style={{ border: `1px solid ${statusColor}33` }}>

@@ -1,0 +1,31 @@
+GET / ok
+professors?q=Akhmetov ok -> Nurzhan Akhmetov
+professor detail ok courses = ['MATH102']
+reviews anonymized ok: 2
+login ok name = user7782679 is_new = True
+second login reuses account ok
+PATCH /me/display-name ok
+non-Univer login rejected ok
+eligibility ok
+POST review ok
+duplicate review blocked ok
+admin apply ok
+Traceback (most recent call last):
+  File "D:\浏览器下载\KazNU Helper App Design\backend\tests\smoke_test.py", line 195, in <module>
+    asyncio.run(main())
+    ~~~~~~~~~~~^^^^^^^^
+  File "E:\Python314\Lib\asyncio\runners.py", line 204, in run
+    return runner.run(main)
+           ~~~~~~~~~~^^^^^^
+  File "E:\Python314\Lib\asyncio\runners.py", line 127, in run
+    return self._loop.run_until_complete(task)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^
+  File "E:\Python314\Lib\asyncio\base_events.py", line 719, in run_until_complete
+    return future.result()
+           ~~~~~~~~~~~~~^^
+  File "D:\浏览器下载\KazNU Helper App Design\backend\tests\smoke_test.py", line 190, in main
+    await check(client)
+  File "D:\浏览器下载\KazNU Helper App Design\backend\tests\smoke_test.py", line 122, in check
+    assert r.status_code == 200, r.text
+           ^^^^^^^^^^^^^^^^^^^^
+AssertionError: {"detail":"Only KazNU Univer accounts are allowed (student ID or @…kaznu.kz e-mail)"}

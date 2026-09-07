@@ -1,0 +1,46 @@
+# ===========================================================================
+# KazNU Helper — 后端本地开发栈（Postgres + API）
+# 说明：统一域名/HTTPS/反代请使用仓库根目录的 docker-compose.yml
+# 用法（在 /opt/kaznu11 下）：
+#   docker compose -f backend/docker-compose.yml up -d --build
+# ===========================================================================
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-kaznu}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-kaznu_postgres_2026}
+      POSTGRES_DB: ${POSTGRES_DB:-kaznu_helper}
+    ports:
+      - "5432:5432"
+    volumes:
+      - backend_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-kaznu} -d ${POSTGRES_DB:-kaznu_helper}"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  api:
+    build: .
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-kaznu}:${POSTGRES_PASSWORD:-kaznu_postgres_2026}@db:5432/${POSTGRES_DB:-kaznu_helper}
+      DEBUG: ${DEBUG:-false}
+      DB_ECHO: ${DB_ECHO:-false}
+      DEMO_PASSWORD: ${DEMO_PASSWORD:-123456}
+      DEMO_ALL_PASSWORD: ${DEMO_ALL_PASSWORD:-true}
+      ANON_HASH_SECRET: ${ANON_HASH_SECRET:-change-me}
+      SUPER_ADMIN_USERNAME: ${SUPER_ADMIN_USERNAME:-admin@1losion.me}
+      SUPER_ADMIN_PASSWORD: ${SUPER_ADMIN_PASSWORD:-admin123456}
+      ADMIN_SESSION_SECRET: ${ADMIN_SESSION_SECRET:-change-me}
+      CORS_ORIGINS: ${CORS_ORIGINS:-*}
+      SEED_ON_STARTUP: ${SEED_ON_STARTUP:-true}
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  backend_pgdata:

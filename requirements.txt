@@ -1,0 +1,39 @@
+# =========================================================
+# KazNU Helper — 全项目 Python 依赖清单 (standard requirements.txt)
+#
+# 汇总来源（已逐一分析 import）：
+#   backend/app/*            → FastAPI 2.0 后端（RateMyProf + 账号系统）
+#   backend/main.py / main.py→ uvicorn 启动入口（app 工厂转发）
+#   backend/scraper.py       → Univer.kz 抓取（requests + BeautifulSoup4）
+#   scripts/make_legal_pdf.py→ 三语法律条款 PDF（reportlab）
+#   backend/tests/*          → 冒烟测试（httpx + aiosqlite，开发用）
+#
+# 服务器部署环境：Python 3.11+，PostgreSQL（asyncpg）
+# 安装：python -m pip install -r requirements.txt
+# =========================================================
+
+# ---------- Web API（FastAPI + 限流 + 配置） ----------
+fastapi>=0.115,<1.0
+uvicorn[standard]>=0.30
+pydantic>=2.7,<3.0
+slowapi>=0.1.9
+python-dotenv>=1.0
+
+# ---------- 管理后台（SQLAdmin + 会话签名） ----------
+sqladmin>=0.18,<1.0
+itsdangerous>=2.1        # Starlette SessionMiddleware 签名所需
+
+# ---------- 数据库（Async SQLAlchemy + PostgreSQL asyncpg） ----------
+sqlalchemy[asyncio]>=2.0.30,<3.0
+asyncpg>=0.29
+
+# ---------- Univer.kz 校园网抓取（backend/scraper.py） ----------
+requests>=2.31
+beautifulsoup4>=4.12
+
+# ---------- 工具脚本：三语法律 PDF（scripts/make_legal_pdf.py） ----------
+reportlab>=4.1
+
+# ---------- 开发 / 测试（不在生产环境运行也安全） ----------
+httpx>=0.27        # backend/tests/smoke_test.py 使用
+aiosqlite>=0.20    # 无 PostgreSQL 时的本地冒烟测试（DATABASE_URL=sqlite+aiosqlite）

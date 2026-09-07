@@ -1,0 +1,83 @@
+# =====================================================================
+# KazNU Helper — 统一域名一键启动栈（/opt/kaznu11/docker-compose.yml）
+#
+#   1losion.me ──► Caddy (80/443, 自动 Let's Encrypt)
+#                    ├─ /api, /admin, /docs, /healthz …  ► api:8000
+#                    └─ 其他路径                       ► ./deploy/www（静态占位/前端）
+#
+# 使用：
+#   cd /opt/kaznu11
+#   bash update.sh                      # 或手动：
+#   cp -n .env.example .env && docker compose up -d --build
+# =====================================================================
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-kaznu}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-kaznu_postgres_2026}
+      POSTGRES_DB: ${POSTGRES_DB:-kaznu_helper}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-kaznu} -d ${POSTGRES_DB:-kaznu_helper}"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    networks: [kaznu]
+
+  api:
+    build: ./backend
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-kaznu}:${POSTGRES_PASSWORD:-kaznu_postgres_2026}@db:5432/${POSTGRES_DB:-kaznu_helper}
+      DEBUG: ${DEBUG:-false}
+      DB_ECHO: ${DB_ECHO:-false}
+      DEMO_PASSWORD: ${DEMO_PASSWORD:-123456}
+      DEMO_ALL_PASSWORD: ${DEMO_ALL_PASSWORD:-true}
+      ANON_HASH_SECRET: ${ANON_HASH_SECRET:-change-me}
+      SUPER_ADMIN_USERNAME: ${SUPER_ADMIN_USERNAME:-admin@1losion.me}
+      SUPER_ADMIN_PASSWORD: ${SUPER_ADMIN_PASSWORD:-admin123456}
+      ADMIN_SESSION_SECRET: ${ADMIN_SESSION_SECRET:-change-me}
+      CORS_ORIGINS: ${CORS_ORIGINS:-*}
+      SEED_ON_STARTUP: ${SEED_ON_STARTUP:-true}
+    depends_on:
+      db:
+        condition: service_healthy
+    expose:
+      - "8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://127.0.0.1:8000/healthz')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks: [kaznu]
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      SITE_ADDRESS: ${SITE_ADDRESS:-https://1losion.me}
+    volumes:
+      - ./deploy/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      # 前端静态文件：构建后把 dist/* 放进 ./deploy/www 即可被站点根路径伺服
+      - ./deploy/www:/srv/www:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - api
+    networks: [kaznu]
+
+volumes:
+  pgdata:
+  caddy_data:
+  caddy_config:
+
+networks:
+  kaznu:
+    driver: bridge

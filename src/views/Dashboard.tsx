@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
-import { useI18n } from "../contexts/LanguageContext";
+import { useI18n, type AllTranslationKey } from "../contexts/LanguageContext";
 import { API_URLS } from "../utils/config";
 import { Capacitor } from "@capacitor/core";
 import { buildLiveActivityPayload, syncLiveActivity, type LiveActivityKind } from "../native/liveActivity";
 import { postClassReminderBannerNow } from "../native/notifications";
 import { motorHaptic } from "../utils/haptics";
+import { tr } from "../utils/locale";
 import { playAlarmSound } from "../utils/alarm";
 import { academicWeekOf, ACADEMIC_YEAR } from "../utils/calendar";
 import { courseStatusFromDate } from "../utils/courseStatus";
@@ -315,11 +316,28 @@ function open2gisClassroom(building: string, room: string) {
 }
 
 const QUICK = [
-  { icon: "📚", label: "Materials", color: "#5E5CE6", bg: "rgba(94,92,230,0.13)" },
-  { icon: "📅", label: "Calendar", color: "#10B981", bg: "rgba(16,185,129,0.13)" },
-  { icon: "🔔", label: "Univer", color: "#F59E0B", bg: "rgba(245,158,11,0.13)" },
-  { icon: "🏠", label: "Dorm", color: "#007AFF", bg: "rgba(0,122,255,0.15)" },
+  { key: "materials", icon: "📚", label: "materials", target: "materials", color: "#5E5CE6", bg: "rgba(94,92,230,0.13)" },
+  { key: "calendar", icon: "📅", label: "calendar", target: "schedule", color: "#10B981", bg: "rgba(16,185,129,0.13)" },
+  { key: "profReviews", icon: "⭐", label: "profReviews", target: "prof-reviews", color: "#FF9F0A", bg: "rgba(255,159,10,0.14)" },
+  { key: "univer", icon: "🔔", label: "univer", target: "services", color: "#F59E0B", bg: "rgba(245,158,11,0.13)" },
+  { key: "dorm", icon: "🏠", label: "dorm", target: "dorm", color: "#007AFF", bg: "rgba(0,122,255,0.15)" },
+  { key: "grades", icon: "🎓", label: "grades", target: "grades", color: "#30D158", bg: "rgba(48,209,88,0.13)" },
+  { key: "news", icon: "📰", label: "news", target: "news", color: "#FF453A", bg: "rgba(255,69,58,0.12)" },
+  { key: "profile", icon: "👤", label: "profile", target: "profile", color: "#00C7BE", bg: "rgba(0,199,190,0.13)" },
 ];
+
+function quickLabel(t: (k: AllTranslationKey) => string, label: string): string {
+  switch (label) {
+    case "materials": return t("materials");
+    case "calendar": return t("schedule");
+    case "profReviews": return tr("Prof Reviews", "Оқытушы бағасы", "Отзывы о преп.");
+    case "dorm": return t("dormUtilities");
+    case "grades": return t("grades");
+    case "news": return t("news");
+    case "profile": return tr("Profile", "Профиль", "Профиль");
+    default: return "Univer";
+  }
+}
 
 /** GPA 卡片：从后端 /api/gpa 拉取，再触发数字与折线入场动画。 */
 /** GPA 0→4.0 线性量尺：随挂载从低(0)涨到数据库里的 GPA 值。 */
@@ -392,7 +410,7 @@ function GpaCard({ onNavigate }: { onNavigate: (tab: string) => void }) {
   );
 }
 
-export default function Dashboard({ onOpenProfile, onNavigate }: { onOpenProfile: () => void; onNavigate: (tab: string) => void }) {
+export default function Dashboard({ onOpenProfile, onNavigate, onOpenReviews }: { onOpenProfile: () => void; onNavigate: (tab: string) => void; onOpenReviews?: (professorName?: string, courseName?: string) => void }) {
   const [pressed, setPressed] = useState<string | null>(null);
   const [unreadNotifications, setUnreadNotifications] = useState(() => Math.max(0, 3 - (JSON.parse(localStorage.getItem("readNotificationIds") || "[]") as string[]).length));
   const t = useI18n();
@@ -627,6 +645,15 @@ export default function Dashboard({ onOpenProfile, onNavigate }: { onOpenProfile
                   </svg>
                   {t("navigate")}
                 </button>
+                <button
+                  type="button"
+                  onClick={() => onOpenReviews?.(activeCourse.prof, activeCourse.name)}
+                  className="haptic-action mt-3 ml-2 px-3 py-1.5 rounded-full text-xs font-semibold inline-flex items-center gap-1.5 transition-opacity active:opacity-70"
+                  style={{ background: "rgba(255,214,10,0.14)", color: "#FFD60A", border: "1px solid rgba(255,214,10,0.32)" }}
+                >
+                  <span aria-hidden="true">⭐</span>
+                  {tr("View Professor Rating", "Оқытушы бағасын қарау", "Рейтинг преподавателя")}
+                </button>
               </>
             )}
           </div>
@@ -660,12 +687,20 @@ export default function Dashboard({ onOpenProfile, onNavigate }: { onOpenProfile
                 key={q.label}
                 type="button"
                 onClick={() => {
-                  if (q.label === "Dorm") {
+                  if (q.target === "dorm") {
                     // 快速导航：用宿舍 2GIS 短链直达（iOS 原生里这串链接会自动唤起 2GIS）
                     openExternal(DORM_NAV_URL);
                     return;
                   }
-                  onNavigate(q.label === "Materials" ? "materials" : q.label === "Calendar" ? "schedule" : "services");
+                  if (q.target === "prof-reviews") {
+                    onOpenReviews?.();
+                    return;
+                  }
+                  if (q.target === "profile") {
+                    onOpenProfile();
+                    return;
+                  }
+                  onNavigate(q.target);
                 }}
                 onMouseDown={() => setPressed(q.label)}
                 onMouseUp={() => setPressed(null)}
@@ -678,7 +713,7 @@ export default function Dashboard({ onOpenProfile, onNavigate }: { onOpenProfile
                 <div className="w-10 h-10 squircle-sm flex items-center justify-center text-xl" style={{ background: q.bg }}>
                   {q.icon}
                 </div>
-                <span className="theme-secondary text-xs font-medium" style={{ fontSize: 11 }}>{q.label === "Materials" ? t("materials") : q.label === "Calendar" ? t("schedule") : q.label === "Dorm" ? t("dormUtilities") : "Univer"}</span>
+                <span className="theme-secondary text-xs font-medium" style={{ fontSize: 11 }}>{quickLabel(t, q.label)}</span>
               </button>
             ))}
           </div>

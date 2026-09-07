@@ -1,0 +1,14 @@
+GET / ok
+professors?q=Akhmetov ok -> Nurzhan Akhmetov
+professor detail ok courses = ['MATH102']
+reviews anonymized ok: 2
+login ok name = user3456848 is_new = True
+second login reuses account ok
+PATCH /me/display-name ok
+non-Univer login rejected ok
+eligibility ok
+POST review ok
+duplicate review blocked ok
+legacy /api/schedule + /api/news ok
+courses?q=CS201 ok -> CS201
+All backend smoke tests passed OK

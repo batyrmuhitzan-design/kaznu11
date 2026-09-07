@@ -2,6 +2,8 @@ import { useState } from "react";
 import ThemeSwitcher from "../components/ThemeSwitcher";
 import { useLanguage, useI18n, type Language } from "../contexts/LanguageContext";
 import { clearSession } from "../utils/session";
+import { loadCommunityAccount, saveCommunityAccount } from "../services/ProfReviewsService";
+import { tr } from "../utils/locale";
 import { applyCourseAlertsPreference } from "../services/CourseReminderService";
 import SwipeBack from "../components/SwipeBack";
 import LegalModal from "../components/LegalModal";
@@ -39,7 +41,20 @@ function Settings({ onBack }: { onBack: () => void }) {
   const [showLanguages, setShowLanguages] = useState(false);
   const [newsNotifications, setNewsNotifications] = useState(() => localStorage.getItem("newsNotifications") !== "muted");
   const [classAlerts, setClassAlerts] = useState(() => localStorage.getItem("courseAlertsEnabled") !== "off");
+  const [communityOpen, setCommunityOpen] = useState(false);
+  const [accDraft, setAccDraft] = useState(() => loadCommunityAccount());
+  const [nameDraft, setNameDraft] = useState(accDraft.displayName);
+  const [tagDraft, setTagDraft] = useState(accDraft.departmentTag);
   const languageNames: Record<Language, string> = { EN: "English", KZ: "Қазақша", RU: "Русский" };
+
+  const saveCommunity = () => {
+    const cleaned = nameDraft.trim().replace(/\s+/g, "_");
+    if (cleaned.length < 3 || cleaned.length > 24) return;
+    const next = { ...accDraft, displayName: cleaned, departmentTag: tagDraft.trim() || accDraft.departmentTag, isDefaultName: false };
+    saveCommunityAccount(next);
+    setAccDraft(next);
+    setCommunityOpen(false);
+  };
 
   return (
     <div className="app-surface h-full flex flex-col overflow-hidden">
@@ -59,6 +74,56 @@ function Settings({ onBack }: { onBack: () => void }) {
               </div>
               <ThemeSwitcher />
             </div>
+          </div>
+        </section>
+
+        <section>
+          <p className="theme-section-title text-xs font-semibold uppercase tracking-wide mb-2 px-1">{t("preferences")}</p>
+          <div className="glass squircle-md overflow-hidden">
+            <button
+              type="button"
+              onClick={() => setCommunityOpen((o) => !o)}
+              className="haptic-action theme-row w-full flex items-center justify-between px-4 py-4 text-left"
+            >
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-white flex items-center gap-1.5">
+                  👤 {tr("Global display name", "Жаһандық атау", "Глобальное имя")}
+                </p>
+                <p className="theme-muted text-xs mt-0.5 truncate" style={{ fontFamily: "JetBrains Mono" }}>{accDraft.displayName}</p>
+              </div>
+              <Chevron />
+            </button>
+            {communityOpen && (
+              <div className="px-4 pb-4 space-y-2.5 border-t border-white/10 pt-3">
+                <input
+                  value={nameDraft}
+                  onChange={(e) => setNameDraft(e.target.value)}
+                  maxLength={24}
+                  placeholder="user1234567"
+                  className="w-full px-3 py-2.5 squircle-sm text-sm text-white outline-none"
+                  style={{ background: "var(--field-bg)", border: "1px solid var(--field-border)" }}
+                />
+                <input
+                  value={tagDraft}
+                  onChange={(e) => setTagDraft(e.target.value)}
+                  maxLength={120}
+                  placeholder={tr("Department tag", "Факультет белгісі", "Метка факультета")}
+                  className="w-full px-3 py-2.5 squircle-sm text-sm text-white outline-none"
+                  style={{ background: "var(--field-bg)", border: "1px solid var(--field-border)" }}
+                />
+                <p className="text-[10px] leading-relaxed" style={{ color: "rgba(235,235,245,0.45)" }}>
+                  {tr("Auto-assigned on first login. Reviews never show this name — only the department tag.", "Алғашқы кіруде автоматты түрде беріледі. Бұл атау пікірлерде ешқашан көрсетілмейді — тек факультет белгісі.", "Выдаётся автоматически при входе. Имя не показывается в отзывах — только метка факультета.")}
+                </p>
+                <div className="flex gap-2">
+                  <button type="button" onClick={() => { setNameDraft(accDraft.displayName); setCommunityOpen(false); }} className="haptic-action flex-1 py-2.5 squircle-sm text-xs font-semibold theme-muted" style={{ background: "rgba(255,255,255,0.07)" }}>
+                    {t("cancel")}
+                  </button>
+                  <button type="button" onClick={saveCommunity} className="haptic-action flex-[2] py-2.5 squircle-sm text-xs font-bold" style={{ background: "#007AFF", color: "#fff" }}>
+                    ✓ {tr("Save", "Сақтау", "Сохранить")}
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </section>
 
