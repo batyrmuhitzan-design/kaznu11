@@ -4,6 +4,7 @@ import { useTheme } from "../contexts/ThemeContext";
 import { saveSession, readSavedAccount, readLastUsername } from "../utils/session";
 import { motorHaptic, errorHaptic } from "../utils/haptics";
 import kaznuLogo from "../assets/kaznu-logo.png";
+import LegalModal, { hasAcceptedTerms, persistTermsAccepted } from "../components/LegalModal";
 
 const LANGUAGES: Language[] = ["EN", "KZ", "RU"];
 
@@ -165,6 +166,7 @@ function LoginToolbar() {
 
 export default function LoginScreen({ onSuccess }: { onSuccess: () => void }) {
   const t = useI18n();
+  const { language } = useLanguage();
 
   const savedAccount = readSavedAccount();
   const returning = savedAccount !== null;
@@ -176,8 +178,11 @@ export default function LoginScreen({ onSuccess }: { onSuccess: () => void }) {
   const [error, setError] = useState<string | null>(null);
   const [shaking, setShaking] = useState(false);
   const [leaving, setLeaving] = useState(false);
+  // 法律条款强制同意（首次进入必须勾选）
+  const [agreed, setAgreed] = useState(() => hasAcceptedTerms());
+  const [showLegal, setShowLegal] = useState(false);
 
-  const canSubmit = username.trim().length > 0 && password.length > 0 && !busy && !leaving;
+  const canSubmit = username.trim().length > 0 && password.length > 0 && agreed && !busy && !leaving;
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
@@ -320,6 +325,57 @@ export default function LoginScreen({ onSuccess }: { onSuccess: () => void }) {
             <p className="text-[11px] mt-1.5 pl-[30px] leading-relaxed" style={{ color: "#FF453A", opacity: 0.92 }}>{t("reverifyHint")}</p>
           )}
 
+          {/* 法律条款强制同意 */}
+          <button
+            type="button"
+            role="checkbox"
+            aria-checked={agreed}
+            onClick={() => {
+              const next = !agreed;
+              setAgreed(next);
+              if (next) persistTermsAccepted();
+            }}
+            className="haptic-action mt-5 w-full flex items-start gap-2.5 text-left"
+          >
+            <span
+              className="mt-0.5 w-[22px] h-[22px] rounded-md flex items-center justify-center shrink-0 transition-colors"
+              style={{
+                background: agreed ? "linear-gradient(135deg, #0033A0, #007AFF)" : "var(--field-bg)",
+                border: agreed ? "none" : "1px solid var(--field-border)",
+              }}
+            >
+              {agreed && (
+                <svg viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5">
+                  <path d="M4 12.5l5 5L20 6.5" />
+                </svg>
+              )}
+            </span>
+            <span className="flex-1 text-xs font-medium leading-relaxed" style={{ color: "var(--app-text)" }}>
+              {language === "KZ"
+                ? "Пайдалану шарттары мен құпиялылық саясатымен келісемін"
+                : language === "RU"
+                  ? "Я согласен(на) с Условиями использования и Политикой конфиденциальности"
+                  : "I agree to the Terms of Service and Privacy Policy"}{" "}
+              <button
+                type="button"
+                onClick={() => setShowLegal(true)}
+                className="inline text-[13px] font-bold underline decoration-1 underline-offset-2"
+                style={{ color: "#409CFF" }}
+              >
+                {language === "KZ" ? "Terms & Privacy Policy" : language === "RU" ? "Terms & Privacy Policy" : "Terms & Privacy Policy"}
+              </button>
+            </span>
+          </button>
+          {!agreed && (
+            <p className="text-[11px] mt-1.5 pl-[32px] leading-relaxed" style={{ color: "#FF9F0A", opacity: 0.9 }}>
+              {language === "KZ"
+                ? "Жалғастыру үшін алдымен шарттармен келісіңіз"
+                : language === "RU"
+                  ? "Сначала согласитесь с условиями, чтобы продолжить"
+                  : "Please agree to the terms to continue"}
+            </p>
+          )}
+
           <button
             type="submit"
             disabled={!canSubmit}
@@ -336,6 +392,7 @@ export default function LoginScreen({ onSuccess }: { onSuccess: () => void }) {
           <LoginToolbar />
         </div>
       </div>
+      <LegalModal open={showLegal} onClose={() => setShowLegal(false)} />
     </div>
   );
 }

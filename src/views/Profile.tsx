@@ -4,6 +4,7 @@ import { useLanguage, useI18n, type Language } from "../contexts/LanguageContext
 import { clearSession } from "../utils/session";
 import { applyCourseAlertsPreference } from "../services/CourseReminderService";
 import SwipeBack from "../components/SwipeBack";
+import LegalModal from "../components/LegalModal";
 import { screenFadeOut } from "../utils/screenFade";
 import { APP_VERSION } from "../utils/update";
 
@@ -136,6 +137,7 @@ function About({ onBack }: { onBack: () => void }) {
   const t = useI18n();
   const { language } = useLanguage();
   const [openPolicy, setOpenPolicy] = useState<number | null>(null);
+  const [showLegalTerms, setShowLegalTerms] = useState(false);
 
   const policyTitles: Record<string, string[]> = {
     EN: ["Disclaimer", "Privacy notice", "Terms of use", "No official affiliation"],
@@ -183,6 +185,21 @@ function About({ onBack }: { onBack: () => void }) {
         </div>
         <p className="theme-muted text-xs text-center leading-relaxed px-2">{t("aboutDescription")}</p>
 
+        {/* 条款与隐私（随时可再查看） */}
+        <button
+          type="button"
+          onClick={() => setShowLegalTerms(true)}
+          className="haptic-action glass squircle-md w-full flex items-center justify-between px-4 py-3.5 text-left"
+        >
+          <div>
+            <p className="text-sm font-semibold text-white">
+              {language === "KZ" ? "Құқықтық ақпарат" : language === "RU" ? "Правовая информация" : "Terms of Service & Privacy Policy"}
+            </p>
+            <p className="theme-muted text-[11px] mt-0.5">KK · EN · RU</p>
+          </div>
+          <Chevron />
+        </button>
+        <LegalModal open={showLegalTerms} onClose={() => setShowLegalTerms(false)} />
         {/* 声明 / 隐私 / 条款 */}
         <div className="space-y-2.5">
           {policies.map((policy, index) => {
