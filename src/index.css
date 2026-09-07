@@ -2,6 +2,9 @@
 @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap');
 @import 'tailwindcss';
 
+/* 主题由 <html>.dark/.light 决定（ThemeContext），让 dark: 变体跟随 .dark 类而非系统媒体查询 */
+@custom-variant dark (&:where(.dark, .dark *));
+
 html,
 body,
 #root {
@@ -670,8 +673,8 @@ html {
 .legal-modal-sheet {
   background: #1c1c1e;
   color: #ffffff;
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.5);
+  border: none;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.5);
 }
 .legal-modal-sheet .lms-title {
   color: #ffffff;
@@ -717,7 +720,7 @@ html {
 .light .legal-modal-sheet {
   background: #ffffff;
   color: #111827;
-  border: 1px solid rgba(0, 0, 0, 0.16);
+  border: none;
   box-shadow: 0 18px 60px rgba(0, 0, 0, 0.22);
 }
 .light .legal-modal-sheet .lms-title {

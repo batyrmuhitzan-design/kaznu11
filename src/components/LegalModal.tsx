@@ -62,15 +62,15 @@ export default function LegalModal({
 
   return (
     <div
-      className="fixed inset-0 z-[12000] flex items-center justify-center p-4"
-      style={{ background: "rgba(0,0,0,0.72)", backdropFilter: "blur(10px)", color: "#FFFFFF" }}
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ background: "rgba(0,0,0,0.4)", backdropFilter: "blur(6px)" }}
       onClick={onClose}
     >
       <div
         role="dialog"
         aria-modal="true"
         aria-label={doc.docTitle}
-        className="relative legal-modal-sheet w-full max-w-[560px] h-[82vh] max-h-[760px] flex flex-col squircle-lg overflow-hidden"
+        className="relative legal-modal-sheet w-full max-w-lg h-[82vh] max-h-[760px] flex flex-col rounded-2xl overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         {/* 标题 + 语言切换 */}

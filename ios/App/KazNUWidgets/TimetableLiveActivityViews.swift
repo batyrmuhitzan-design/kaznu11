@@ -113,6 +113,40 @@ struct TimetableLiveActivityLockView: View {
                             remaining: context.state.remainingSeconds
                         )
                     )
+
+                // 课表式线性进度条：SwiftUI Capsule 实现（ActivityKit 锁屏不支持 ProgressView，
+                // 这里用两条圆角填充条手动按剩余比例切割，颜色随三档实时变化）
+                HStack(spacing: 0) {
+                    Capsule()
+                        .fill(
+                            TimetableActivityStyle.phaseColor(
+                                total: context.state.totalSeconds,
+                                remaining: context.state.remainingSeconds
+                            )
+                        )
+                        .frame(
+                            width: CGFloat(
+                                216.0 * TimetableActivityStyle.fraction(
+                                    total: context.state.totalSeconds,
+                                    remaining: context.state.remainingSeconds
+                                )
+                            ),
+                            height: 5
+                        )
+                    Capsule()
+                        .fill(Color.white.opacity(0.16))
+                        .frame(
+                            width: CGFloat(
+                                216.0 * (1 - TimetableActivityStyle.fraction(
+                                    total: context.state.totalSeconds,
+                                    remaining: context.state.remainingSeconds
+                                ))
+                            ),
+                            height: 5
+                        )
+                }
+                .frame(width: 216, height: 5, alignment: .leading)
+                .padding(.top, 4)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
 
