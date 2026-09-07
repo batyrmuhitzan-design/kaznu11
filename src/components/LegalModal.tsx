@@ -70,27 +70,25 @@ export default function LegalModal({
         role="dialog"
         aria-modal="true"
         aria-label={doc.docTitle}
-        className="relative bg-[#1C1C1E] w-full max-w-[560px] h-[82vh] max-h-[760px] flex flex-col squircle-lg overflow-hidden"
-        style={{ border: "1px solid rgba(255,255,255,0.18)", color: "#FFFFFF", boxShadow: "0 18px 60px rgba(0,0,0,0.5)" }}
+        className="relative legal-modal-sheet w-full max-w-[560px] h-[82vh] max-h-[760px] flex flex-col squircle-lg overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         {/* 标题 + 语言切换 */}
-        <div className="shrink-0 p-4 pb-3" style={{ borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
+        <div className="lms-divider shrink-0 p-4 pb-3">
           <div className="flex items-center justify-between gap-3">
-            <p className="text-sm font-bold text-white leading-snug" style={{ letterSpacing: "-0.2px" }}>
+            <p className="lms-title text-sm font-bold leading-snug" style={{ letterSpacing: "-0.2px" }}>
               {doc.docTitle}
             </p>
             <button
               type="button"
               aria-label="Close"
               onClick={onClose}
-              className="haptic-action shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-white"
-              style={{ background: "rgba(255,255,255,0.12)", border: "1px solid rgba(255,255,255,0.22)", color: "#FFFFFF" }}
+              className="haptic-action lms-close shrink-0 w-8 h-8 rounded-full flex items-center justify-center"
             >
               ✕
             </button>
           </div>
-          <p className="text-[10px] mt-1 text-gray-300" style={{ color: "rgba(235,235,245,0.78)" }}>KazNU Helper · Legal · {doc.updated}</p>
+          <p className="lms-meta text-[10px] mt-1">KazNU Helper · Legal · {doc.updated}</p>
 
           <div role="tablist" aria-label="Language" className="flex gap-1.5 mt-3">
             {LANG_TABS.map(({ code, label }) => {
@@ -102,13 +100,7 @@ export default function LegalModal({
                   role="tab"
                   aria-selected={active}
                   onClick={() => setLang(code)}
-                  className="haptic-action flex-1 py-2 rounded-lg text-xs font-bold transition-colors"
-                  style={{
-                    color: active ? "#FFFFFF" : "rgba(235,235,245,0.72)",
-                    background: active ? "linear-gradient(135deg, #0033A0, #007AFF)" : "rgba(255,255,255,0.08)",
-                    border: active ? "1px solid rgba(255,255,255,0.35)" : "1px solid rgba(255,255,255,0.16)",
-                    boxShadow: active ? "0 2px 10px rgba(0,122,255,0.35)" : "none",
-                  }}
+                  className={`haptic-action flex-1 py-2 rounded-lg text-xs font-bold transition-colors ${active ? "lms-tab-active" : "lms-tab"}`}
                 >
                   {label}
                 </button>
@@ -121,10 +113,10 @@ export default function LegalModal({
         <div className="flex-1 min-h-0 overflow-y-auto px-5 py-4 space-y-5">
           {doc.sections.map((section, index) => (
             <section key={`${lang}-${index}`}>
-              <h3 className="text-[13px] font-bold text-white mb-2">{section.title}</h3>
+              <h3 className="lms-section-title text-[13px] font-bold mb-2">{section.title}</h3>
               <div className="space-y-2">
                 {section.body.map((paragraph, pi) => (
-                  <p key={pi} className="text-xs leading-relaxed text-gray-300" style={{ color: "rgba(235,235,245,0.88)" }}>
+                  <p key={pi} className="lms-body text-xs leading-relaxed">
                     {paragraph}
                   </p>
                 ))}
@@ -134,20 +126,18 @@ export default function LegalModal({
         </div>
 
         {/* 底部 */}
-        <div className="shrink-0 p-4 pt-3 flex gap-2.5" style={{ borderTop: "1px solid rgba(255,255,255,0.08)" }}>
+        <div className="lms-divider shrink-0 p-4 pt-3 flex gap-2.5">
           <button
             type="button"
             onClick={() => { void openLegalPdf(); }}
-            className="haptic-action flex-1 py-3 rounded-xl text-sm font-bold"
-            style={{ background: "rgba(255,255,255,0.10)", color: "#fff", border: "1px solid rgba(255,255,255,0.25)" }}
+            className="haptic-action lms-btn-ghost flex-1 py-3 rounded-xl text-sm font-bold"
           >
             📄 {lang === "kk" ? "Толық PDF-ті ашу" : lang === "ru" ? "Открыть PDF" : "Open Full PDF"}
           </button>
           <button
             type="button"
             onClick={onClose}
-            className="haptic-action flex-1 py-3 rounded-xl text-sm font-bold"
-            style={{ background: "linear-gradient(135deg, #0033A0, #007AFF)", color: "#fff", border: "1px solid rgba(255,255,255,0.25)" }}
+            className="haptic-action lms-btn-primary flex-1 py-3 rounded-xl text-sm font-bold"
           >
             {lang === "kk" ? "Жабу" : lang === "ru" ? "Закрыть" : "Close"}
           </button>

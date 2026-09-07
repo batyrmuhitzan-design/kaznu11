@@ -113,6 +113,21 @@ struct TimetableLiveActivityLockView: View {
                             remaining: context.state.remainingSeconds
                         )
                     )
+
+                // 原生进度条：剩余比例实时 → 全绿渐变到红（与圆环同一数据源）
+                ProgressView(
+                    value: TimetableActivityStyle.fraction(
+                        total: context.state.totalSeconds,
+                        remaining: context.state.remainingSeconds
+                    )
+                )
+                .tint(
+                    TimetableActivityStyle.phaseColor(
+                        total: context.state.totalSeconds,
+                        remaining: context.state.remainingSeconds
+                    )
+                )
+                .padding(.top, 2)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
 

@@ -260,7 +260,7 @@ function CountdownRing({ remaining, total, ringColor, urgent = false }: { remain
   const angle = ((remaining % 60) / 60) * 360;
 
   return (
-    <svg width="116" height="116" viewBox="0 0 88 88" className={`absolute right-3 top-3${urgent ? " animate-breathing-glow" : ""}`}>
+    <svg width="116" height="116" viewBox="0 0 88 88" className={`absolute right-3 top-3${urgent ? " animate-vivid-pulse" : ""}`}>
       <circle cx="44" cy="44" r={RADIUS} fill="none" strokeWidth="8" className="ring-track" />
       <circle
         cx="44"
