@@ -341,9 +341,62 @@ export function endCourseLiveActivity(): void {
 }
 
 /**
+ * 课程当天时间窗：[startTime, endTime)，若 weekday 不是今天返回 null。
+ */
+function classWindowFor(lesson: CourseReminderLesson, now: Date): { startAt: Date; endAt: Date } | null {
+  if (lesson.weekday !== todayWeekdayIndex(now)) return null;
+  const startAt = occurrenceDate(lesson.weekday, lesson.startH, lesson.startM, now);
+  const endAt = occurrenceDate(lesson.weekday, lesson.endH, lesson.endM, now);
+  if (endAt.getTime() <= startAt.getTime()) return null;
+  return { startAt, endAt };
+}
+
+/** 课程已在上课时（[开始, 结束)）→ 启动“课中到下课”的 Live Activity。 */
+export function startCourseLiveActivityInClass(lesson: CourseReminderLesson, now: Date = new Date()): boolean {
+  if (!Capacitor.isNativePlatform()) return false;
+  const window = classWindowFor(lesson, now);
+  if (!window || now < window.startAt || now >= window.endAt) return false;
+
+  const active = readActive();
+  if (active && active.key !== `${lesson.id}:${window.endAt.toISOString()}`) endCourseLiveActivity();
+
+  const totalSeconds = (window.endAt.getTime() - window.startAt.getTime()) / 1000;
+  const remainingSeconds = Math.max(0, (window.endAt.getTime() - now.getTime()) / 1000);
+  const minutesLeft = Math.max(0, Math.ceil(remainingSeconds / 60));
+
+  const payload = buildLiveActivityPayload({
+    control: "start",
+    name: lesson.name,
+    type: lesson.type ?? "lecture",
+    professor: lesson.prof ?? "",
+    room: lesson.room ?? "",
+    building: lesson.building ?? "",
+    courseShort: lesson.short ?? initialsOfCourse(lesson.name),
+    startH: lesson.startH,
+    startM: lesson.startM,
+    endH: lesson.endH,
+    endM: lesson.endM,
+    remaining: remainingSeconds,
+    total: totalSeconds,
+    kind: "in-class",
+    statusLabel: minutesLeft > 0 ? `Ends in ${minutesLeft} min` : "Class ending",
+    navigation: NAVIGATION,
+  });
+  syncLiveActivity(payload);
+  writeActive({
+    key: `${lesson.id}:${window.endAt.toISOString()}`,
+    courseId: lesson.id,
+    courseName: lesson.name,
+    launchAtISO: window.endAt.toISOString(),
+  });
+  return true;
+}
+
+/**
  * 课表状态看护：在服务每次被唤醒（挂载/每分钟 tick/回到前台）时调用。
- *  - 发现正处于某节课 [-30min, 上课) → 启动（若尚未启动）或刷新倒计时；
- *  - 若已启动的倒计时越过上课时刻 → 自动结束（最终提示交给 T-0 系统通知）。
+ *  - 课前 [-30min, 上课) → 启动/刷新“倒计时到上课”的灵动岛；
+ *  - 上课中 [上课, 下课) → 维持/补启动“倒计时到下课”的灵动岛；
+ *  - 跨过终点（下课 / 上课点）→ 自动结束并交给系统本地通知。
  */
 export function syncTimetableLiveActivity(lessons: CourseReminderLesson[], now: Date = new Date()): void {
   if (!Capacitor.isNativePlatform() || lessons.length === 0) return;
@@ -365,11 +418,21 @@ export function syncTimetableLiveActivity(lessons: CourseReminderLesson[], now: 
     return;
   }
 
+  // —— 不在课前 30 分钟窗口 ——
+  // 如果正在上课：补启动“倒计时到下课”的灵动岛
+  const inClass = lessons
+    .map((lesson) => ({ lesson, window: classWindowFor(lesson, now) }))
+    .find((item) => item.window !== null && now >= item.window.startAt && now < item.window.endAt);
+
   const active = readActive();
-  if (!active) return;
-  const launchAt = new Date(active.launchAtISO);
-  if (!Number.isNaN(launchAt.getTime()) && now >= launchAt) {
+  if (active) {
+    const endAt = new Date(active.launchAtISO);
+    const isExpired = !Number.isNaN(endAt.getTime()) && now >= endAt;
+    if (!isExpired) return; // 还有未结束的课前倒计时，不做任何事
     endCourseLiveActivity();
+  }
+  if (inClass) {
+    startCourseLiveActivityInClass(inClass.lesson, now);
   }
 }
 

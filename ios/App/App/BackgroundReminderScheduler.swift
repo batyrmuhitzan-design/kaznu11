@@ -1,5 +1,6 @@
 import BackgroundTasks
 import Foundation
+import WidgetKit
 
 /// BGAppRefreshTask：App 被用户完全划掉后，系统仍会在“下一节课开始前 32 分钟”把 App 唤醒，
 /// 在本进程里调用 ActivityKit 启动 Live Activity —— 这是 iOS 本地（无远程推送）能做的最大程度补救。
@@ -115,6 +116,11 @@ enum BackgroundReminderScheduler {
 
         if let data = try? JSONEncoder().encode(lessons) {
             UserDefaults.standard.set(data, forKey: scheduleKey)
+            // 同步给桌面小组件（App Group，需在签名里开启 App Groups 能力）
+            if let suite = UserDefaults(suiteName: "group.com.kaznu.helper.widget") {
+                suite.set(data, forKey: "kaznu.schedule.v1")
+            }
+            WidgetCenter.shared.reloadAllTimelines()
         }
     }
 

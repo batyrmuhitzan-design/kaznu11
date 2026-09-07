@@ -16,20 +16,11 @@ const CIRC = 2 * Math.PI * RADIUS;
 // 课前/课间倒计时窗口（分钟）：每节课开始前 30 分钟进入倒计时
 const PRE_CLASS_WINDOW_MIN = 30;
 
-/** 倒计时颜色：随时间连续渐变 绿 → 橘 → 红（remaining 越大越绿，越小越红） */
+/** 倒计时颜色：progress = remaining/total → >0.5 绿 #34C759；>0.2 橙 #FF9500；其余红 #FF3B30 */
 function countdownTone(pct: number) {
-  const green = [48, 209, 88];
-  const orange = [255, 159, 10];
-  const red = [255, 69, 58];
-  const pos = 1 - Math.min(1, Math.max(0, pct));
-  let a: number[], b: number[], t: number;
-  if (pos <= 0.5) {
-    a = green; b = orange; t = pos / 0.5;
-  } else {
-    a = orange; b = red; t = (pos - 0.5) / 0.5;
-  }
-  const rgb = a.map((v, i) => Math.round(v + (b[i] - v) * t));
-  return `rgb(${rgb[0]}, ${rgb[1]}, ${rgb[2]})`;
+  if (pct > 0.5) return "#34C759";
+  if (pct > 0.2) return "#FF9500";
+  return "#FF3B30";
 }
 
 type CourseType = "lecture" | "lab" | "seminar";
@@ -255,7 +246,7 @@ function formatCountdown(seconds: number) {
 }
 
 /** 大卡片右上角的倒计时环：外环消耗 + 中心时钟（指针随秒旋转）+ 时间数字。 */
-function CountdownRing({ remaining, total, ringColor = "#007AFF" }: { remaining: number; total: number; ringColor?: string }) {
+function CountdownRing({ remaining, total, ringColor }: { remaining: number; total: number; ringColor?: string }) {
   const pct = total > 0 ? remaining / total : 0;
   const [entered, setEntered] = useState(false);
   useEffect(() => {
@@ -263,6 +254,8 @@ function CountdownRing({ remaining, total, ringColor = "#007AFF" }: { remaining:
     return () => cancelAnimationFrame(raf);
   }, []);
 
+  // 未显式传色时，跟随三档阈值变色（与首页课程卡一致）
+  const color = ringColor ?? countdownTone(pct);
   const offset = CIRC * (1 - (entered ? pct : 0));
   const angle = ((remaining % 60) / 60) * 360;
 
@@ -274,20 +267,20 @@ function CountdownRing({ remaining, total, ringColor = "#007AFF" }: { remaining:
         cy="44"
         r={RADIUS}
         fill="none"
-        stroke={ringColor}
+        stroke={color}
         strokeWidth="8"
         strokeLinecap="round"
         strokeDasharray={CIRC}
         strokeDashoffset={offset}
         className="progress-ring"
-        style={{ transition: "stroke-dashoffset 1s cubic-bezier(0.16, 1, 0.3, 1), stroke 500ms ease" }}
+        style={{ transition: "stroke-dashoffset 1s linear, stroke 0.5s ease" }}
       />
       {/* 中间放大显示剩余时间 */}
       <text x="44" y="47" textAnchor="middle" fontSize="15" fontWeight="800" fontFamily="Inter" className="ring-time" style={{ fontVariantNumeric: "tabular-nums", letterSpacing: "-0.5px" }}>
         {formatCountdown(remaining)}
       </text>
-      <text x="44" y="60" textAnchor="middle" fill={ringColor} fontSize="7.5" fontWeight="700" fontFamily="Inter" style={{ letterSpacing: "1.2px" }}>
-        {pct <= 0.25 ? "· LAST" : pct <= 0.5 ? "· HALF" : "· LIVE"}
+      <text x="44" y="60" textAnchor="middle" fill={color} fontSize="7.5" fontWeight="700" fontFamily="Inter" style={{ letterSpacing: "1.2px" }}>
+        {pct <= 0.2 ? "· LAST" : pct <= 0.5 ? "· HALF" : "· LIVE"}
       </text>
     </svg>
   );
