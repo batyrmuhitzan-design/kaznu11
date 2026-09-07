@@ -10,9 +10,13 @@ const config: CapacitorConfig = {
     contentInset: 'never',
   },
   plugins: {
+    LocalNotifications: {
+      // iOS 前台也以系统 Top Banner 形式展示（前台横幅 / 后台横幅 / 锁屏 / 通知中心）。
+      presentationOptions: ['badge', 'sound', 'banner', 'list'],
+    },
     StatusBar: {
       // 状态栏悬浮在 WebView 上方（沉浸式）。页面顶部已由 .app-root 的
-      // padding-top: env(safe-area-inset-top) 让出安全区，两者不会重叠。
+      // padding-top: calc(env(safe-area-inset-top) + 12px) 让出安全区，两者不会重叠。
       overlaysWebView: true,
       // 初始跟随 App 默认深色背景 → 用 DARK（原生 lightContent = 浅色文字）。
       // 深浅主题切换时由 src/native/statusBar.ts 在运行时同步成 LIGHT/DARK。

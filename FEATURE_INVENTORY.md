@@ -78,7 +78,7 @@
 | 课程成绩/学分/老师 | 内置 | 同上 | `GET /api/semesters/{id}` | 🔴 |
 | ECTS/剩余学分 | 内置 | 教学计划数据 | `GET /api/degree-plan` | 🔴 |
 | What-If 模拟 | 本地算法 | 本地即可（输入真实 GPA） | — | ✅ |
-| 导出 PDF / 雷达图 | 占位 | 原生 PDF 导出 | 前端+后端数据 | 🔴 |
+| 导出 PDF / 雷达图 | 占位 | 原生 PDF 导出 | 前端+后端数据 | 🟢 PDF 已接入 jsPDF+Share；雷达图仍为占位 |
 
 ---
 
@@ -88,7 +88,7 @@
 |---|---|---|---|---|
 | 课程资料分组 | 内置静态 | Moodle / Univer 课程文件 | `GET /api/materials?course=...` | 🔴 |
 | 搜索框 | 本地过滤 | 本地过滤（数据来自后端） | — | ✅ |
-| 下载按钮 | 本地打勾“已保存” | 真实下载存 iPhone(Filesystem) | `GET /api/materials/{id}/file` | 🔴 |
+| 下载按钮 | 本地打勾“已保存” | 真实下载存 iPhone(Filesystem) | `GET /api/materials/{id}/file` | 🟢 iOS：jsPDF 生成真实文件写入 Documents + 系统分享 |
 
 > 文件下载 + 存到 iPhone 是原生能力，需要 `@capacitor/filesystem`，工作量中。
 
@@ -159,7 +159,7 @@
 | Live Activity | 锁屏倒计时 | ActivityKit（复杂） | 🔴 占位 |
 | 闹钟声音 | 提醒 | Capacitor Audio | 🔴 |
 | 2GIS/Kaspi 深链 | 外部跳转 | `@capacitor/app-launcher` | 🔴 |
-| PDF 导出 | 成绩单 | Filesystem + Sharing | 🔴 |
+| PDF 导出 | 成绩单 | Filesystem + Sharing | 🟢 jsPDF 生成 + Share Sheet |
 
 ---
 

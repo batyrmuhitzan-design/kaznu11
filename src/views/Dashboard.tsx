@@ -1,11 +1,14 @@
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { useI18n } from "../contexts/LanguageContext";
 import { API_URLS } from "../utils/config";
+import { Capacitor } from "@capacitor/core";
 import { buildLiveActivityPayload, syncLiveActivity } from "../native/liveActivity";
+import { postClassReminderBannerNow } from "../native/notifications";
 import { motorHaptic } from "../utils/haptics";
 import { playAlarmSound } from "../utils/alarm";
 import { useDevSim, useLongPressOpen, SIM_NEWS_EVENT } from "../contexts/DevSimContext";
 import { academicWeekOf, ACADEMIC_YEAR } from "../utils/calendar";
+import { courseStatusFromDate } from "../utils/courseStatus";
 
 const RADIUS = 36;
 const CIRC = 2 * Math.PI * RADIUS;
@@ -423,6 +426,11 @@ export default function Dashboard({ onOpenProfile, onNavigate }: { onOpenProfile
   const countdownPct = hasCountdown && countdown.total > 0 ? countdown.remaining / countdown.total : 0;
   const ringColor = !hasCountdown ? "rgba(255,255,255,0.5)" : countdownTone(countdownPct);
   const hhmm = (h: number, m: number) => `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}`;
+  // “Today / Бүгін” 课程行状态：由系统当前时间动态算出（每 1s 刷新，跨过开始/结束节点自动切换）
+  const todayRows = TODAY_COURSES.map((course) => ({
+    ...course,
+    status: courseStatusFromDate(now, course.startH, course.startM, course.endH, course.endM),
+  }));
   const countdownStatus = hasCountdown
     ? countdown.mode === "in-class"
       ? t("endsIn")
@@ -434,7 +442,7 @@ export default function Dashboard({ onOpenProfile, onNavigate }: { onOpenProfile
   const notifiedRef = useRef(new Set<string>());
 
   // 上课闹钟：只有在 Course Radar 里开了铃铛的课程才提醒；
-  // 提前 30 分钟触发系统通知 + 马达震动 + 铃声；后续 iOS 原生直接接本地通知/闹钟。
+  // 提前 30 分钟触发“真实 iOS 系统横幅通知”（前台/后台/锁屏均可展示）+ 马达震动 + 铃声。
   useEffect(() => {
     if (countdown.mode === "idle") return;
     let alarmIds: Set<string> = new Set();
@@ -447,25 +455,33 @@ export default function Dashboard({ onOpenProfile, onNavigate }: { onOpenProfile
     const { course, remaining } = countdown;
     if (!alarmIds.has(course.id)) return;
     if (remaining <= 0 || remaining > 30 * 60) return;
-    const fire = (key: string, title: string, body: string) => {
+    const fire = (key: string, title: string, body: string, opts?: { alarm?: boolean }) => {
       const nk = `${course.id}:${key}`;
       if (notifiedRef.current.has(nk)) return;
       notifiedRef.current.add(nk);
-      if ("Notification" in window && Notification.permission === "granted") {
-        try {
-          new Notification(title, { body, tag: nk, requireInteraction: true });
-        } catch {
-          /* 忽略通知错误 */
-        }
+      if (opts?.alarm) {
+        motorHaptic();
+        // 原生端系统通知自带提示音，不叠加 WebAudio；Web 预览才播铃声。
+        if (!Capacitor.isNativePlatform()) playAlarmSound();
       }
+      // 原生：@capacitor/local-notifications → 真实系统 Top Banner；
+      // Web：退回浏览器 Notification（仅已授权时）。
+      void postClassReminderBannerNow({ courseId: course.id, marker: key, title, body }).then((sent) => {
+        if (sent) return;
+        if ("Notification" in window && Notification.permission === "granted") {
+          try {
+            new Notification(title, { body, tag: nk, requireInteraction: true });
+          } catch {
+            /* 忽略通知错误 */
+          }
+        }
+      });
     };
     const mins = remaining / 60;
     const room = `${t("room")} ${course.room}`;
     if (countdown.mode === "pre-class") {
       if (mins <= 30 && mins > 29.8) {
-        fire("t30", `${course.name} · ${t("startsIn")} 30 ${t("minutes")}`, room);
-        motorHaptic();
-        playAlarmSound();
+        fire("t30", `${course.name} · ${t("startsIn")} 30 ${t("minutes")}`, room, { alarm: true });
       } else if (mins <= 15 && mins > 14.8) fire("t15", `${course.name} · ${t("startsIn")} 15 ${t("minutes")}`, room);
       else if (mins <= 5 && mins > 4.8) fire("t5", `${course.name} · ${t("startsIn")} 5 ${t("minutes")}`, room);
       else if (mins <= 1 && mins > 0.8) fire("t1", `${course.name} · ${t("startsIn")} 1 ${t("minutes")}`, room);
@@ -677,34 +693,66 @@ export default function Dashboard({ onOpenProfile, onNavigate }: { onOpenProfile
             <button type="button" onClick={() => onNavigate("schedule")} className="haptic-action text-xs font-medium" style={{ color: "#007AFF" }}>{t("seeAll")}</button>
           </div>
           <div className="space-y-2">
-            {[
-              { time: "09:00", name: "Linear Algebra", room: "204", type: "lecture", color: "#5E5CE6", done: true },
-              { time: "11:00", name: "Higher Math II", room: "315", type: "lecture", color: "#5E5CE6", done: false },
-              { time: "14:00", name: "Physics Lab", room: "Lab 3", type: "lab", color: "#30D158", done: false },
-              { time: "16:00", name: "English Seminar", room: "108", type: "seminar", color: "#FF9F0A", done: false },
-            ].map((c) => (
-              <button
-                key={c.time}
-                type="button"
-                onClick={() => onNavigate("schedule")}
-                className={`haptic-action theme-panel interactive-card w-full flex items-center gap-3 px-3.5 py-3 squircle-md text-left ${c.done ? "past-course" : ""}`}
-                style={{ opacity: 1 }}
-              >
-                <div className="text-center shrink-0">
-                  <p className="theme-muted text-xs font-semibold" style={{ fontFamily: "JetBrains Mono" }}>{c.time}</p>
-                </div>
-                <div className="w-0.5 self-stretch rounded-full shrink-0" style={{ background: c.color, opacity: c.done ? 0.4 : 1 }} />
-                <div className="flex-1 min-w-0">
-                  <p className={`text-sm font-semibold truncate ${c.done ? "past-course-title" : "text-white"}`} style={{ textDecoration: c.done ? "line-through" : "none" }}>{c.name}</p>
-                  <p className="theme-muted text-xs">Room {c.room} · {c.type}</p>
-                </div>
-                {c.done && (
-                  <svg viewBox="0 0 20 20" fill="#30D158" className="w-4 h-4 shrink-0">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                  </svg>
-                )}
-              </button>
-            ))}
+            {todayRows.map((course) => {
+              const status = course.status;
+              const done = status === "completed";
+              const live = status === "in-progress";
+              const typeLabel = t(TYPE_META[course.type].labelKey);
+              return (
+                <button
+                  key={course.id}
+                  type="button"
+                  onClick={() => onNavigate("schedule")}
+                  className={`haptic-action theme-panel interactive-card w-full flex items-center gap-3 px-3.5 py-3 squircle-md text-left ${done ? "past-course" : ""}`}
+                  style={{
+                    opacity: 1,
+                    border: live ? "1px solid rgba(48,209,88,0.4)" : done ? "1px solid rgba(255,255,255,0.04)" : undefined,
+                    boxShadow: live ? "0 0 0 1px rgba(48,209,88,0.16), 0 6px 18px rgba(48,209,88,0.12)" : undefined,
+                    transition: "border-color 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease",
+                  }}
+                >
+                  <div className="text-center shrink-0">
+                    <p
+                      className="text-xs font-semibold"
+                      style={{
+                        color: live ? "#30D158" : done ? "rgba(235,235,245,0.35)" : "rgba(235,235,245,0.6)",
+                        fontFamily: "JetBrains Mono",
+                      }}
+                    >
+                      {hhmm(course.startH, course.startM)}
+                    </p>
+                    {live && (
+                      <p className="text-[9px] font-bold mt-0.5" style={{ color: "#30D158", fontFamily: "JetBrains Mono" }}>
+                        {hhmm(course.endH, course.endM)}
+                      </p>
+                    )}
+                  </div>
+                  <div className="w-0.5 self-stretch rounded-full shrink-0" style={{ background: live ? "#30D158" : course.color, opacity: done ? 0.4 : 1 }} />
+                  <div className="flex-1 min-w-0">
+                    <p
+                      className={`text-sm font-semibold truncate ${done ? "past-course-title" : "text-white"}`}
+                      style={{ textDecoration: done ? "line-through" : "none" }}
+                    >
+                      {course.name}
+                    </p>
+                    <p className="theme-muted text-xs">Room {course.room} · {typeLabel}</p>
+                  </div>
+                  {live ? (
+                    <span
+                      className="shrink-0 flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold"
+                      style={{ background: "rgba(48,209,88,0.14)", color: "#30D158", border: "1px solid rgba(48,209,88,0.28)" }}
+                    >
+                      <span className="w-1.5 h-1.5 rounded-full animate-pulse-glow" style={{ background: "#30D158" }} />
+                      {t("statusInProgress")}
+                    </span>
+                  ) : done ? (
+                    <svg viewBox="0 0 20 20" fill="#30D158" className="w-4 h-4 shrink-0" aria-label="Completed">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                    </svg>
+                  ) : null}
+                </button>
+              );
+            })}
           </div>
         </div>
       </div>

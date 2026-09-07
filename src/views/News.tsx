@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
+import { Capacitor } from "@capacitor/core";
 import { useI18n } from "../contexts/LanguageContext";
 import realNews from "../data/realNews.json";
 import { API_URLS } from "../utils/config";
+import { postNewsUpdateBannerNow } from "../native/notifications";
 
 export interface NewsItem {
   id: string;
@@ -73,8 +75,20 @@ export default function News({ onOpenDetail }: { onOpenDetail: (item: NewsItem) 
           setItems(nextItems);
           const seenIds = JSON.parse(localStorage.getItem("seenNewsIds") || "[]") as string[];
           const newItems = initialized ? nextItems.filter((item) => !seenIds.includes(item.id)) : [];
-          if (notificationsEnabled() && "Notification" in window && Notification.permission === "granted") {
-            newItems.forEach((item) => new Notification(item.title, { body: item.summary, tag: item.id }));
+          if (notificationsEnabled()) {
+            newItems.forEach((item) => {
+              // 原生 iOS：真实系统 Top Banner（前台横幅 / 后台横幅 / 锁屏 / 通知中心）；
+              // Web：退回浏览器 Notification（仅已授权时）。
+              if (Capacitor.isNativePlatform()) {
+                void postNewsUpdateBannerNow({ newsId: item.id, title: item.title, body: item.summary });
+              } else if ("Notification" in window && Notification.permission === "granted") {
+                try {
+                  new Notification(item.title, { body: item.summary, tag: item.id });
+                } catch {
+                  /* 忽略通知错误 */
+                }
+              }
+            });
           }
           localStorage.setItem("seenNewsIds", JSON.stringify(nextItems.map((item) => item.id)));
           initialized = true;

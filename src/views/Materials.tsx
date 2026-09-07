@@ -1,7 +1,18 @@
 import { useState } from "react";
 import { useI18n } from "../contexts/LanguageContext";
 import { useToast } from "../contexts/ToastContext";
-import { hapticSuccess } from "../utils/haptics";
+import { hapticSuccess, hapticError } from "../utils/haptics";
+import {
+  isNative,
+  APP_DOCS_FOLDER,
+  createMaterialPdf,
+  toPdfFileName,
+  writePdfFile,
+  deleteSavedPdf,
+  askAfterSave,
+  shareNativeFile,
+  downloadBase64OnWeb,
+} from "../native/fileExport";
 
 type DocFormat = "PDF" | "PPT" | "DOC" | "XLS" | "ZIP";
 
@@ -130,10 +141,22 @@ export default function Materials() {
     return undefined;
   };
 
-  const handleDownload = (fileId: string) => {
-    // 已下载 → 点击移除（本地演示）
+  const waitMs = (ms: number) => new Promise<void>((resolve) => window.setTimeout(resolve, ms));
+
+  /** 下载进度：让 React 有时间把百分比画出来（进度与实际 IO 阶段对应）。 */
+  const pumpProgress = async (fileId: string, from: number, to: number, steps = 7, gap = 85) => {
+    for (let step = 1; step <= steps; step++) {
+      const progress = Math.min(100, Math.round(from + ((to - from) * step) / steps));
+      setActive({ id: fileId, progress });
+      await waitMs(gap);
+    }
+  };
+
+  const handleDownload = async (fileId: string) => {
+    // 已下载 → 点击移除：原生端同时删除 Documents 里真实写出的文件
     if (saved.has(fileId)) {
       const file = findFile(fileId);
+      if (file && isNative()) await deleteSavedPdf(toPdfFileName(file.name));
       setSaved((prev) => {
         const next = new Set(prev);
         next.delete(fileId);
@@ -142,23 +165,69 @@ export default function Materials() {
       toast.push(file ? `《${file.name}》已从本地移除` : "Removed", "info");
       return;
     }
-    if (active) return; // 同一时间只模拟一个下载
+    if (active) return; // 同一时间只处理一个下载
 
     const file = findFile(fileId);
-    let progress = 0;
-    setActive({ id: fileId, progress });
-    const timer = window.setInterval(() => {
-      progress += 6 + Math.random() * 16;
-      if (progress >= 100) {
-        window.clearInterval(timer);
+    const section = COURSE_MATERIALS.find((s) => s.files.some((f) => f.id === fileId));
+    if (!file || !section) return;
+
+    setActive({ id: fileId, progress: 4 });
+    const fileName = toPdfFileName(file.name);
+    try {
+      // 1) 生成真实 PDF（jsPDF → base64 二进制）
+      setActive({ id: fileId, progress: 10 });
+      const base64 = createMaterialPdf({
+        course: section.course,
+        code: section.code,
+        prof: section.prof,
+        title: file.name,
+        format: file.format,
+        size: file.size,
+        date: file.date,
+      });
+      await pumpProgress(fileId, 10, 46);
+
+      if (isNative()) {
+        // 2) 原生：真实写入 Documents（自动建目录），文件在“文件”App 可见
+        await pumpProgress(fileId, 46, 72);
+        const savedFile = await writePdfFile(base64, fileName, { folder: APP_DOCS_FOLDER });
+        await pumpProgress(fileId, 72, 100);
         setActive(null);
         setSaved((prev) => new Set(prev).add(fileId));
-        toast.push(file ? `《${file.name}》已保存至本地` : "File saved", "success");
         void hapticSuccess();
-      } else {
-        setActive({ id: fileId, progress: Math.min(100, Math.round(progress)) });
+        toast.push(`《${file.name}》已保存到本机 ${APP_DOCS_FOLDER}`, "success");
+
+        // 3) 原生 Action Sheet：在“文件”中查看 / 发送分享（不再只弹 Toast）
+        const choice = await askAfterSave(fileName);
+        if (choice === "share") {
+          try {
+            await shareNativeFile(savedFile.uri, {
+              title: file.name,
+              text: `KazNU Helper — ${section.course}`,
+            });
+            void hapticSuccess();
+          } catch {
+            /* 用户取消系统分享，文件仍保留在本机 */
+          }
+        } else if (choice === "view") {
+          toast.push("已保存到 文件 App → 我的 iPhone → KazNU Helper", "success");
+        }
+        return;
       }
-    }, 130);
+
+      // 3) Web 预览：真实浏览器下载（Blob + <a download>）
+      await pumpProgress(fileId, 46, 86);
+      downloadBase64OnWeb(base64, fileName);
+      await pumpProgress(fileId, 86, 100);
+      setActive(null);
+      setSaved((prev) => new Set(prev).add(fileId));
+      void hapticSuccess();
+      toast.push(`《${file.name}》已生成并开始下载`, "success");
+    } catch {
+      setActive(null);
+      void hapticError();
+      toast.push(file ? `《${file.name}》下载失败，请重试` : "Download failed", "error");
+    }
   };
 
   return (
@@ -215,43 +284,59 @@ export default function Materials() {
               {section.files.map((file) => {
                 const isSaved = saved.has(file.id);
                 return (
-                  <div key={file.id} className="flex items-center gap-3 px-4 py-3">
-                    <FileIcon format={file.format} />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-white truncate">{file.name}</p>
-                      <p className="text-[11px] mt-0.5" style={{ color: "rgba(235,235,245,0.45)", fontFamily: "JetBrains Mono" }}>
-                        {file.format} · {file.size}
-                        {file.pages ? ` · ${file.pages} pp` : ""} · {file.date}
-                      </p>
+                  <div key={file.id}>
+                    <div className="flex items-center gap-3 px-4 py-3">
+                      <FileIcon format={file.format} />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-white truncate">{file.name}</p>
+                        <p className="text-[11px] mt-0.5" style={{ color: "rgba(235,235,245,0.45)", fontFamily: "JetBrains Mono" }}>
+                          {file.format} · {file.size}
+                          {file.pages ? ` · ${file.pages} pp` : ""} · {file.date}
+                        </p>
+                      </div>
+                      {active && active.id === file.id ? (
+                        <span
+                          role="progressbar"
+                          aria-valuenow={active.progress}
+                          aria-label={`${active.progress}%`}
+                          className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 squircle-xs text-xs font-bold"
+                          style={{ background: "rgba(0,122,255,0.12)", color: "#409CFF", border: "1px solid rgba(0,122,255,0.3)" }}
+                        >
+                          <span className="inline-block w-3 h-3 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: "#409CFF", borderTopColor: "transparent" }} />
+                          {active.progress}%
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => handleDownload(file.id)}
+                          data-action="download"
+                          data-haptic="heavy"
+                          className="haptic-action shrink-0 flex items-center gap-1.5 px-3 py-1.5 squircle-xs text-xs font-bold transition-all active:scale-95"
+                          style={{
+                            background: isSaved ? "rgba(48,209,88,0.16)" : "rgba(0,122,255,0.16)",
+                            color: isSaved ? "#30D158" : "#409CFF",
+                            border: `1px solid ${isSaved ? "rgba(48,209,88,0.3)" : "rgba(0,122,255,0.3)"}`,
+                          }}
+                        >
+                          <DownloadIcon filled={isSaved} />
+                          {isSaved ? t("downloaded") : t("download")}
+                        </button>
+                      )}
                     </div>
                     {active && active.id === file.id ? (
-                      <span
-                        role="progressbar"
-                        aria-valuenow={active.progress}
-                        aria-label={`${active.progress}%`}
-                        className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 squircle-xs text-xs font-bold"
-                        style={{ background: "rgba(0,122,255,0.12)", color: "#409CFF", border: "1px solid rgba(0,122,255,0.3)" }}
-                      >
-                        <span className="inline-block w-3 h-3 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: "#409CFF", borderTopColor: "transparent" }} />
-                        {active.progress}%
-                      </span>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => handleDownload(file.id)}
-                        data-action="download"
-                        data-haptic="heavy"
-                        className="haptic-action shrink-0 flex items-center gap-1.5 px-3 py-1.5 squircle-xs text-xs font-bold transition-all active:scale-95"
-                        style={{
-                          background: isSaved ? "rgba(48,209,88,0.16)" : "rgba(0,122,255,0.16)",
-                          color: isSaved ? "#30D158" : "#409CFF",
-                          border: `1px solid ${isSaved ? "rgba(48,209,88,0.3)" : "rgba(0,122,255,0.3)"}`,
-                        }}
-                      >
-                        <DownloadIcon filled={isSaved} />
-                        {isSaved ? t("downloaded") : t("download")}
-                      </button>
-                    )}
+                      <div className="px-4 pb-3.5">
+                        <div className="h-1.5 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.08)" }}>
+                          <div
+                            className="h-full rounded-full"
+                            style={{
+                              width: `${Math.max(0, Math.min(100, active.progress))}%`,
+                              background: "linear-gradient(90deg, #007AFF, #30D158)",
+                              transition: "width 160ms linear",
+                            }}
+                          />
+                        </div>
+                      </div>
+                    ) : null}
                   </div>
                 );
               })}

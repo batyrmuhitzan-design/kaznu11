@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import Dashboard from "./views/Dashboard";
 import Grades from "./views/Grades";
 import Materials from "./views/Materials";
@@ -15,10 +15,12 @@ import { syncNativeStatusBar } from "./native/statusBar";
 import { attachHapticDelegate } from "./utils/haptics";
 import UpdateDialog, { type UpdateDialogKind } from "./components/UpdateDialog";
 import { DevPanel } from "./components/DevPanel";
-import { SIM_UPDATE_EVENT } from "./contexts/DevSimContext";
+import { SIM_UPDATE_EVENT, useDevSim } from "./contexts/DevSimContext";
+import { installQuickActionListener, type QuickActionTarget } from "./native/quickActions";
 import { APP_VERSION, classifyUpdate, fetchUpdateInfo, isOptionalSkipped, skipOptional, type UpdateInfo } from "./utils/update";
 import { captureDeviceContext } from "./native/device";
 import { requestNotificationPermission } from "./native/notifications";
+import { attachGlobalLiveActivityWatcher, enableClassReminderNotificationActions } from "./services/CourseReminderService";
 
 const TABS = [
   { id: "dashboard", label: "Home", icon: "house.fill" },
@@ -71,12 +73,50 @@ export default function App() {
   const { resolvedTheme } = useTheme();
   const t = useI18n();
   const tabLabels = { dashboard: t("home"), news: t("news"), materials: t("materials"), schedule: t("schedule"), services: t("services") };
+  const sim = useDevSim();
 
   const [updateState, setUpdateState] = useState<{ kind: Exclude<UpdateDialogKind, "none">; info: UpdateInfo } | null>(null);
 
   const closeUpdateDialog = () => setUpdateState(null);
 
+  // 3D Touch / 长按图标快捷操作：路由跳转（未登录先缓存，登录后补跳）
+  const pendingShortcutRef = useRef<QuickActionTarget | null>(null);
+  const authedRef = useRef(authed);
+  authedRef.current = authed;
+  const routeQuickAction = useCallback(
+    (target: QuickActionTarget) => {
+      if (target === "dev") {
+        sim.openPanel();
+        return;
+      }
+      setActiveTab(target); // "schedule" | "profile"
+    },
+    [sim],
+  );
+  useEffect(() => {
+    return installQuickActionListener((target) => {
+      if (!authedRef.current) {
+        pendingShortcutRef.current = target;
+        return;
+      }
+      routeQuickAction(target);
+    });
+  }, [routeQuickAction]);
+  useEffect(() => {
+    if (!authed) return;
+    const pending = pendingShortcutRef.current;
+    if (!pending) return;
+    pendingShortcutRef.current = null;
+    routeQuickAction(pending);
+  }, [authed, routeQuickAction]);
+
   useEffect(() => attachHapticDelegate(), []);
+  // 全局 Live Activity 看护：课表同步过之后，每 60s / 回到前台检查 T-30 灵动岛
+  useEffect(() => attachGlobalLiveActivityWatcher(), []);
+  // 点击 T-60 通知或“开启灵动岛”按钮 → 立即启动 Live Activity
+  useEffect(() => {
+    enableClassReminderNotificationActions();
+  }, []);
 
   // 已登录状态下每次打开 App 都刷新“最近活跃”，15 天内回来就不用重新验证
   useEffect(() => {

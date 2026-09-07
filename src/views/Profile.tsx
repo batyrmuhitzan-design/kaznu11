@@ -2,6 +2,7 @@ import { useState } from "react";
 import ThemeSwitcher from "../components/ThemeSwitcher";
 import { useLanguage, useI18n, type Language } from "../contexts/LanguageContext";
 import { clearSession } from "../utils/session";
+import { applyCourseAlertsPreference } from "../services/CourseReminderService";
 import { screenFadeOut } from "../utils/screenFade";
 import { APP_VERSION } from "../utils/update";
 
@@ -34,6 +35,7 @@ function Settings({ onBack }: { onBack: () => void }) {
   const t = useI18n();
   const [showLanguages, setShowLanguages] = useState(false);
   const [newsNotifications, setNewsNotifications] = useState(() => localStorage.getItem("newsNotifications") !== "muted");
+  const [classAlerts, setClassAlerts] = useState(() => localStorage.getItem("courseAlertsEnabled") !== "off");
   const languageNames: Record<Language, string> = { EN: "English", KZ: "Қазақша", RU: "Русский" };
 
   return (
@@ -63,6 +65,22 @@ function Settings({ onBack }: { onBack: () => void }) {
             <button type="button" aria-pressed={newsNotifications} onClick={() => { const next = !newsNotifications; setNewsNotifications(next); localStorage.setItem("newsNotifications", next ? "enabled" : "muted"); }} className="haptic-action theme-row w-full flex items-center justify-between px-4 py-4 text-left">
               <span className="text-sm font-semibold text-white">{t("newsNotifications")}</span>
               <span className={`text-xs ${newsNotifications ? "text-green-500" : "theme-muted"}`}>{newsNotifications ? t("enabled") : t("muted")}</span>
+            </button>
+            <button
+              type="button"
+              aria-pressed={classAlerts}
+              onClick={() => {
+                const next = !classAlerts;
+                setClassAlerts(next);
+                void applyCourseAlertsPreference(next);
+              }}
+              className="haptic-action theme-row w-full flex items-center justify-between px-4 py-4 text-left"
+            >
+              <div>
+                <span className="text-sm font-semibold text-white">⏰ 上课与成绩提醒 · Class &amp; grades</span>
+                <p className="theme-muted text-xs mt-0.5">T-60 / T-30 / T-0 reminders · always on by default</p>
+              </div>
+              <span className={`text-xs ${classAlerts ? "text-green-500" : "theme-muted"}`}>{classAlerts ? t("enabled") : t("muted")}</span>
             </button>
             <button type="button" onClick={() => setShowLanguages((open) => !open)} className="haptic-action theme-row w-full flex items-center justify-between px-4 py-4 text-left">
               <span className="text-sm font-semibold text-white">{t("language")}</span>
@@ -103,13 +121,38 @@ function Settings({ onBack }: { onBack: () => void }) {
 
 function About({ onBack }: { onBack: () => void }) {
   const t = useI18n();
+  const [openPolicy, setOpenPolicy] = useState<number | null>(null);
+
+  const policies: Array<{ title: string; body: string }> = [
+    {
+      title: "Disclaimer · 免责声明",
+      body:
+        "KazNU Helper is an independent student tool. Timetable, grades, news and campus data are provided for convenience only and may contain delays or errors. Always confirm critical academic information (exams, deadlines, registrations, fees) with official Al-Farabi Kazakh National University systems and staff. The app does not replace official academic services and is not responsible for decisions made based on its data.",
+    },
+    {
+      title: "Privacy notice · 隐私说明",
+      body:
+        "All personal data (login session, student ID, preferences) stays on your device and is never sold. Location is used only to detect whether you are near campus for campus services. Notifications are scheduled locally on your iPhone. If you later connect to third-party services (Univer, Kaspi, Telegram, WeChat, printers), their own privacy policies apply. You can disable each permission in iOS Settings or inside the app.",
+    },
+    {
+      title: "Terms of use · 使用条款",
+      body:
+        "By using KazNU Helper you agree to use it for lawful, non-commercial, personal purposes. You may not republish, resell or scrape the content. We may change or remove features at any time. The app is provided 'as is' without warranties of any kind, express or implied, to the maximum extent permitted by law.",
+    },
+    {
+      title: "No official affiliation · 非官方声明",
+      body:
+        "KazNU Helper is NOT an official application of Al-Farabi Kazakh National University. 'KazNU' and university names/marks belong to their respective owners and are referenced only to identify the academic context. This project has no sponsorship or endorsement from the university.",
+    },
+  ];
+
   return (
     <div className="app-surface h-full flex flex-col overflow-hidden">
       <div className="screen-pin px-4 pt-1">
         <BackButton onClick={onBack} />
       </div>
       <div className="flex-1 min-h-0 overflow-y-auto px-4 pt-3 pb-28 space-y-4 animate-slide-up">
-        <div className="flex flex-col items-center text-center pt-2 pb-3">
+        <div className="flex flex-col items-center text-center pt-2 pb-1">
           <div className="w-20 h-20 rounded-3xl flex items-center justify-center text-white text-xl font-bold" style={{ background: "linear-gradient(135deg, #0033A0, #007AFF)" }}>AB</div>
           <h1 className="text-2xl font-bold text-white mt-4">KazNU Helper</h1>
           <p className="theme-muted text-sm mt-1">{t("university")}</p>
@@ -118,7 +161,27 @@ function About({ onBack }: { onBack: () => void }) {
           <div className="flex items-center justify-between"><span className="theme-muted text-sm">{t("version")}</span><span className="text-sm font-semibold text-white">{APP_VERSION}</span></div>
           <div className="flex items-center justify-between"><span className="theme-muted text-sm">{t("university")}</span><span className="text-sm font-semibold text-white">Al-Farabi KazNU</span></div>
         </div>
-        <p className="theme-muted text-xs text-center leading-relaxed px-5">{t("aboutDescription")}</p>
+        <p className="theme-muted text-xs text-center leading-relaxed px-2">{t("aboutDescription")}</p>
+
+        {/* 声明 / 隐私 / 条款 */}
+        <div className="space-y-2.5">
+          {policies.map((policy, index) => {
+            const open = openPolicy === index;
+            return (
+              <div key={policy.title} className="glass squircle-md overflow-hidden">
+                <button
+                  type="button"
+                  onClick={() => setOpenPolicy(open ? null : index)}
+                  className="haptic-action theme-row w-full flex items-center justify-between px-4 py-3.5 text-left"
+                >
+                  <span className="text-sm font-semibold text-white">{policy.title}</span>
+                  <Chevron />
+                </button>
+                {open && <p className="theme-secondary text-xs leading-relaxed px-4 pb-4">{policy.body}</p>}
+              </div>
+            );
+          })}
+        </div>
       </div>
     </div>
   );

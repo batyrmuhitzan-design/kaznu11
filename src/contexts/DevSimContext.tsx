@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
 import { hapticImpact, hapticSuccess, hapticTap } from "../utils/haptics";
 import { useToast } from "./ToastContext";
+import { postNewsUpdateBannerNow } from "../native/notifications";
 
 /** 倒计时模拟：把“当前时间”拨到典型时刻来观察主页倒计时。 */
 export type CountdownSim = "off" | "pre5" | "end2";
@@ -75,8 +76,11 @@ export function DevSimProvider({ children }: { children: ReactNode }) {
       /* ignore */
     }
     window.dispatchEvent(new CustomEvent(SIM_NEWS_EVENT, { detail: entry }));
-    toast.push("Simulated a new campus notification 🔔", "info");
     void hapticSuccess();
+    // 原生 iOS：直接弹真实系统 Top Banner（前台/锁屏均可见）；Web：退回 In-App Toast。
+    void postNewsUpdateBannerNow({ newsId: entry.id, title: entry.title, body: entry.body }).then((sent) => {
+      if (!sent) toast.push("Simulated a new campus notification 🔔", "info");
+    });
   }, [toast]);
 
   const triggerUpdateTest = useCallback((kind: "optional" | "forced") => {

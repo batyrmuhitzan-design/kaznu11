@@ -17,7 +17,7 @@
 
 ## 2. 状态栏 / 安全区（问题 1）
 - `src/App.tsx`：已删除假状态栏（9:41/WiFi/电池）DOM。
-- `src/index.css`：`.app-root { padding-top: env(safe-area-inset-top) }`；底部由 `.tab-bar` 用 `env(safe-area-inset-bottom)` 让位。
+- `src/index.css`：`.app-root { padding-top: calc(env(safe-area-inset-top) + 12px) }`（安全区之外再留 12px 呼吸间距）；顶部胶囊 toast（`.toast-pop`，如 “Univer · synced ✓”）同样让出 `env(safe-area-inset-top) + 12px`，绝不压住系统时钟/灵动岛/电池；底部由 `.tab-bar` 用 `env(safe-area-inset-bottom)` 让位。
 - `capacitor.config.ts`：`StatusBar.overlaysWebView=true`、`style:'DARK'`；`ios.contentInset:'never'` 避免与 CSS env 双重偏移。
 - `src/native/statusBar.ts`：深浅主题切换时运行时同步 `Style.Dark/Light`。
 - 原生 iOS 文件 `ios/App/App/Info.plist`：已加 `NSLocationWhenInUseUsageDescription`。
@@ -50,8 +50,56 @@
 - Schedule 默认聚焦“今天”并显示 NOW 时间线；主页标题显示真实/模拟周次。
 
 ## 8. Dev Simulation Console（问题 7）
-- 唤起方式：**Ctrl/Cmd + Shift + D**，或长按 Dashboard 右上角头像 0.6s。
-- 能力：临近上课(5min) / 即将下课(2min)、周次 1–18 切换、模拟新通知(铃铛红点+Toast)、模拟可选/强制更新、一键清除。
+- 唤起方式：**Ctrl/Cmd + Shift + D**，或长按 Dashboard 右上角头像 0.6s，或主屏 3D Touch「开发者控制台」。
+- 能力：临近上课(5min) / 即将下课(2min)、周次 1–18 切换、模拟新通知(铃铛红点 + 系统横幅/Web Toast)、模拟可选/强制更新、一键清除。
+
+## 9. 主屏 3D Touch / 快捷操作 + 系统通知（本次）
+- 快捷项：`ios/App/App/Info.plist → UIApplicationShortcutItems`
+  - 📅 今日课表（→ `schedule` 页）· 🆔 电子学生证（→ `profile` 页）· 🔔 开发者控制台（→ Dev Console）。
+- 原生桥：`SceneDelegate.swift` / `AppDelegate.swift` 中 `KaznuQuickActions` 把快捷 type 注入 WKWebView 的 `kaznu:shortcut` CustomEvent，轮询 `window.__kaznuShortcutAck` 补发防丢。
+- React 入口：`src/native/quickActions.ts` 监听并映射 → `src/App.tsx` 路由跳转（未登录先缓存、登录后补跳）。
+- 系统通知：`src/native/notifications.ts` 用 `@capacitor/local-notifications` 发**真实系统 Top Banner**
+  - “新闻更新”→ `postNewsUpdateBannerNow()`（Dev Console 模拟新通知触发）；
+  - “课前即时提醒”→ `postClassReminderBannerNow()`（Dashboard 30/15/5/1 分钟与下课提醒触发，前台横幅/锁屏/通知中心均可见）。
+  - `capacitor.config.ts` 已加 `LocalNotifications.presentationOptions: [badge,sound,banner,list]`，前台也弹系统横幅。
+  - Web 预览自动退化：浏览器 Notification / In-App Toast。
+
+## 10. iOS 实时活动（Live Activity / 灵动岛倒计时）
+- `ios/App/App/Info.plist`：`NSSupportsLiveActivities = YES` + `kaznuhelper://` URL Scheme（灵动岛展开按钮深链）。
+- Web 服务：`src/services/CourseReminderService.ts`
+  - T-60：排“⏰ 1小时后有课：《课名》[教室]”系统本地通知；
+  - T-30：`syncTimetableLiveActivity`（每分钟 + 回前台补查）经桥启动 Live Activity；
+  - T-0：排“🔔 上课提醒”通知并自动 `end` 灵动岛；
+  - 模块级 `registerReminderLessons` + App 入口 `attachGlobalLiveActivityWatcher` 保证跨页面看护。
+- 原生桥：`ios/App/App/KaznuBridgeViewController.swift`（注入 `window.__KAZNU_LIVE_ACTIVITY_BRIDGE__`
+  + `window.__KAZNU_BG_REMINDER_SYNC__`）+ `TimetableLiveActivityController.swift`（ActivityKit start/update/end）。
+- 后台兜底：`ios/App/App/BackgroundReminderScheduler.swift`（BGAppRefreshTask `kz.kaznu.helper.refresh`，
+  下一节课开始前 32 分钟唤醒；Info.plist 已声明 `BGTaskSchedulerPermittedIdentifiers` + `UIBackgroundModes=[fetch]`）。
+- T-60 通知为 `interruptionLevel=timeSensitive`，带 Category 按钮“开启灵动岛 / Start Live Activity”；
+  点击通知或按钮会以 60 分钟窗口立即启动灵动岛（`src/services/CourseReminderService.ts` 监听
+  `localNotificationActionPerformed`）。
+- 通知分类：上课/成绩“关键提醒”默认开启（设置页可关：⏰ 上课与成绩提醒）；
+  新闻推送由设置页“News notifications”开关控制（默认开启，可关）。
+- 声明与隐私：`LEGAL.md`（免责声明/隐私政策/使用条款/非官方声明），App 内 About → 政策折叠展示。
+- Widget 源码：`ios/KazNUHelperWidget/`（锁屏深色卡片 + 圆环 + Dynamic Island compact/expanded/minimal）。
+- 接入步骤（Xcode 建 Widget Extension Target 并把文件加进两个 Target）：见 **`ios/LIVE_ACTIVITY_GUIDE.md`**。
+- ⚠️ 免费个人证书无法签名 App Extension；且 App 被完全杀死后 iOS 只保证本地通知准时触发，
+  灵动岛需在 App 进程存活/回前台时启动（详见指南“局限说明”）。
+
+## 11. 真实文件下载 / PDF 导出（本次）
+- 新增插件：`@capacitor/filesystem`、`@capacitor/action-sheet`、`@capacitor/share`、`jspdf`。
+- 核心工具：`src/native/fileExport.ts`
+  - `createMaterialPdf()` / `createTranscriptPdf()`：用 jsPDF 动态生成**真实标准 PDF**（A4、校徽色带、自动翻页 + 页码）。
+  - `writePdfFile()` / `savePdfToDocuments()` / `exportPdfForSharing()`：真实写入 iOS Documents / Cache。
+  - `askAfterSave()`：下载完成后弹原生 Action Sheet（在“文件”中查看 / 发送分享 / 取消）。
+  - `shareNativeFile()`：打开系统 iOS Share Sheet（存“文件”、AirDrop、微信/Telegram、打印）。
+  - `downloadBase64OnWeb()`：纯 Web 预览退化为真实浏览器下载。
+- Materials：点击下载 → 生成 PDF → **写入 Documents/KazNU Helper/Downloads**（配合 `Info.plist` 的
+  `UIFileSharingEnabled` / `LSSupportsOpeningDocumentsInPlace`，在“文件 → 我的 iPhone → KazNU Helper”可见）
+  → 行内真实进度条 + 百分比 → 完成成功 Taptic → Action Sheet 选择“查看/分享”；再点按钮可移除并删除真实文件。
+- Grades：导出成绩单 → 用当前 GPA/荣誉/各学期成绩动态生成 PDF → 写入 Cache 临时目录 →
+  **自动弹出系统 Share Sheet**，可存“文件”、发送或无线打印。
+- Web 预览：两端都生成真实文件并由浏览器下载，不弹假 Toast 占位。
 
 ---
 

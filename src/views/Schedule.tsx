@@ -1,10 +1,17 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useTheme } from "../contexts/ThemeContext";
 import { useI18n } from "../contexts/LanguageContext";
 import { API_URLS, STUDENT_ID } from "../utils/config";
 import { useDevSim } from "../contexts/DevSimContext";
 import { academicWeekOf, datesOfThisWeek, nowMinutes, todayWeekdayIndex, ACADEMIC_YEAR } from "../utils/calendar";
+import { courseStatusFromTime } from "../utils/courseStatus";
 import { scheduleClassReminders, type ClassLessonInput } from "../native/notifications";
+import {
+  scheduleUpcomingClassReminders,
+  syncTimetableLiveActivity,
+  registerReminderLessons,
+  type CourseReminderLesson,
+} from "../services/CourseReminderService";
 
 const DAYS = ["mon", "tue", "wed", "thu", "fri", "sat"] as const;
 
@@ -60,6 +67,32 @@ const MOCK_FALLBACK: Record<number, Course[]> = {
   ],
 };
 
+/** 把按星期分组的课表数据展开成 CourseReminderService 需要的扁平课程列表。 */
+function toReminderLessons(data: Record<string, unknown>): CourseReminderLesson[] {
+  const lessons: CourseReminderLesson[] = [];
+  Object.entries(data ?? {}).forEach(([key, list]) => {
+    const weekday = Number(key);
+    if (!Number.isInteger(weekday) || weekday < 0 || weekday > 6 || !Array.isArray(list)) return;
+    (list as Array<Partial<Course> & { id?: string }>).forEach((course, index) => {
+      if (!course.name) return;
+      lessons.push({
+        id: course.id ?? `${key}-${index}-${course.name}`,
+        name: course.name,
+        short: course.short,
+        type: course.type ?? "lecture",
+        room: course.room ?? "",
+        prof: course.prof ?? "",
+        weekday,
+        startH: course.startH ?? 9,
+        startM: course.startM ?? 0,
+        endH: course.endH ?? (course.startH ?? 9) + 1,
+        endM: course.endM ?? 30,
+      });
+    });
+  });
+  return lessons;
+}
+
 const START_H = 8;
 const END_H = 20;
 const TOTAL_MINS = (END_H - START_H) * 60;
@@ -72,13 +105,33 @@ function timeToY(h: number, m: number) {
   return ((h - START_H) * 60 + m) * PX_PER_MIN;
 }
 
-function CourseCard({ course, isDark }: { course: Course; isDark: boolean }) {
+function CourseCard({
+  course,
+  isDark,
+  isToday,
+  nowH,
+  nowM,
+}: {
+  course: Course;
+  isDark: boolean;
+  isToday: boolean;
+  nowH: number;
+  nowM: number;
+}) {
   const [expanded, setExpanded] = useState(false);
   const t = useI18n();
   const s = GET_TYPE_STYLE(course.type, isDark);
   const durationMins = (course.endH - course.startH) * 60 + (course.endM - course.startM);
   const top = timeToY(course.startH, course.startM);
   const height = durationMins * PX_PER_MIN;
+
+  // 与首页“Today / Бүгін”共用同一套状态计算：
+  // 仅“今天”的课程参与判断；已结束的变淡，正在上课的高亮。
+  const status = isToday
+    ? courseStatusFromTime(nowH * 60 + nowM, course.startH, course.startM, course.endH, course.endM)
+    : "upcoming";
+  const isPastNow = status === "completed";
+  const isLiveNow = status === "in-progress";
 
   return (
     <div
@@ -87,9 +140,14 @@ function CourseCard({ course, isDark }: { course: Course; isDark: boolean }) {
         top,
         height,
         background: s.bg,
-        borderLeft: `3px solid ${s.color}`,
+        borderLeft: isLiveNow ? "3px solid #30D158" : `3px solid ${s.color}`,
         border: course.conflict ? `2px solid ${s.color}` : undefined,
-        boxShadow: expanded ? `0 4px 20px ${s.color}30` : undefined,
+        boxShadow: expanded
+          ? `0 4px 20px ${s.color}30`
+          : isLiveNow
+            ? "0 0 0 1px rgba(48,209,88,0.35), 0 4px 16px rgba(48,209,88,0.18)"
+            : undefined,
+        opacity: isPastNow ? 0.45 : 1,
         cursor: "pointer",
         zIndex: expanded ? 10 : 1,
       }}
@@ -134,6 +192,13 @@ export default function Schedule() {
   const [coursesByDay, setCoursesByDay] = useState<Record<number, Course[]>>({});
   const [loading, setLoading] = useState(true);
 
+  // 每分钟刷新一次：让“现在线”与课程状态在跨过上下课时间节点时自动切换
+  const [, setMinuteTick] = useState(0);
+  useEffect(() => {
+    const id = window.setInterval(() => setMinuteTick((tick) => tick + 1), 60_000);
+    return () => window.clearInterval(id);
+  }, []);
+
   // 时间感知：真实时钟 + Dev Console 模拟；自动聚焦到“今天”
   const sim = useDevSim();
   const now = sim.simulatedNow(new Date());
@@ -168,31 +233,52 @@ export default function Schedule() {
 
   useEffect(() => {
     fetch(`${API_URLS.schedule}?student_id=${STUDENT_ID}`)
-      .then((res) => res.json())
+      .then((res) => (res.ok ? res.json() : Promise.reject(new Error("Schedule request failed"))))
       .then((data) => {
-        if (data && typeof data === "object" && !Array.isArray(data) && data.schedule) {
-          setCoursesByDay(data);
-        } else if (data && typeof data === "object" && !Array.isArray(data)) {
-          setCoursesByDay(data);
-        } else {
-          setCoursesByDay(MOCK_FALLBACK);
-        }
-        // 原生本地通知：每周按课表自动提醒（仅原生端生效）
-        if (data && typeof data === "object" && !Array.isArray(data)) {
-          void scheduleClassReminders(flattenLessons(data as Record<string, unknown>), 30);
-        }
+        const raw: Record<string, unknown> =
+          data && typeof data === "object" && !Array.isArray(data) && data.schedule && typeof data.schedule === "object"
+            ? (data.schedule as Record<string, unknown>)
+            : (data as Record<string, unknown>);
+        const hasValidDays = Object.keys(raw ?? {}).some((key) => Number.isInteger(Number(key)) && Array.isArray(raw[key]));
+        const schedule = hasValidDays ? (raw as Record<number, Course[]>) : MOCK_FALLBACK;
+        setCoursesByDay(schedule);
+        const reminderList = toReminderLessons(schedule as unknown as Record<string, unknown>);
+        registerReminderLessons(reminderList);
+
+        // 原生本地通知：每周循环提醒（提前 30 分钟，沿用 Course Radar 开关语义）
+        void scheduleClassReminders(flattenLessons(schedule as unknown as Record<string, unknown>), 30);
+        // 原生系统通知：T-60 “1小时后有课” + T-0 “上课提醒”（杀掉 App 也能触发）
+        void scheduleUpcomingClassReminders(reminderList);
         setLoading(false);
       })
       .catch((err) => {
         console.warn("未连接到 API 后端，使用本地备用课表:", err);
         setCoursesByDay(MOCK_FALLBACK);
+        const reminderList = toReminderLessons(MOCK_FALLBACK as unknown as Record<string, unknown>);
+        registerReminderLessons(reminderList);
         void scheduleClassReminders(flattenLessons(MOCK_FALLBACK as unknown as Record<string, unknown>), 30);
+        void scheduleUpcomingClassReminders(reminderList);
         setLoading(false);
       });
   }, []);
 
   const courses = coursesByDay[selectedDay] || [];
   const nowY = timeToY(nowH, nowM);
+
+  // Live Activity 看护：每分钟 + 回到前台时检查是否要启动/结束灵动岛倒计时
+  const reminderLessons = useMemo(() => toReminderLessons(coursesByDay as unknown as Record<string, unknown>), [coursesByDay]);
+  useEffect(() => {
+    syncTimetableLiveActivity(reminderLessons, new Date());
+    const interval = window.setInterval(() => syncTimetableLiveActivity(reminderLessons, new Date()), 60_000);
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") syncTimetableLiveActivity(reminderLessons, new Date());
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      window.clearInterval(interval);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [reminderLessons]);
 
   const theme = {
     bg: isDark ? "#000000" : "#F2F2F7",
@@ -275,7 +361,9 @@ export default function Schedule() {
               {t("syncing")}
             </div>
           ) : (
-            courses.map((c) => <CourseCard key={c.id} course={c} isDark={isDark} />)
+            courses.map((c) => (
+              <CourseCard key={c.id} course={c} isDark={isDark} isToday={selectedDay === todayIdx} nowH={nowH} nowM={nowM} />
+            ))
           )}
 
           {!loading && courses.length === 0 && (

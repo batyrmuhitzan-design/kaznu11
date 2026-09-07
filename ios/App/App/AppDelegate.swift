@@ -7,8 +7,18 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     var window: UIWindow?
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
+        // 注册后台任务：下一节课开始前 32 分钟唤醒 App 拉起 Live Activity
+        BackgroundReminderScheduler.register()
         // Override point for customization after application launch.
         return true
+    }
+
+    // 兜底：某些系统路径会把主屏快捷操作直接派发给 AppDelegate（场景路径走 SceneDelegate）。
+    func application(_ application: UIApplication,
+                     performActionFor shortcutItem: UIApplicationShortcutItem,
+                     completionHandler: @escaping (Bool) -> Void) {
+        KaznuQuickActions.dispatch(shortcutItem.type)
+        completionHandler(true)
     }
 
     func applicationWillResignActive(_ application: UIApplication) {
@@ -26,7 +36,8 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     }
 
     func applicationDidBecomeActive(_ application: UIApplication) {
-        // Restart any tasks that were paused (or not yet started) while the application was inactive. If the application was previously in the background, optionally refresh the user interface.
+        // 回到前台时确保 BGTask 队列里有“下一节课 -32min”的后台唤醒点
+        BackgroundReminderScheduler.scheduleNextIfNeeded()
     }
 
     func applicationWillTerminate(_ application: UIApplication) {

@@ -128,11 +128,12 @@ button:focus-visible { outline: 2px solid rgba(0,122,255,0.8); outline-offset: 2
 .light .past-course-title { color: rgba(60,60,67,0.62); }
 /* ===== 原生状态栏适配（不再渲染假状态栏 DOM）=====
    状态栏悬浮在 WebView 上方（StatusBar overlaysWebView=true），
-   顶层 .app-root 用 env(safe-area-inset-top) 让出刘海/灵动岛高度，
-   保证各页面 Header（如 Good morning / Week 6）不与真实系统状态栏重叠。 */
+   顶层 .app-root 在 env(safe-area-inset-top) 之外再留 12px 呼吸间距，
+   保证各页面 Header（Good morning / Week 6 / 标题行）绝不与状态栏
+   时钟、灵动岛/刘海、电池等系统元素重叠。 */
 .app-root {
   box-sizing: border-box;
-  padding-top: env(safe-area-inset-top, 0px);
+  padding-top: calc(env(safe-area-inset-top, 0px) + 12px);
 }
 
 button { position: relative; overflow: hidden; }
@@ -225,7 +226,9 @@ button:active::after { opacity: 0.85; animation: button-sweep 520ms cubic-bezier
 .toast-pop {
   position: fixed;
   left: 50%;
-  top: 20px;
+  /* 顶部同步状态胶囊（如 “Univer · synced ✓”）：必须让出刘海/灵动岛安全区，
+     从 env(safe-area-inset-top) 下方 12px 开始，避免压住系统时钟与电池图标。 */
+  top: calc(env(safe-area-inset-top, 0px) + 12px);
   z-index: 70;
   padding: 10px 16px;
   border-radius: 999px;
