@@ -13,6 +13,8 @@
  * 无需改动 Web 侧 UI 代码。
  */
 
+import { Capacitor } from "@capacitor/core";
+
 export type LiveActivityPhase = "green" | "orange" | "red";
 export type LiveActivityKind = "pre-class" | "in-class" | "none";
 /** 原生端动作：start=启动灵动岛；update=刷新剩余秒数/颜色；end=结束并收起。 */
@@ -123,12 +125,54 @@ declare global {
 }
 
 /**
+ * 原生桥可能晚于 JS 首帧注入（WKWebView atDocumentStart 一般更快，但极冷启动/重载时
+ * React 可能比注入更早开始）。这里做一次缓冲：原生平台若桥暂缺，先缓存最新 payload，
+ * 每 1s 重试投递（最多 15s），桥就绪后先补发，避免“信息栏一直没有卡片”。
+ */
+let pendingBridgePayload: LiveActivityPayload | null = null;
+let bridgeRetryTimer: number | undefined;
+
+function hasLiveActivityBridge(): boolean {
+  return typeof window !== "undefined" && typeof window.__KAZNU_LIVE_ACTIVITY_BRIDGE__ === "function";
+}
+
+function flushPendingBridgePayload(): boolean {
+  if (!pendingBridgePayload || !hasLiveActivityBridge()) return false;
+  const payload = pendingBridgePayload;
+  pendingBridgePayload = null;
+  window.__KAZNU_LIVE_ACTIVITY_BRIDGE__!(payload);
+  return true;
+}
+
+function scheduleBridgeRetry(): void {
+  if (bridgeRetryTimer !== undefined) return;
+  let attempts = 0;
+  const tick = () => {
+    bridgeRetryTimer = undefined;
+    if (flushPendingBridgePayload()) return;
+    attempts += 1;
+    if (attempts < 15 && !hasLiveActivityBridge()) {
+      bridgeRetryTimer = window.setTimeout(tick, 1000);
+    } else {
+      pendingBridgePayload = null;
+    }
+  };
+  bridgeRetryTimer = window.setTimeout(tick, 1000);
+}
+
+/**
  * 同步到原生桥。
  * - 原生包（WKWebView/ActivityKit）会注入 window.__KAZNU_LIVE_ACTIVITY_BRIDGE__。
  * - 纯 Web 预览里这里什么都不做 —— App 内不显示任何悬浮小部件。
  */
 export function syncLiveActivity(payload: LiveActivityPayload) {
-  if (typeof window !== "undefined" && typeof window.__KAZNU_LIVE_ACTIVITY_BRIDGE__ === "function") {
-    window.__KAZNU_LIVE_ACTIVITY_BRIDGE__(payload);
+  if (typeof window === "undefined") return;
+  if (hasLiveActivityBridge()) {
+    window.__KAZNU_LIVE_ACTIVITY_BRIDGE__!(payload);
+    return;
   }
+  if (!Capacitor.isNativePlatform()) return;
+  // 原生桥暂缺：缓存“start/update/end”最新一条，等注入后再补发
+  pendingBridgePayload = payload;
+  scheduleBridgeRetry();
 }
