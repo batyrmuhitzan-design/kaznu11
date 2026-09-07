@@ -7,7 +7,8 @@
     "dev": "vite --host",
     "build": "vite build",
     "preview": "vite preview",
-    "format": "oxfmt"
+    "format": "oxfmt",
+    "postinstall": "node scripts/patch-capacitor-system-sound.cjs"
   },
   "dependencies": {
     "@capacitor/action-sheet": "^8.1.1",

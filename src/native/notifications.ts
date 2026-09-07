@@ -74,8 +74,8 @@ export async function postSystemBannerNow(opts: SystemBannerOptions): Promise<bo
     title: opts.title,
     body: opts.body,
     threadIdentifier: opts.threadId,
-    // 必须显式声明，否则 iOS 本地通知 content.sound 为空 → 锁屏/横幅不响铃。
-    sound: "class-alert.wav",
+    // iOS 系统默认通知声（Tri-tone）：原生端由 postinstall 补丁映射到 UNNotificationSound.default
+    sound: "system-default",
     // iOS 8.3.0+：App 在前台也显示横幅（background/lock screen 由系统原生接管）。
     foreground: true,
     schedule: { at: new Date(Date.now() + BANNER_DELAY_MS) },
@@ -162,7 +162,7 @@ export async function scheduleClassReminders(lessons: ClassLessonInput[], leadMi
         id: 100 + (idx % 5000),
         title: `${lesson.name} · 上课提醒`,
         body: `还有 ${leadMinutes} 分钟开始${lesson.room ? ` · ${lesson.room}` : ""}`,
-        sound: "class-alert.wav",
+        sound: "system-default",
         schedule: { on: { weekday, hour, minute } },
       };
     })

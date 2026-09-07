@@ -233,6 +233,7 @@ export async function scheduleUpcomingClassReminders(
         // 用户点通知/按钮时，用 courseId 找回课程并立即启动 Live Activity
         extra: { kind: "class-upcoming", marker: c.marker, courseId: lesson.id },
         foreground: true,
+        sound: "system-default",
         schedule: { at: c.at },
       });
     }

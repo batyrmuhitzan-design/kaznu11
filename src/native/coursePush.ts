@@ -107,6 +107,8 @@ export async function enableCoursePush(spec: CoursePushSpec): Promise<boolean> {
     schedule: { on: { weekday: weekdayEnum(item.weekday), hour: item.at.hour, minute: item.at.minute } },
     threadIdentifier: `kaznu.course.${spec.id}`,
     extra: { courseId: spec.id },
+    // 系统经典 Tri-tone 通知声
+    sound: "system-default",
     // iOS 16+ 时效性提醒
     interruptionLevel: "timeSensitive",
   }));
