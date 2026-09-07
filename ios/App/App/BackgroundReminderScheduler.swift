@@ -66,20 +66,47 @@ enum BackgroundReminderScheduler {
     }
 
     /// 计算并尝试启动 Live Activity；返回是否已启动。
+    /// 覆盖两个窗口：
+    ///  - 课前 T-32 分钟 ~ 上课：倒计时到“上课时刻”
+    ///  - 正在上课：倒计时到“下课时刻”（进度=已上课时长）
+    /// 非灵动岛机型（iPhone XR 等）系统会自动把同一 Activity 渲染成锁屏/通知栏卡片。
     @discardableResult
     static func tryStartLiveActivityIfNeeded(now: Date = Date()) -> Bool {
         guard let lessons = loadLessons() else { return false }
         guard #available(iOS 16.2, *) else { return false }
         for lesson in lessons {
             guard let start = date(for: lesson.weekday, h: lesson.startH, m: lesson.startM, now: now) else { continue }
-            // 32 分钟窗口（BGTask 的 32 分钟触发点已含 2 分钟系统余量）
-            let windowStart = start.addingTimeInterval(-32 * 60)
-            guard now >= windowStart && now < start else { continue }
+            guard let end = date(for: lesson.weekday, h: lesson.endH, m: lesson.endM, now: now),
+                  end > start else { continue }
 
-            let remaining = start.timeIntervalSince(now)
-            let payload = startPayload(for: lesson, startDate: start, remainingSeconds: remaining)
-            TimetableLiveActivityController.startNow(payload)
-            return true
+            let preWindowStart = start.addingTimeInterval(-32 * 60)
+            if now >= preWindowStart && now < start {
+                let remaining = start.timeIntervalSince(now)
+                let payload = startPayload(
+                    for: lesson,
+                    startDate: start,
+                    endDate: end,
+                    kind: "pre-class",
+                    totalSeconds: 30 * 60,
+                    remainingSeconds: remaining
+                )
+                TimetableLiveActivityController.startNow(payload)
+                return true
+            }
+            if now >= start && now < end {
+                let total = end.timeIntervalSince(start)
+                let remaining = max(0, end.timeIntervalSince(now))
+                let payload = startPayload(
+                    for: lesson,
+                    startDate: start,
+                    endDate: end,
+                    kind: "in-class",
+                    totalSeconds: total,
+                    remainingSeconds: remaining
+                )
+                TimetableLiveActivityController.startNow(payload)
+                return true
+            }
         }
         return false
     }
@@ -165,13 +192,19 @@ enum BackgroundReminderScheduler {
     private static func startPayload(
         for lesson: Lesson,
         startDate: Date,
+        endDate: Date,
+        kind: String,
+        totalSeconds: Double,
         remainingSeconds: TimeInterval
     ) -> [String: Any] {
-        let total: Double = 30 * 60
         let remaining = max(0, remainingSeconds)
-        let fraction = remaining / total
+        let fraction = remaining / totalSeconds
         let phase: String = fraction > 0.5 ? "green" : (fraction > 0.25 ? "orange" : "red")
         let courseShort = (lesson.short ?? initials(of: lesson.name)).uppercased()
+        let isPreClass = kind == "pre-class"
+        let statusLabel = isPreClass
+            ? "Starts in \(Int(ceil(remaining / 60))) min"
+            : "Class ends in \(Int(ceil(remaining / 60))) min"
 
         return [
             "control": "start",
@@ -188,10 +221,10 @@ enum BackgroundReminderScheduler {
                 "end": String(format: "%02d:%02d", lesson.endH, lesson.endM),
             ],
             "countdownSeconds": remaining,
-            "totalSeconds": total,
+            "totalSeconds": totalSeconds,
             "phase": phase,
-            "kind": "pre-class",
-            "statusLabel": "Starts in \(Int(ceil(remaining / 60))) min",
+            "kind": kind,
+            "statusLabel": statusLabel,
             "navigation": ["label": "Open Schedule", "url": "kaznuhelper://schedule"],
             "shouldShowLiveActivity": true,
         ]

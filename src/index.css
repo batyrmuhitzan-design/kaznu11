@@ -210,13 +210,9 @@ button { position: relative; }
   border-top: 0.5px solid rgba(255,255,255,0.1);
 }
 
-/* 刷新/操作提示（toast）：深浅主题都保证白字，淡入下滑更丝滑 */
+/* 刷新/操作提示（toast）：放在 .toast-host（全宽 flex 居中）里，无需自身定位/猜位移 */
 .toast-pop {
-  position: fixed;
-  left: 50%;
-  /* 顶部同步状态胶囊（如 “Univer · synced ✓”）：必须让出刘海/灵动岛安全区，
-     从 env(safe-area-inset-top) 下方 12px 开始，避免压住系统时钟与电池图标。 */
-  top: calc(env(safe-area-inset-top, 0px) + 12px);
+  position: relative;
   z-index: 70;
   padding: 10px 16px;
   border-radius: 999px;
@@ -227,9 +223,9 @@ button { position: relative; }
   border: 1px solid rgba(255, 255, 255, 0.16);
   box-shadow: 0 6px 22px rgba(0, 0, 0, 0.28);
   width: max-content;
-  max-width: 86%;
+  max-width: 100%;
   text-align: center;
-  transform: translateX(-50%);
+  margin: 0 auto;
   animation: toast-in 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
   pointer-events: none;
 }
@@ -240,13 +236,13 @@ button { position: relative; }
   box-shadow: 0 6px 22px rgba(0, 0, 0, 0.14);
 }
 @keyframes toast-in {
-  from { opacity: 0; transform: translateX(-50%) translateY(-10px) scale(0.94); }
-  to { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+  from { opacity: 0; transform: translateY(-10px) scale(0.94); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
 }
 .toast-pop.toast-out { animation: toast-out 0.28s ease-in both; }
 @keyframes toast-out {
-  from { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
-  to { opacity: 0; transform: translateX(-50%) translateY(-8px) scale(0.95); }
+  from { opacity: 1; transform: translateY(0) scale(1); }
+  to { opacity: 0; transform: translateY(-8px) scale(0.95); }
 }
 @media (prefers-reduced-motion: reduce) {
   .toast-pop { animation: none; }

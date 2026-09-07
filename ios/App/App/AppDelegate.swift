@@ -9,6 +9,10 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
         // 注册后台任务：下一节课开始前 32 分钟唤醒 App 拉起 Live Activity
         BackgroundReminderScheduler.register()
+        // 启动时先补一次 BGTask 调度，并尝试“强制拉起”当前窗口的课表 Live Activity
+        //（课前 30 分钟 / 正在上课都会直接 Activity.request，iPhone XR~17 通用）
+        BackgroundReminderScheduler.scheduleNextIfNeeded()
+        BackgroundReminderScheduler.tryStartLiveActivityIfNeeded()
         // Override point for customization after application launch.
         return true
     }

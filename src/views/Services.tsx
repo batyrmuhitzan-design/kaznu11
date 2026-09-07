@@ -507,9 +507,14 @@ export default function Services() {
         </div>
       </div>
 
-      {/* Toast */}
+      {/* Toast：全宽 flex 容器精确定位，不依赖 translateX 猜位置 */}
       {toast && (
-        <div className={`toast-pop${toastOut ? " toast-out" : ""}`}>{toast}</div>
+        <div
+          className="toast-host fixed inset-x-0 top-0 z-[120] flex justify-center pointer-events-none"
+          style={{ paddingTop: "calc(env(safe-area-inset-top, 0px) + 14px)" }}
+        >
+          <div className={`toast-pop${toastOut ? " toast-out" : ""}`}>{toast}</div>
+        </div>
       )}
 
       {/* 通知权限被拒 → 引导去系统设置 */}

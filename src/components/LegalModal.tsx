@@ -61,16 +61,17 @@ export default function LegalModal({
   const doc = LEGAL_DATA[lang];
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      style={{ background: "rgba(0,0,0,0.4)", backdropFilter: "blur(6px)" }}
-      onClick={onClose}
-    >
+    <div className="fixed inset-0 z-50 flex flex-col justify-end" onClick={onClose}>
+      {/* 背景毛玻璃（不用黑色遮罩条，两侧不再出现黑边） */}
+      <div
+        className="absolute inset-0"
+        style={{ background: "rgba(0,0,0,0.22)", backdropFilter: "blur(6px)", WebkitBackdropFilter: "blur(6px)" }}
+      />
       <div
         role="dialog"
         aria-modal="true"
         aria-label={doc.docTitle}
-        className="relative legal-modal-sheet w-full max-w-lg h-[82vh] max-h-[760px] flex flex-col rounded-2xl overflow-hidden"
+        className="legal-modal-sheet relative flex flex-col w-full h-[92vh] rounded-t-[28px] overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         {/* 标题 + 语言切换 */}
@@ -125,8 +126,8 @@ export default function LegalModal({
           ))}
         </div>
 
-        {/* 底部 */}
-        <div className="lms-divider shrink-0 p-4 pt-3 flex gap-2.5">
+        {/* 底部（含 Home Indicator 安全区） */}
+        <div className="lms-divider shrink-0 px-4 pt-3 flex gap-2.5" style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 14px)" }}>
           <button
             type="button"
             onClick={() => { void openLegalPdf(); }}
