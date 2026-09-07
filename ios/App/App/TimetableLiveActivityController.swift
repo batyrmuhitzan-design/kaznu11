@@ -20,6 +20,11 @@ import Foundation
 enum TimetableLiveActivityController {
     private static let storedIDKey = "kaznu.timetableLiveActivityID"
 
+    /// 最近一次 Activity.request 的结果描述（供 Web 端回执提示）
+    private(set) static var lastRequestMessage = "no-request"
+    /// 最近一次是否成功
+    private(set) static var lastRequestSucceeded = false
+
     // MARK: - 入口
 
     static func handle(_ payload: [String: Any]) {
@@ -59,8 +64,12 @@ enum TimetableLiveActivityController {
                 pushType: nil
             )
             UserDefaults.standard.set(activity.id, forKey: storedIDKey)
+            lastRequestSucceeded = true
+            lastRequestMessage = "Live Activity started · id=\(activity.id)"
         } catch {
-            // 未授权 / 超过数量上限等情况静默失败（本地通知仍会兜底）
+            // 未授权 / 超过数量上限等情况：记录原因供 Web 端回执，便于排查
+            lastRequestSucceeded = false
+            lastRequestMessage = "Activity.request failed: \(error.localizedDescription)"
         }
     }
 

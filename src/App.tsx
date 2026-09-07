@@ -5,6 +5,7 @@ import Materials from "./views/Materials";
 import Schedule from "./views/Schedule";
 import Services from "./views/Services";
 import Profile from "./views/Profile";
+import { useToast } from "./contexts/ToastContext";
 import { useI18n } from "./contexts/LanguageContext";
 import News, { NewsDetail, type NewsItem } from "./views/News";
 import Notifications from "./views/Notifications";
@@ -73,6 +74,7 @@ export default function App() {
   const [selectedNews, setSelectedNews] = useState<NewsItem | null>(null);
   const { resolvedTheme } = useTheme();
   const t = useI18n();
+  const toast = useToast();
   const tabLabels = { dashboard: t("home"), news: t("news"), materials: t("materials"), schedule: t("schedule"), services: t("services") };
   const sim = useDevSim();
 
@@ -114,6 +116,22 @@ export default function App() {
   useEffect(() => attachHapticDelegate(), []);
   // 全局 Live Activity 看护：课表同步过之后，每 60s / 回到前台检查 T-30 灵动岛
   useEffect(() => attachGlobalLiveActivityWatcher(), []);
+  // 原生回执：把 Activity.request 是否真的成功告诉用户（长按头像 → 模拟倒计时即可看到）
+  useEffect(() => {
+    const onResult = (event: Event) => {
+      const detail = (event as CustomEvent<{ ok: boolean; authorized: boolean; message: string }>).detail;
+      if (!detail) return;
+      if (detail.ok) {
+        toast.push("Live Activity 已由 iOS 原生启动 ✓ 按 Home 键查看", "success");
+      } else if (!detail.authorized) {
+        toast.push("系统未授权实时活动：请到 设置→KazNU Helper→实时活动 开启", "error");
+      } else {
+        toast.push(`Live Activity 启动失败：${detail.message}`, "error");
+      }
+    };
+    window.addEventListener("kaznu:nativeLiveActivityResult", onResult);
+    return () => window.removeEventListener("kaznu:nativeLiveActivityResult", onResult);
+  }, [toast]);
   // 点击 T-60 通知或“开启灵动岛”按钮 → 立即启动 Live Activity
   useEffect(() => {
     enableClassReminderNotificationActions();
