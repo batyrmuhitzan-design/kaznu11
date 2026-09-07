@@ -55,7 +55,8 @@ enum TimetableLiveActivityController {
         do {
             let activity = try Activity<TimetableLiveActivityAttributes>.request(
                 attributes: content.attributes,
-                content: ActivityContent(state: content.state, staleDate: nil)
+                content: ActivityContent(state: content.state, staleDate: nil),
+                pushType: nil
             )
             UserDefaults.standard.set(activity.id, forKey: storedIDKey)
         } catch {

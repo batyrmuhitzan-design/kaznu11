@@ -1,5 +1,6 @@
 import ActivityKit
 import SwiftUI
+import WidgetKit
 
 // ===================== 公共样式 =====================
 
