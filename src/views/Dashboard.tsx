@@ -525,6 +525,11 @@ export default function Dashboard({ onOpenProfile, onNavigate }: { onOpenProfile
       if (liveSessionKeyRef.current !== sessionKey) {
         liveSessionKeyRef.current = sessionKey;
         lastSyncRef.current = remainingSec;
+        window.dispatchEvent(
+          new CustomEvent("kaznu:liveActivitySendDebug", {
+            detail: { name: liveCourse.name, mode: countdown.mode, seconds: remainingSec },
+          }),
+        );
         syncLiveActivity(buildLiveActivityPayload({ ...makeInput(), control: "start" }));
         return;
       }

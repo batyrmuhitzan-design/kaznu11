@@ -118,19 +118,28 @@ export default function App() {
   useEffect(() => attachGlobalLiveActivityWatcher(), []);
   // 原生回执：把 Activity.request 是否真的成功告诉用户（长按头像 → 模拟倒计时即可看到）
   useEffect(() => {
+    const onSendDebug = (event: Event) => {
+      const detail = (event as CustomEvent<{ name: string; mode: string; seconds: number }>).detail;
+      if (!detail) return;
+      toast.push(`📤 前端已请求原生启动 Live Activity：${detail.name}`, "info");
+    };
     const onResult = (event: Event) => {
       const detail = (event as CustomEvent<{ ok: boolean; authorized: boolean; message: string }>).detail;
       if (!detail) return;
       if (detail.ok) {
-        toast.push("Live Activity 已由 iOS 原生启动 ✓ 按 Home 键查看", "success");
+        toast.push("✅ Live Activity 已由 iOS 原生启动，按 Home 键查看", "success");
       } else if (!detail.authorized) {
         toast.push("系统未授权实时活动：请到 设置→KazNU Helper→实时活动 开启", "error");
       } else {
         toast.push(`Live Activity 启动失败：${detail.message}`, "error");
       }
     };
+    window.addEventListener("kaznu:liveActivitySendDebug", onSendDebug);
     window.addEventListener("kaznu:nativeLiveActivityResult", onResult);
-    return () => window.removeEventListener("kaznu:nativeLiveActivityResult", onResult);
+    return () => {
+      window.removeEventListener("kaznu:liveActivitySendDebug", onSendDebug);
+      window.removeEventListener("kaznu:nativeLiveActivityResult", onResult);
+    };
   }, [toast]);
   // 点击 T-60 通知或“开启灵动岛”按钮 → 立即启动 Live Activity
   useEffect(() => {
