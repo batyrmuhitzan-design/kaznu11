@@ -199,6 +199,19 @@ function About({ onBack }: { onBack: () => void }) {
           </div>
           <Chevron />
         </button>
+        <button
+          type="button"
+          onClick={() => window.open("/KazNU_Helper_Legal_Notice_3Lang.pdf", "_blank")}
+          className="haptic-action glass squircle-md w-full flex items-center justify-between px-4 py-3.5 text-left"
+        >
+          <div>
+            <p className="text-sm font-semibold text-white">
+              {language === "KZ" ? "📄 Толық PDF ашу" : language === "RU" ? "📄 Открыть полный PDF" : "📄 Open Full PDF Legal Notice"}
+            </p>
+            <p className="theme-muted text-[11px] mt-0.5">KK · EN · RU · PDF</p>
+          </div>
+          <Chevron />
+        </button>
         <LegalModal open={showLegalTerms} onClose={() => setShowLegalTerms(false)} />
         {/* 声明 / 隐私 / 条款 */}
         <div className="space-y-2.5">

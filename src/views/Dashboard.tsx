@@ -16,11 +16,11 @@ const CIRC = 2 * Math.PI * RADIUS;
 // 课前/课间倒计时窗口（分钟）：每节课开始前 30 分钟进入倒计时
 const PRE_CLASS_WINDOW_MIN = 30;
 
-/** 倒计时颜色：progress = remaining/total → >0.5 绿 #34C759；>0.2 橙 #FF9500；其余红 #FF3B30 */
+/** 倒计时颜色：progress = remaining/total → >0.5 绿 #10B981；>0.2 橙 #F59E0B；≤0.2 红 #EF4444 */
 function countdownTone(pct: number) {
-  if (pct > 0.5) return "#34C759";
-  if (pct > 0.2) return "#FF9500";
-  return "#FF3B30";
+  if (pct > 0.5) return "#10B981";
+  if (pct > 0.2) return "#F59E0B";
+  return "#EF4444";
 }
 
 type CourseType = "lecture" | "lab" | "seminar";

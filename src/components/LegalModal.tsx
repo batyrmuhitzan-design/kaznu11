@@ -54,6 +54,8 @@ export default function LegalModal({
   const [lang, setLang] = useState<LegalLang>(() =>
     typeof window === "undefined" ? "en" : toLegalLang(window.localStorage.getItem("language")),
   );
+  const [showPdf, setShowPdf] = useState(false);
+  const PDF_URL = "/KazNU_Helper_Legal_Notice_3Lang.pdf";
   if (typeof initialLanguage === "string" && initialLanguage !== lang) setLang(initialLanguage);
 
   if (!open) return null;
@@ -69,10 +71,21 @@ export default function LegalModal({
         role="dialog"
         aria-modal="true"
         aria-label={doc.docTitle}
-        className="w-full max-w-[560px] h-[82vh] max-h-[760px] flex flex-col squircle-lg overflow-hidden"
-        style={{ background: "rgba(18,18,22,0.98)", border: "1px solid rgba(255,255,255,0.12)" }}
+        className="relative w-full max-w-[560px] h-[82vh] max-h-[760px] flex flex-col squircle-lg overflow-hidden"
+        style={{ background: "rgba(18,18,24,1)", border: "1px solid rgba(255,255,255,0.14)", color: "#fff" }}
         onClick={(e) => e.stopPropagation()}
       >
+        {/* 完整 PDF 预览（WebView 内联查看） */}
+        {showPdf && (
+          <div className="absolute inset-0 z-20 flex flex-col p-3 gap-2" style={{ background: "#0b0b10" }}>
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-bold text-white">📄 Legal Notice · PDF</p>
+              <button type="button" aria-label="Close PDF" onClick={() => setShowPdf(false)} className="haptic-action w-8 h-8 rounded-full flex items-center justify-center text-white/80" style={{ background: "rgba(255,255,255,0.1)" }}>✕</button>
+            </div>
+            <iframe title="KazNU Legal Notice PDF" src={PDF_URL} className="flex-1 w-full rounded-lg" style={{ border: "none", background: "#fff" }} />
+          </div>
+        )}
+
         {/* 标题 + 语言切换 */}
         <div className="shrink-0 p-4 pb-3" style={{ borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
           <div className="flex items-center justify-between gap-3">
@@ -89,7 +102,7 @@ export default function LegalModal({
               ✕
             </button>
           </div>
-          <p className="theme-muted text-[10px] mt-1">KazNU Helper · Legal · {doc.updated}</p>
+          <p className="text-[10px] mt-1" style={{ color: "rgba(235,235,245,0.65)" }}>KazNU Helper · Legal · {doc.updated}</p>
 
           <div role="tablist" aria-label="Language" className="flex gap-1.5 mt-3">
             {LANG_TABS.map(({ code, label }) => {
@@ -121,7 +134,7 @@ export default function LegalModal({
               <h3 className="text-[13px] font-bold text-white mb-2">{section.title}</h3>
               <div className="space-y-2">
                 {section.body.map((paragraph, pi) => (
-                  <p key={pi} className="theme-secondary text-xs leading-relaxed">
+                  <p key={pi} className="text-xs leading-relaxed" style={{ color: "rgba(235,235,245,0.82)" }}>
                     {paragraph}
                   </p>
                 ))}
@@ -131,11 +144,19 @@ export default function LegalModal({
         </div>
 
         {/* 底部 */}
-        <div className="shrink-0 p-4 pt-3" style={{ borderTop: "1px solid rgba(255,255,255,0.08)" }}>
+        <div className="shrink-0 p-4 pt-3 flex gap-2.5" style={{ borderTop: "1px solid rgba(255,255,255,0.08)" }}>
+          <button
+            type="button"
+            onClick={() => setShowPdf(true)}
+            className="haptic-action flex-1 py-3 rounded-xl text-sm font-bold"
+            style={{ background: "rgba(255,255,255,0.10)", color: "#fff" }}
+          >
+            📄 {lang === "kk" ? "Толық PDF-ті ашу" : lang === "ru" ? "Открыть PDF" : "Open Full PDF"}
+          </button>
           <button
             type="button"
             onClick={onClose}
-            className="haptic-action w-full py-3 rounded-xl text-sm font-bold"
+            className="haptic-action flex-1 py-3 rounded-xl text-sm font-bold"
             style={{ background: "linear-gradient(135deg, #0033A0, #007AFF)", color: "#fff" }}
           >
             {lang === "kk" ? "Жабу" : lang === "ru" ? "Закрыть" : "Close"}

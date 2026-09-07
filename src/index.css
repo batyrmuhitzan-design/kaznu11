@@ -223,6 +223,9 @@ button { position: relative; }
   background: rgba(30, 30, 32, 0.92);
   border: 1px solid rgba(255, 255, 255, 0.16);
   box-shadow: 0 6px 22px rgba(0, 0, 0, 0.28);
+  width: max-content;
+  max-width: 86%;
+  text-align: center;
   transform: translateX(-50%);
   animation: toast-in 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
   pointer-events: none;

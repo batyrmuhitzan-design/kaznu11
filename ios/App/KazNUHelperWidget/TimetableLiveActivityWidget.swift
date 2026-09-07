@@ -199,7 +199,7 @@ private struct OverviewProvider: TimelineProvider {
     }
 
     private static func loadLessons() -> [OverviewLesson] {
-        guard let suite = UserDefaults(suiteName: "group.com.kaznu.helper.widget"),
+        guard let suite = UserDefaults(suiteName: "group.com.kaznu.helper"),
               let data = suite.data(forKey: "kaznu.schedule.v1") else { return [] }
         return (try? JSONDecoder().decode([OverviewLesson].self, from: data)) ?? []
     }

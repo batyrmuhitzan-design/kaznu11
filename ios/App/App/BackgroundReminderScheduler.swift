@@ -117,7 +117,7 @@ enum BackgroundReminderScheduler {
         if let data = try? JSONEncoder().encode(lessons) {
             UserDefaults.standard.set(data, forKey: scheduleKey)
             // 同步给桌面小组件（App Group，需在签名里开启 App Groups 能力）
-            if let suite = UserDefaults(suiteName: "group.com.kaznu.helper.widget") {
+            if let suite = UserDefaults(suiteName: "group.com.kaznu.helper") {
                 suite.set(data, forKey: "kaznu.schedule.v1")
             }
             WidgetCenter.shared.reloadAllTimelines()
