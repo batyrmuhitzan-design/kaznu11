@@ -136,24 +136,9 @@ button:focus-visible { outline: 2px solid rgba(0,122,255,0.8); outline-offset: 2
   padding-top: calc(env(safe-area-inset-top, 0px) + 12px);
 }
 
-button { position: relative; overflow: hidden; }
-button::after {
-  content: "";
-  position: absolute;
-  top: -40%;
-  bottom: -40%;
-  left: -55%;
-  width: 34%;
-  background: linear-gradient(100deg, transparent, rgba(255,255,255,0.26), transparent);
-  transform: translateX(0) skewX(-16deg);
-  pointer-events: none;
-  opacity: 0;
-}
-button:hover::after,
-button:focus-visible::after { opacity: 1; animation: button-sweep 700ms cubic-bezier(0.16, 1, 0.3, 1) forwards; }
-button:active::after { opacity: 0.85; animation: button-sweep 520ms cubic-bezier(0.16, 1, 0.3, 1) forwards; }
-@keyframes button-sweep { from { transform: translateX(0) skewX(-16deg); } to { transform: translateX(430%) skewX(-16deg); } }
-@media (prefers-reduced-motion: reduce) { button::after { display: none; } }
+/* 全局按钮：点击反馈只保留组件自带的 active:scale 缩放，去掉了“扫光/划光”高光动画。
+   按压观感与底部导航键一致：干净、无光效划过。 */
+button { position: relative; }
 
 @theme inline {
   --color-brand: #0033A0;
@@ -267,12 +252,7 @@ button:active::after { opacity: 0.85; animation: button-sweep 520ms cubic-bezier
 .ring-time { fill: #fff; }
 .light .ring-time { fill: #1c1c1e; }
 
-/* 导航键不要“一闪而过”的扫光特效，和其它普通按键保持一致 */
-.tab-bar button { overflow: visible; }
-.tab-bar button::after { content: none; }
-.tab-bar button:hover::after,
-.tab-bar button:focus-visible::after,
-.tab-bar button:active::after { content: none; animation: none; }
+/* 按钮扫光动画已全局移除，这里不再需要导航键特例 */
 
 .live-activity {
   background: linear-gradient(135deg, rgba(0,51,160,0.85) 0%, rgba(0,122,255,0.75) 100%);
