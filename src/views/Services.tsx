@@ -243,9 +243,9 @@ export default function Services() {
   const statusColor = univerStatus === "ok" ? "#30D158" : "#FF9F0A";
   const statusLabel = univerStatus === "ok" ? t("allSystems") : t("degradedCache");
   const tiles = [
-    { id: "schedule", accent: "#30D158", ok: true, label: t("schedule"), meta: "明日 09:00 Data Structures · 2 节已同步" },
-    { id: "grades", accent: "#409CFF", ok: true, label: t("grades"), meta: "GPA 3.82 · 2 分钟前更新" },
-    { id: "registration", accent: "#FF9F0A", ok: false, label: t("registration"), meta: "9月1日开放选课 · 已选 5/6 门" },
+    { id: "schedule", accent: "#10B981", ok: true, label: t("schedule"), meta: "Tomorrow 09:00 Data Structures · 2 sessions synced" },
+    { id: "grades", accent: "#409CFF", ok: true, label: t("grades"), meta: "GPA 3.82 · updated 2 min ago" },
+    { id: "registration", accent: "#F59E0B", ok: false, label: t("registration"), meta: "Registration opens Sep 1 · 5/6 selected" },
   ];
 
   if (activeService) {

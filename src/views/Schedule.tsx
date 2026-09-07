@@ -2,7 +2,6 @@ import { useState, useEffect, useMemo } from "react";
 import { useTheme } from "../contexts/ThemeContext";
 import { useI18n } from "../contexts/LanguageContext";
 import { API_URLS, STUDENT_ID } from "../utils/config";
-import { useDevSim } from "../contexts/DevSimContext";
 import { academicWeekOf, datesOfThisWeek, nowMinutes, todayWeekdayIndex, ACADEMIC_YEAR } from "../utils/calendar";
 import { courseStatusFromTime } from "../utils/courseStatus";
 import { scheduleClassReminders, type ClassLessonInput } from "../native/notifications";
@@ -199,12 +198,11 @@ export default function Schedule() {
     return () => window.clearInterval(id);
   }, []);
 
-  // 时间感知：真实时钟 + Dev Console 模拟；自动聚焦到“今天”
-  const sim = useDevSim();
-  const now = sim.simulatedNow(new Date());
+  // 时间感知：真实时钟；自动聚焦到“今天”
+  const now = new Date();
   const todayIdx = Math.min(todayWeekdayIndex(now), DAYS.length - 1);
   const weekDates = datesOfThisWeek(now);
-  const academicWeek = sim.weekOverride ?? academicWeekOf(now);
+  const academicWeek = academicWeekOf(now);
   const { h: nowH, m: nowM } = nowMinutes(now);
 
   useEffect(() => {
@@ -252,7 +250,7 @@ export default function Schedule() {
         setLoading(false);
       })
       .catch((err) => {
-        console.warn("未连接到 API 后端，使用本地备用课表:", err);
+        console.warn("API backend unreachable, using local fallback schedule:", err);
         setCoursesByDay(MOCK_FALLBACK);
         const reminderList = toReminderLessons(MOCK_FALLBACK as unknown as Record<string, unknown>);
         registerReminderLessons(reminderList);

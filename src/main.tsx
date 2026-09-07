@@ -5,16 +5,13 @@ import './index.css'
 import { ThemeProvider } from './contexts/ThemeContext'
 import { LanguageProvider } from './contexts/LanguageContext'
 import { ToastProvider } from './contexts/ToastContext'
-import { DevSimProvider } from './contexts/DevSimContext'
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <ThemeProvider>
       <LanguageProvider>
         <ToastProvider>
-          <DevSimProvider>
-            <App />
-          </DevSimProvider>
+          <App />
         </ToastProvider>
       </LanguageProvider>
     </ThemeProvider>

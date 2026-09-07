@@ -5,7 +5,6 @@ import Materials from "./views/Materials";
 import Schedule from "./views/Schedule";
 import Services from "./views/Services";
 import Profile from "./views/Profile";
-import { useToast } from "./contexts/ToastContext";
 import { useI18n } from "./contexts/LanguageContext";
 import News, { NewsDetail, type NewsItem } from "./views/News";
 import Notifications from "./views/Notifications";
@@ -15,9 +14,7 @@ import { useTheme } from "./contexts/ThemeContext";
 import { syncNativeStatusBar } from "./native/statusBar";
 import { attachHapticDelegate } from "./utils/haptics";
 import UpdateDialog, { type UpdateDialogKind } from "./components/UpdateDialog";
-import { DevPanel } from "./components/DevPanel";
 import SwipeBack from "./components/SwipeBack";
-import { SIM_UPDATE_EVENT, useDevSim } from "./contexts/DevSimContext";
 import { installQuickActionListener, type QuickActionTarget } from "./native/quickActions";
 import { APP_VERSION, classifyUpdate, fetchUpdateInfo, isOptionalSkipped, skipOptional, type UpdateInfo } from "./utils/update";
 import { captureDeviceContext } from "./native/device";
@@ -74,9 +71,7 @@ export default function App() {
   const [selectedNews, setSelectedNews] = useState<NewsItem | null>(null);
   const { resolvedTheme } = useTheme();
   const t = useI18n();
-  const toast = useToast();
   const tabLabels = { dashboard: t("home"), news: t("news"), materials: t("materials"), schedule: t("schedule"), services: t("services") };
-  const sim = useDevSim();
 
   const [updateState, setUpdateState] = useState<{ kind: Exclude<UpdateDialogKind, "none">; info: UpdateInfo } | null>(null);
 
@@ -88,13 +83,11 @@ export default function App() {
   authedRef.current = authed;
   const routeQuickAction = useCallback(
     (target: QuickActionTarget) => {
-      if (target === "dev") {
-        sim.openPanel();
-        return;
-      }
+      // “developer console” 在生产版本中不再开放，其它入口照常跳转
+      if (target === "dev") return;
       setActiveTab(target); // "schedule" | "profile"
     },
-    [sim],
+    [],
   );
   useEffect(() => {
     return installQuickActionListener((target) => {
@@ -116,31 +109,6 @@ export default function App() {
   useEffect(() => attachHapticDelegate(), []);
   // 全局 Live Activity 看护：课表同步过之后，每 60s / 回到前台检查 T-30 灵动岛
   useEffect(() => attachGlobalLiveActivityWatcher(), []);
-  // 原生回执：把 Activity.request 是否真的成功告诉用户（长按头像 → 模拟倒计时即可看到）
-  useEffect(() => {
-    const onSendDebug = (event: Event) => {
-      const detail = (event as CustomEvent<{ name: string; mode: string; seconds: number }>).detail;
-      if (!detail) return;
-      toast.push(`📤 前端已请求原生启动 Live Activity：${detail.name}`, "info");
-    };
-    const onResult = (event: Event) => {
-      const detail = (event as CustomEvent<{ ok: boolean; authorized: boolean; message: string }>).detail;
-      if (!detail) return;
-      if (detail.ok) {
-        toast.push("✅ Live Activity 已由 iOS 原生启动，按 Home 键查看", "success");
-      } else if (!detail.authorized) {
-        toast.push("系统未授权实时活动：请到 设置→KazNU Helper→实时活动 开启", "error");
-      } else {
-        toast.push(`Live Activity 启动失败：${detail.message}`, "error");
-      }
-    };
-    window.addEventListener("kaznu:liveActivitySendDebug", onSendDebug);
-    window.addEventListener("kaznu:nativeLiveActivityResult", onResult);
-    return () => {
-      window.removeEventListener("kaznu:liveActivitySendDebug", onSendDebug);
-      window.removeEventListener("kaznu:nativeLiveActivityResult", onResult);
-    };
-  }, [toast]);
   // 点击 T-60 通知或“开启灵动岛”按钮 → 立即启动 Live Activity
   useEffect(() => {
     enableClassReminderNotificationActions();
@@ -172,23 +140,6 @@ export default function App() {
       cancelled = true;
     };
   }, [authed]);
-
-  // Dev Console：手动触发“可选更新 / 强制更新”弹窗
-  useEffect(() => {
-    const onTest = (e: Event) => {
-      const detail = (e as CustomEvent<{ kind?: "optional" | "forced" }>).detail;
-      const kind = detail?.kind === "forced" ? "forced" : "optional";
-      const info: UpdateInfo = {
-        latest_version: "2.0.0",
-        min_supported_version: kind === "forced" ? "2.0.0" : "1.0.0",
-        update_url: "https://github.com/batyrmuhitzan-design/kaznu11/releases",
-        notes: ["Dev Console 测试更新", "用于验证更新弹窗交互"],
-      };
-      setUpdateState({ kind, info });
-    };
-    window.addEventListener(SIM_UPDATE_EVENT, onTest);
-    return () => window.removeEventListener(SIM_UPDATE_EVENT, onTest);
-  }, []);
 
   // 启动时采集定位/时区 + 提前申请本地通知权限（失败都不阻塞）
   useEffect(() => {
@@ -266,7 +217,6 @@ export default function App() {
         onClose={closeUpdateDialog}
         onDismissOptional={updateState?.info ? () => skipOptional(updateState!.info!.latest_version) : undefined}
       />
-      <DevPanel />
     </div>
   );
 }

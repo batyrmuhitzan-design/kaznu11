@@ -161,7 +161,7 @@ export async function scheduleClassReminders(lessons: ClassLessonInput[], leadMi
       return {
         id: 100 + (idx % 5000),
         title: `${lesson.name} · 上课提醒`,
-        body: `还有 ${leadMinutes} 分钟开始${lesson.room ? ` · ${lesson.room}` : ""}`,
+        body: `Starts in ${leadMinutes} min${lesson.room ? ` · ${lesson.room}` : ""}`,
         sound: "system-default",
         schedule: { on: { weekday, hour, minute } },
       };

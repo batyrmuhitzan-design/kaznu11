@@ -1,4 +1,3 @@
-import ActivityKit
 import Capacitor
 import UIKit
 import WebKit
@@ -53,34 +52,15 @@ final class KaznuBridgeViewController: CAPBridgeViewController, WKScriptMessageH
         switch message.name {
         case "kaznuLiveActivity":
             DispatchQueue.main.async { [weak self] in
-                guard let self else { return }
+                guard self != nil else { return }
                 if #available(iOS 16.2, *) {
                     TimetableLiveActivityController.handle(payload)
                 }
-                self.emitLiveActivityResult()
             }
         case "kaznuReminderSync":
             BackgroundReminderScheduler.syncSchedule(payload)
         default:
             break
         }
-    }
-
-    /// 把 Activity.request 的真实结果投递给 Web（toast 诊断），便于确认原生侧是否启动成功。
-    private func emitLiveActivityResult() {
-        guard let webView else { return }
-        var ok = false
-        var authorized = false
-        var safe = ""
-        if #available(iOS 16.2, *) {
-            ok = TimetableLiveActivityController.lastRequestSucceeded
-            authorized = ActivityAuthorizationInfo().areActivitiesEnabled
-            let raw = TimetableLiveActivityController.lastRequestMessage
-            safe = raw
-                .replacingOccurrences(of: "\\", with: "\\\\")
-                .replacingOccurrences(of: "'", with: "\\'")
-        }
-        let script = "window.dispatchEvent(new CustomEvent('kaznu:nativeLiveActivityResult',{detail:{ok:\(ok),authorized:\(authorized),message:'\(safe)'}}));"
-        webView.evaluateJavaScript(script, completionHandler: nil)
     }
 }

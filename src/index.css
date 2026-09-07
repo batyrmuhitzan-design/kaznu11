@@ -147,9 +147,9 @@ button { position: relative; }
   --color-brand: #0033A0;
   --color-accent: #007AFF;
   --color-purple: #5E5CE6;
-  --color-green: #30D158;
-  --color-red: #FF453A;
-  --color-orange: #FF9F0A;
+  --color-green: #10B981;
+  --color-red: #EF4444;
+  --color-orange: #F59E0B;
 
   --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
   --font-mono: 'JetBrains Mono', 'SF Mono', monospace;
@@ -266,15 +266,15 @@ button { position: relative; }
   background: linear-gradient(180deg, rgba(0,122,255,0.18) 0%, rgba(0,122,255,0) 100%);
 }
 
-.grade-a { background: rgba(48,209,88,0.15); color: #30D158; border: 1px solid rgba(48,209,88,0.25); }
+.grade-a { background: rgba(16,185,129,0.15); color: #10B981; border: 1px solid rgba(16,185,129,0.25); }
 .grade-b { background: rgba(0,122,255,0.15); color: #409CFF; border: 1px solid rgba(0,122,255,0.25); }
-.grade-c { background: rgba(255,159,10,0.15); color: #FF9F0A; border: 1px solid rgba(255,159,10,0.25); }
-.grade-f { background: rgba(255,69,58,0.15); color: #FF453A; border: 1px solid rgba(255,69,58,0.25); }
+.grade-c { background: rgba(245,158,11,0.15); color: #F59E0B; border: 1px solid rgba(245,158,11,0.25); }
+.grade-f { background: rgba(239,68,68,0.15); color: #EF4444; border: 1px solid rgba(239,68,68,0.25); }
 
 .time-needle {
-  background: linear-gradient(90deg, #FF453A, rgba(255,69,58,0.3));
+  background: linear-gradient(90deg, #EF4444, rgba(239,68,68,0.3));
   height: 1.5px;
-  box-shadow: 0 0 8px rgba(255,69,58,0.6);
+  box-shadow: 0 0 8px rgba(239,68,68,0.6);
 }
 
 .status-dot {
@@ -284,9 +284,9 @@ button { position: relative; }
 
 @keyframes pulse-glow {
   0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
+  50% { opacity: 0.72; }
 }
-.animate-pulse-glow { animation: pulse-glow 2s ease-in-out infinite; }
+.animate-pulse-glow { animation: pulse-glow 2.6s ease-in-out infinite; }
 
 @keyframes slide-up {
   from { transform: translateY(8px); opacity: 0; }
@@ -295,8 +295,8 @@ button { position: relative; }
 .animate-slide-up { animation: slide-up 0.3s ease-out forwards; }
 
 .course-lecture { background: rgba(94,92,230,0.15); border-left: 3px solid #5E5CE6; }
-.course-lab { background: rgba(48,209,88,0.12); border-left: 3px solid #30D158; }
-.course-exam { background: rgba(255,69,58,0.12); border-left: 3px solid #FF453A; }
+.course-lab { background: rgba(16,185,129,0.12); border-left: 3px solid #10B981; }
+.course-exam { background: rgba(239,68,68,0.12); border-left: 3px solid #EF4444; }
 
 /* 主题自适应的量尺轨道：统一磨砂渐变 + 内阴影，让填充条更精致 */
 .meter-track {
@@ -337,7 +337,7 @@ button { position: relative; }
   .collapsible-open .course-row-in { animation: none; }
 }
 
-.course-seminar { background: rgba(255,159,10,0.12); border-left: 3px solid #FF9F0A; }
+.course-seminar { background: rgba(245,158,11,0.12); border-left: 3px solid #F59E0B; }
 /* ===== 全局主题切换过渡 ===== */
 
 
@@ -650,17 +650,17 @@ html {
   0%,
   100% {
     opacity: 1;
-    filter: drop-shadow(0 0 12px rgba(239, 68, 68, 0.95)) drop-shadow(0 0 4px rgba(239, 68, 68, 0.8));
+    filter: drop-shadow(0 0 8px rgba(239, 68, 68, 0.55)) drop-shadow(0 0 2px rgba(239, 68, 68, 0.3));
     transform: scale(1);
   }
   50% {
     opacity: 1;
-    filter: drop-shadow(0 0 3px rgba(239, 68, 68, 0.35));
-    transform: scale(0.98);
+    filter: drop-shadow(0 0 3px rgba(239, 68, 68, 0.18));
+    transform: scale(0.996);
   }
 }
 .animate-vivid-pulse {
-  animation: vivid-glow-pulse 1.2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  animation: vivid-glow-pulse 2.6s cubic-bezier(0.45, 0, 0.55, 1) infinite;
   will-change: filter, transform;
   transform-origin: center;
 }

@@ -54,7 +54,7 @@ export async function openLegalPdf(): Promise<void> {
       return;
     }
   } catch (error) {
-    console.warn("系统 Share/QuickLook 预览不可用，尝试原生 Browser 回退", error);
+    console.warn("System QuickLook/Share preview unavailable, falling back to Browser", error);
   }
 
   try {
@@ -63,7 +63,7 @@ export async function openLegalPdf(): Promise<void> {
       return;
     }
   } catch (error) {
-    console.warn("Capacitor Browser 不可用，回退 window.open", error);
+    console.warn("Capacitor Browser unavailable, falling back to window.open", error);
   }
   window.open(url, "_blank", "noopener,noreferrer");
 }

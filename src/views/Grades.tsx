@@ -209,7 +209,7 @@ export default function Grades({ onBack }: { onBack?: () => void }) {
   const handleExportPdf = async () => {
     if (exporting) return;
     setExporting(true);
-    toast.push("正在生成 PDF…", "info");
+    toast.push("Generating PDF…", "info");
     try {
       // 让 Spinner 先绘制出来，再做真实 CPU 排版
       await new Promise<void>((resolve) => window.setTimeout(resolve, 200));
@@ -245,7 +245,7 @@ export default function Grades({ onBack }: { onBack?: () => void }) {
         // 2) 原生：写入 Cache 临时目录 → 自动弹出系统 iOS Share Sheet（保存到“文件”/发送/打印）
         const saved = await exportPdfForSharing(base64, fileName);
         void hapticSuccess();
-        toast.push("成绩单 PDF 已生成，选择保存位置或发送", "success");
+        toast.push("Transcript PDF generated · choose where to save", "success");
         try {
           await shareNativeFile(saved.uri, {
             title: "KazNU Academic Record",
@@ -263,14 +263,14 @@ export default function Grades({ onBack }: { onBack?: () => void }) {
       }
     } catch {
       void hapticError();
-      toast.push("PDF 导出失败，请重试", "error");
+      toast.push("PDF export failed, please try again", "error");
     } finally {
       setExporting(false);
     }
   };
 
   const handleRadar = () => {
-    toast.push("雷达图分析即将上线", "info");
+    toast.push("Radar chart analysis is coming soon", "info");
   };
 
   useEffect(() => {

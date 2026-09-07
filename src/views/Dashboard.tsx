@@ -6,7 +6,6 @@ import { buildLiveActivityPayload, syncLiveActivity, type LiveActivityKind } fro
 import { postClassReminderBannerNow } from "../native/notifications";
 import { motorHaptic } from "../utils/haptics";
 import { playAlarmSound } from "../utils/alarm";
-import { useDevSim, useLongPressOpen, SIM_NEWS_EVENT } from "../contexts/DevSimContext";
 import { academicWeekOf, ACADEMIC_YEAR } from "../utils/calendar";
 import { courseStatusFromDate } from "../utils/courseStatus";
 
@@ -43,14 +42,14 @@ interface TodayCourse {
 const TODAY_COURSES: TodayCourse[] = [
   { id: "la", name: "Linear Algebra", room: "204", building: "Main Building", prof: "Akhmetov N.T.", type: "lecture", startH: 9, startM: 0, endH: 10, endM: 30, color: "#5E5CE6" },
   { id: "hm2", name: "Higher Mathematics II", room: "315", building: "Main Building", prof: "Bekova A.K.", type: "lecture", startH: 11, startM: 0, endH: 12, endM: 30, color: "#5E5CE6" },
-  { id: "phys", name: "Physics Lab", room: "Lab 3", building: "Physics Block", prof: "Serikova G.M.", type: "lab", startH: 14, startM: 0, endH: 15, endM: 30, color: "#30D158" },
-  { id: "eng", name: "English Seminar", room: "108", building: "Main Building", prof: "Omarova D.S.", type: "seminar", startH: 16, startM: 0, endH: 17, endM: 30, color: "#FF9F0A" },
+  { id: "phys", name: "Physics Lab", room: "Lab 3", building: "Physics Block", prof: "Serikova G.M.", type: "lab", startH: 14, startM: 0, endH: 15, endM: 30, color: "#10B981" },
+  { id: "eng", name: "English Seminar", room: "108", building: "Main Building", prof: "Omarova D.S.", type: "seminar", startH: 16, startM: 0, endH: 17, endM: 30, color: "#F59E0B" },
 ];
 
 const TYPE_META: Record<CourseType, { color: string; bg: string; labelKey: "lecture" | "lab" | "seminar" }> = {
   lecture: { color: "#7B79F7", bg: "rgba(94,92,230,0.25)", labelKey: "lecture" },
-  lab: { color: "#30D158", bg: "rgba(48,209,88,0.18)", labelKey: "lab" },
-  seminar: { color: "#FF9F0A", bg: "rgba(255,159,10,0.18)", labelKey: "seminar" },
+  lab: { color: "#10B981", bg: "rgba(16,185,129,0.18)", labelKey: "lab" },
+  seminar: { color: "#F59E0B", bg: "rgba(245,158,11,0.18)", labelKey: "seminar" },
 };
 
 type CountdownState =
@@ -194,7 +193,7 @@ function AnimatedSparkline({ data, width = 96, height = 32 }: { data: number[]; 
   );
 }
 
-function ProgressRing({ pct, size, strokeWidth = 3, color = "#30D158", children }: { pct: number; size: number; strokeWidth?: number; color?: string; children?: ReactNode }) {
+function ProgressRing({ pct, size, strokeWidth = 3, color = "#10B981", children }: { pct: number; size: number; strokeWidth?: number; color?: string; children?: ReactNode }) {
   const r = (size - strokeWidth) / 2;
   const c = 2 * Math.PI * r;
   const [entered, setEntered] = useState(false);
@@ -317,8 +316,8 @@ function open2gisClassroom(building: string, room: string) {
 
 const QUICK = [
   { icon: "📚", label: "Materials", color: "#5E5CE6", bg: "rgba(94,92,230,0.13)" },
-  { icon: "📅", label: "Calendar", color: "#30D158", bg: "rgba(48,209,88,0.13)" },
-  { icon: "🔔", label: "Univer", color: "#FF9F0A", bg: "rgba(255,159,10,0.13)" },
+  { icon: "📅", label: "Calendar", color: "#10B981", bg: "rgba(16,185,129,0.13)" },
+  { icon: "🔔", label: "Univer", color: "#F59E0B", bg: "rgba(245,158,11,0.13)" },
   { icon: "🏠", label: "Dorm", color: "#007AFF", bg: "rgba(0,122,255,0.15)" },
 ];
 
@@ -372,7 +371,7 @@ function GpaCard({ onNavigate }: { onNavigate: (tab: string) => void }) {
     <button type="button" onClick={() => onNavigate("grades")} className="haptic-action interactive-card flex-1 glass squircle-lg p-4 card-shadow inner-glow-blue text-left">
       <div className="flex items-center justify-between">
         <p className="text-xs font-medium" style={{ color: "rgba(235,235,245,0.5)" }}>{t("cumulativeGpa")}</p>
-        <div className="px-1.5 py-0.5 rounded-full text-xs font-semibold" style={{ background: "rgba(48,209,88,0.15)", color: "#30D158", fontSize: 10 }}>▲ {t("top")} 5%</div>
+        <div className="px-1.5 py-0.5 rounded-full text-xs font-semibold" style={{ background: "rgba(16,185,129,0.15)", color: "#10B981", fontSize: 10 }}>▲ {t("top")} 5%</div>
       </div>
       {data ? (
         <>
@@ -397,19 +396,10 @@ export default function Dashboard({ onOpenProfile, onNavigate }: { onOpenProfile
   const [pressed, setPressed] = useState<string | null>(null);
   const [unreadNotifications, setUnreadNotifications] = useState(() => Math.max(0, 3 - (JSON.parse(localStorage.getItem("readNotificationIds") || "[]") as string[]).length));
   const t = useI18n();
-  const sim = useDevSim();
-  const longPress = useLongPressOpen();
   const realNow = useNow(1000);
-  const now = sim.simulatedNow(realNow);
-  const week = sim.weekOverride ?? academicWeekOf(now);
+  const now = realNow;
+  const week = academicWeekOf(now);
   const countdown = computeCountdown(TODAY_COURSES, now);
-
-  // Dev 模拟新通知 → 铃铛红点 +1
-  useEffect(() => {
-    const inc = () => setUnreadNotifications((n) => n + 1);
-    window.addEventListener(SIM_NEWS_EVENT, inc);
-    return () => window.removeEventListener(SIM_NEWS_EVENT, inc);
-  }, []);
 
   const hasCountdown = countdown.mode !== "idle";
   const noMoreToday = countdown.mode === "idle" && !countdown.next;
@@ -525,11 +515,6 @@ export default function Dashboard({ onOpenProfile, onNavigate }: { onOpenProfile
       if (liveSessionKeyRef.current !== sessionKey) {
         liveSessionKeyRef.current = sessionKey;
         lastSyncRef.current = remainingSec;
-        window.dispatchEvent(
-          new CustomEvent("kaznu:liveActivitySendDebug", {
-            detail: { name: liveCourse.name, mode: countdown.mode, seconds: remainingSec },
-          }),
-        );
         syncLiveActivity(buildLiveActivityPayload({ ...makeInput(), control: "start" }));
         return;
       }
@@ -576,18 +561,13 @@ export default function Dashboard({ onOpenProfile, onNavigate }: { onOpenProfile
                   <path d="M12 22c1.1 0 2-.9 2-2h-4a2 2 0 002 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z" />
                 </svg>
               </div>
-              {unreadNotifications > 0 && <div className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full flex items-center justify-center text-white" style={{ fontSize: 9, fontWeight: 700, background: "#FF453A" }}>{unreadNotifications}</div>}
+              {unreadNotifications > 0 && <div className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full flex items-center justify-center text-white" style={{ fontSize: 9, fontWeight: 700, background: "#EF4444" }}>{unreadNotifications}</div>}
             </button>
             <button
               type="button"
               aria-label="Open profile"
-              onClick={() => {
-                if (!sim.open) onOpenProfile();
-              }}
-              onPointerDown={longPress.onPointerDown}
-              onPointerUp={longPress.onPointerUp}
-              onPointerLeave={longPress.onPointerLeave}
-              title="Profile · 长按打开 Dev Console"
+              onClick={() => onOpenProfile()}
+              title="Profile"
               data-haptic="light"
               className="haptic-action w-9 h-9 rounded-full flex items-center justify-center text-white font-bold text-sm transition-transform active:scale-95 select-none"
               style={{ background: "linear-gradient(135deg, #0033A0, #007AFF)", fontSize: 13, touchAction: "manipulation" }}
@@ -607,21 +587,21 @@ export default function Dashboard({ onOpenProfile, onNavigate }: { onOpenProfile
           ) : (
             <IdleRing
               label={noMoreToday ? "🎉" : hhmm(activeCourse.startH, activeCourse.startM)}
-              color={noMoreToday ? "#30D158" : "rgba(0,122,255,0.55)"}
+              color={noMoreToday ? "#10B981" : "rgba(0,122,255,0.55)"}
               fontSize={noMoreToday ? 22 : 16}
             />
           )}
           <div className="pr-[132px]">
             <div className="flex items-center gap-2 mb-2">
               {noMoreToday ? (
-                <div className="px-2 py-0.5 rounded-full text-xs font-semibold" style={{ background: "rgba(48,209,88,0.15)", color: "#30D158" }}>✓ {hhmm(lastToday.endH, lastToday.endM)}</div>
+                <div className="px-2 py-0.5 rounded-full text-xs font-semibold" style={{ background: "rgba(16,185,129,0.15)", color: "#10B981" }}>✓ {hhmm(lastToday.endH, lastToday.endM)}</div>
               ) : (
                 <div className="px-2 py-0.5 rounded-full text-xs font-semibold" style={{ background: TYPE_META[activeCourse.type].bg, color: TYPE_META[activeCourse.type].color }}>
                   {t(TYPE_META[activeCourse.type].labelKey).toUpperCase()}
                 </div>
               )}
               {hasCountdown && countdown.mode === "in-class" && (
-                <div className="w-1.5 h-1.5 rounded-full animate-pulse-glow" style={{ background: "#30D158" }} />
+                <div className="w-1.5 h-1.5 rounded-full animate-pulse-glow" style={{ background: "#10B981" }} />
               )}
               {noMoreToday && <span className="text-lg leading-none">🎉</span>}
             </div>
@@ -657,15 +637,15 @@ export default function Dashboard({ onOpenProfile, onNavigate }: { onOpenProfile
           <GpaCard onNavigate={onNavigate} />
 
           {/* DDL Card */}
-          <button type="button" onClick={() => onNavigate("materials")} className="haptic-action interactive-card flex-1 glass squircle-lg p-4 card-shadow text-left" style={{ borderLeft: "1px solid rgba(255,69,58,0.2)" }}>
+          <button type="button" onClick={() => onNavigate("materials")} className="haptic-action interactive-card flex-1 glass squircle-lg p-4 card-shadow text-left" style={{ borderLeft: "1px solid rgba(239,68,68,0.2)" }}>
             <div className="flex items-center justify-between mb-1">
               <p className="text-xs font-medium" style={{ color: "rgba(235,235,245,0.5)" }}>{t("nextDeadline")}</p>
-              <span className="text-xs" style={{ color: "#FF453A" }}>⚠ 4{t("hoursLeft")}</span>
+              <span className="text-xs" style={{ color: "#EF4444" }}>⚠ 4{t("hoursLeft")}</span>
             </div>
             <p className="text-sm font-bold text-white leading-tight">Data Structures</p>
             <p className="text-xs mt-0.5" style={{ color: "rgba(235,235,245,0.5)" }}>{t("assignment")} 3</p>
-            <div className="mt-3 h-1.5 rounded-full overflow-hidden" style={{ background: "rgba(255,69,58,0.15)" }}>
-              <AnimatedProgress value={85} duration={1400} style={{ background: "linear-gradient(90deg, #FF9F0A, #FF453A)" }} />
+            <div className="mt-3 h-1.5 rounded-full overflow-hidden" style={{ background: "rgba(239,68,68,0.15)" }}>
+              <AnimatedProgress value={85} duration={1400} style={{ background: "linear-gradient(90deg, #F59E0B, #EF4444)" }} />
             </div>
             <p className="text-xs mt-1.5" style={{ color: "rgba(235,235,245,0.4)", fontFamily: "JetBrains Mono" }}>{t("dueToday")} 23:59</p>
           </button>
@@ -724,8 +704,8 @@ export default function Dashboard({ onOpenProfile, onNavigate }: { onOpenProfile
                   className={`haptic-action theme-panel interactive-card w-full flex items-center gap-3 px-3.5 py-3 squircle-md text-left ${done ? "past-course" : ""}`}
                   style={{
                     opacity: 1,
-                    border: live ? "1px solid rgba(48,209,88,0.4)" : done ? "1px solid rgba(255,255,255,0.04)" : undefined,
-                    boxShadow: live ? "0 0 0 1px rgba(48,209,88,0.16), 0 6px 18px rgba(48,209,88,0.12)" : undefined,
+                    border: live ? "1px solid rgba(16,185,129,0.4)" : done ? "1px solid rgba(255,255,255,0.04)" : undefined,
+                    boxShadow: live ? "0 0 0 1px rgba(16,185,129,0.16), 0 6px 18px rgba(16,185,129,0.12)" : undefined,
                     transition: "border-color 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease",
                   }}
                 >
@@ -733,19 +713,19 @@ export default function Dashboard({ onOpenProfile, onNavigate }: { onOpenProfile
                     <p
                       className="text-xs font-semibold"
                       style={{
-                        color: live ? "#30D158" : done ? "rgba(235,235,245,0.35)" : "rgba(235,235,245,0.6)",
+                        color: live ? "#10B981" : done ? "rgba(235,235,245,0.35)" : "rgba(235,235,245,0.6)",
                         fontFamily: "JetBrains Mono",
                       }}
                     >
                       {hhmm(course.startH, course.startM)}
                     </p>
                     {live && (
-                      <p className="text-[9px] font-bold mt-0.5" style={{ color: "#30D158", fontFamily: "JetBrains Mono" }}>
+                      <p className="text-[9px] font-bold mt-0.5" style={{ color: "#10B981", fontFamily: "JetBrains Mono" }}>
                         {hhmm(course.endH, course.endM)}
                       </p>
                     )}
                   </div>
-                  <div className="w-0.5 self-stretch rounded-full shrink-0" style={{ background: live ? "#30D158" : course.color, opacity: done ? 0.4 : 1 }} />
+                  <div className="w-0.5 self-stretch rounded-full shrink-0" style={{ background: live ? "#10B981" : course.color, opacity: done ? 0.4 : 1 }} />
                   <div className="flex-1 min-w-0">
                     <p
                       className={`text-sm font-semibold truncate ${done ? "past-course-title" : "text-white"}`}
@@ -758,13 +738,13 @@ export default function Dashboard({ onOpenProfile, onNavigate }: { onOpenProfile
                   {live ? (
                     <span
                       className="shrink-0 flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold"
-                      style={{ background: "rgba(48,209,88,0.14)", color: "#30D158", border: "1px solid rgba(48,209,88,0.28)" }}
+                      style={{ background: "rgba(16,185,129,0.14)", color: "#10B981", border: "1px solid rgba(16,185,129,0.28)" }}
                     >
-                      <span className="w-1.5 h-1.5 rounded-full animate-pulse-glow" style={{ background: "#30D158" }} />
+                      <span className="w-1.5 h-1.5 rounded-full animate-pulse-glow" style={{ background: "#10B981" }} />
                       {t("statusInProgress")}
                     </span>
                   ) : done ? (
-                    <svg viewBox="0 0 20 20" fill="#30D158" className="w-4 h-4 shrink-0" aria-label="Completed">
+                    <svg viewBox="0 0 20 20" fill="#10B981" className="w-4 h-4 shrink-0" aria-label="Completed">
                       <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                     </svg>
                   ) : null}

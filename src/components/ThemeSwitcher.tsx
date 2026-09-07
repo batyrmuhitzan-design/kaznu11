@@ -7,9 +7,9 @@ interface ThemeOption {
 }
 
 const THEME_OPTIONS: ThemeOption[] = [
-  { value: "light", label: "浅色", title: "切换到浅色模式" },
-  { value: "dark", label: "深色", title: "切换到深色模式" },
-  { value: "system", label: "系统", title: "跟随系统设置" },
+  { value: "light", label: "Light", title: "Switch to light mode" },
+  { value: "dark", label: "Dark", title: "Switch to dark mode" },
+  { value: "system", label: "System", title: "Follow system setting" },
 ];
 
 // SVG Icons - Minimalist iOS Style Line Icons
@@ -86,7 +86,7 @@ export default function ThemeSwitcher() {
         border: "1px solid var(--seg-border)",
       }}
       role="radiogroup"
-      aria-label="主题切换"
+      aria-label="Theme"
     >
       {/* iOS Segmented Control Active Background */}
       <div

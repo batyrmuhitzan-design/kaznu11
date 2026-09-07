@@ -148,22 +148,22 @@ function About({ onBack }: { onBack: () => void }) {
 
   const policies: Array<{ title: string; body: string }> = [
     {
-      title: "Disclaimer · 免责声明",
+      title: "Disclaimer",
       body:
         "KazNU Helper is an independent student tool. Timetable, grades, news and campus data are provided for convenience only and may contain delays or errors. Always confirm critical academic information (exams, deadlines, registrations, fees) with official Al-Farabi Kazakh National University systems and staff. The app does not replace official academic services and is not responsible for decisions made based on its data.",
     },
     {
-      title: "Privacy notice · 隐私说明",
+      title: "Privacy notice",
       body:
         "All personal data (login session, student ID, preferences) stays on your device and is never sold. Location is used only to detect whether you are near campus for campus services. Notifications are scheduled locally on your iPhone. If you later connect to third-party services (Univer, Kaspi, Telegram, WeChat, printers), their own privacy policies apply. You can disable each permission in iOS Settings or inside the app.",
     },
     {
-      title: "Terms of use · 使用条款",
+      title: "Terms of use",
       body:
         "By using KazNU Helper you agree to use it for lawful, non-commercial, personal purposes. You may not republish, resell or scrape the content. We may change or remove features at any time. The app is provided 'as is' without warranties of any kind, express or implied, to the maximum extent permitted by law.",
     },
     {
-      title: "No official affiliation · 非官方声明",
+      title: "No official affiliation",
       body:
         "KazNU Helper is NOT an official application of Al-Farabi Kazakh National University. 'KazNU' and university names/marks belong to their respective owners and are referenced only to identify the academic context. This project has no sponsorship or endorsement from the university.",
     },
