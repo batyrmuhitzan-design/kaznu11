@@ -5,7 +5,7 @@ import WidgetKit
 // ===================== Live Activity Widget 声明 =====================
 
 @available(iOS 16.1, *)
-struct KazNUHelperLiveActivityWidget: Widget {
+struct TimetableLiveActivity: Widget {
     var body: some WidgetConfiguration {
         ActivityConfiguration(for: TimetableLiveActivityAttributes.self) { context in
             // 锁屏 / 通知横幅（iPhone XR 等非灵动岛机型）
@@ -257,9 +257,9 @@ struct KazNUOverviewWidget: Widget {
 
 @main
 @available(iOS 16.1, *)
-struct KazNUHelperWidgetBundle: WidgetBundle {
+struct KazNUWidgetBundle: WidgetBundle {
     var body: some Widget {
-        KazNUHelperLiveActivityWidget()
+        TimetableLiveActivity()
         KazNUOverviewWidget()
     }
 }

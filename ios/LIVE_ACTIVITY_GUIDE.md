@@ -11,27 +11,27 @@
 | `ios/App/App/KaznuBridgeViewController.swift` | 注入 `window.__KAZNU_LIVE_ACTIVITY_BRIDGE__` + `__KAZNU_BG_REMINDER_SYNC__`，接收 Web→原生消息 | **App** |
 | `ios/App/App/TimetableLiveActivityController.swift` | ActivityKit start/update/end | **App** |
 | `ios/App/App/BackgroundReminderScheduler.swift` | BGAppRefreshTask：课程开始前 32 分钟唤醒 App 并拉起 Live Activity | **App** |
-| `ios/App/App/TimetableActivityAttributes.swift` | Live Activity 数据结构（App 侧副本） | **App + KazNUHelperWidget** |
-| `ios/App/KazNUHelperWidget/TimetableActivityAttributes.swift` | Live Activity 数据结构（Widget 侧副本，内容必须与 App 侧一致） | **KazNUHelperWidget** |
-| `ios/App/KazNUHelperWidget/TimetableLiveActivityWidget.swift` | ActivityConfiguration + 灵动岛三态 UI | **KazNUHelperWidget** |
-| `ios/App/KazNUHelperWidget/TimetableLiveActivityViews.swift` | 锁屏深色卡片 + 倒计时圆环 | **KazNUHelperWidget** |
-| `ios/App/KazNUHelperWidget/Info.plist` | 扩展声明（`NSSupportsLiveActivities=YES`） | **KazNUHelperWidget** |
+| `ios/App/App/TimetableActivityAttributes.swift` | Live Activity 数据结构（App 侧副本） | **App + KazNUWidgets** |
+| `ios/App/KazNUWidgets/TimetableActivityAttributes.swift` | Live Activity 数据结构（Widget 侧副本，内容必须与 App 侧一致） | **KazNUWidgets** |
+| `ios/App/KazNUWidgets/TimetableLiveActivityWidget.swift` | ActivityConfiguration + 灵动岛三态 UI | **KazNUWidgets** |
+| `ios/App/KazNUWidgets/TimetableLiveActivityViews.swift` | 锁屏深色卡片 + 倒计时圆环 | **KazNUWidgets** |
+| `ios/App/KazNUWidgets/Info.plist` | 扩展声明（`NSSupportsLiveActivities=YES`） | **KazNUWidgets** |
 | `ios/App/App/Info.plist` | 主 App `NSSupportsLiveActivities=YES` + `kaznuhelper://` scheme | 已内联 |
 
 ## Mac / Xcode 步骤（一次性）
 
 1. `npm install && npm run build && npx cap sync ios && open ios/App/App.xcodeproj`
 2. **File → New → Target… → Widget Extension**
-   - Product Name：`KazNUHelperWidget`
+   - Product Name：`KazNUWidgets`
    - Embed in Application：`App`
    - ✅ 勾选 **Include Live Activity**（会生成 `ActivityConfiguration` 模板）
    - 取消勾选 Configuration App Intent
-3. 删除模板生成的 `KazNUHelperWidget.swift` / `KazNUHelperWidgetBundle.swift` / `Info.plist` 等文件。
-4. 把下列文件拖入 **KazNUHelperWidget Target**（不勾 Copy items，直接引用仓库文件）：
-   - `ios/App/KazNUHelperWidget/TimetableActivityAttributes.swift`
-   - `ios/App/KazNUHelperWidget/TimetableLiveActivityWidget.swift`
-   - `ios/App/KazNUHelperWidget/TimetableLiveActivityViews.swift`
-   - 并将 `ios/App/KazNUHelperWidget/Info.plist` 设为该 Target 的 Info（Target → General → Info plist）。
+3. 删除模板生成的 `KazNUWidgets.swift` / `KazNUWidgetsBundle.swift` / `Info.plist` 等文件。
+4. 把下列文件拖入 **KazNUWidgets Target**（不勾 Copy items，直接引用仓库文件）：
+   - `ios/App/KazNUWidgets/TimetableActivityAttributes.swift`
+   - `ios/App/KazNUWidgets/TimetableLiveActivityWidget.swift`
+   - `ios/App/KazNUWidgets/TimetableLiveActivityViews.swift`
+   - 并将 `ios/App/KazNUWidgets/Info.plist` 设为该 Target 的 Info（Target → General → Info plist）。
 5. 把下列文件拖入 **App Target**（成员归属 App）：
    - `ios/App/App/KaznuBridgeViewController.swift`
    - `ios/App/App/TimetableLiveActivityController.swift`
@@ -44,7 +44,7 @@
    - `ios/App/App/Info.plist` 已声明 `BGTaskSchedulerPermittedIdentifiers =
      kz.kaznu.helper.refresh` + `UIBackgroundModes = [fetch]`（BGAppRefreshTask 必需）。
 
-> 也可用 Xcode 自带步骤：给新文件点右侧 File Inspector → Target Membership 勾选 App 或 KazNUHelperWidget。
+> 也可用 Xcode 自带步骤：给新文件点右侧 File Inspector → Target Membership 勾选 App 或 KazNUWidgets。
 
 ## 行为契约（TS → Native payload）
 

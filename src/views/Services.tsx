@@ -258,8 +258,23 @@ export default function Services() {
 
   return (
     <div className="app-surface h-full flex flex-col overflow-hidden">
-      <div className="screen-pin px-4 pt-1">
-        <h1 className="text-2xl font-bold text-white" style={{ letterSpacing: "-0.5px" }}>{t("campusHub")}</h1>
+      <div className="flex items-center justify-between gap-2 px-4 pt-1 overflow-hidden">
+        <h1 className="flex-1 min-w-0 text-2xl font-bold text-white truncate" style={{ letterSpacing: "-0.5px" }}>{t("campusHub")}</h1>
+        <span
+          className="flex-shrink-0 whitespace-nowrap flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-[11px] font-semibold"
+          style={{ background: "rgba(28,28,30,0.9)", color: statusColor, border: `1px solid ${statusColor}44`, maxWidth: "52vw" }}
+        >
+          <span className="w-1.5 h-1.5 rounded-full shrink-0 animate-pulse-glow" style={{ background: statusColor }} />
+          <span className="truncate">
+            {syncing
+              ? "Syncing…"
+              : univerStatus === "ok"
+                ? lastSync !== "—"
+                  ? `Univer · synced ✓ · ${lastSync}`
+                  : "Univer · synced ✓"
+                : statusLabel}
+          </span>
+        </span>
       </div>
       <div className="flex-1 min-h-0 overflow-y-auto px-4 pt-3 pb-28 space-y-4 animate-slide-up">
 

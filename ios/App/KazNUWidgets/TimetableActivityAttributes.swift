@@ -1,7 +1,7 @@
 import ActivityKit
 import Foundation
 
-// ⚠️ 这个文件必须同时被 两个 Target 编译（membership 勾选 App + KazNUHelperWidget）：
+// ⚠️ 这个文件必须同时被 两个 Target 编译（membership 勾选 App + KazNUWidgets）：
 //  - App 用它发起 / 刷新 / 结束 Live Activity；
 //  - Widget Extension 用它声明 ActivityConfiguration 并渲染。
 // 两侧的 struct 名称与字段必须完全一致，否则系统无法匹配 Activity。

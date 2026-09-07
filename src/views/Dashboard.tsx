@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 
 import { useI18n } from "../contexts/LanguageContext";
 import { API_URLS } from "../utils/config";
 import { Capacitor } from "@capacitor/core";
-import { buildLiveActivityPayload, syncLiveActivity } from "../native/liveActivity";
+import { buildLiveActivityPayload, syncLiveActivity, type LiveActivityKind } from "../native/liveActivity";
 import { postClassReminderBannerNow } from "../native/notifications";
 import { motorHaptic } from "../utils/haptics";
 import { playAlarmSound } from "../utils/alarm";
@@ -272,7 +272,6 @@ function CountdownRing({ remaining, total, ringColor }: { remaining: number; tot
         strokeLinecap="round"
         strokeDasharray={CIRC}
         strokeDashoffset={offset}
-        className="progress-ring"
         style={{ transition: "stroke-dashoffset 1s linear, stroke 0.5s ease" }}
       />
       {/* 中间放大显示剩余时间 */}
@@ -432,6 +431,7 @@ export default function Dashboard({ onOpenProfile, onNavigate }: { onOpenProfile
         : t("startsIn")
     : t("nextLabel");
   const lastSyncRef = useRef(-1);
+  const liveSessionKeyRef = useRef<string | null>(null);
   const notifiedRef = useRef(new Set<string>());
 
   // 上课闹钟：只有在 Course Radar 里开了铃铛的课程才提醒；
@@ -485,47 +485,66 @@ export default function Dashboard({ onOpenProfile, onNavigate }: { onOpenProfile
     }
   }, [countdown, hasCountdown, t]);
 
-  // 后台/锁屏数据出口：前台不渲染任何小部件，只把倒计时数据同步给未来 iOS 原生桥。
+  // Live Activity / 灵动岛真实接线：
+  //  - 进入课前/课中状态的第一秒 → 显式发给原生 `control: "start"`（Activity.request）
+  //  - 之后每秒 → `control: "update"`（ActivityContent 状态刷新，消耗圆环/剩余时间）
+  //  - 回到 idle/无课 → `control: "end"`（Activity.end，自动收起灵动岛与锁屏）
+  // Web 预览无桥接时为空操作，不渲染任何假灵动岛。
   useEffect(() => {
-    if (hasCountdown) {
-      const sec = Math.round(countdown.remaining);
-      if (lastSyncRef.current === sec) return;
-      lastSyncRef.current = sec;
-      const kind = countdown.mode === "in-class" ? "in-class" : "pre-class";
-      syncLiveActivity(
-        buildLiveActivityPayload({
-          name: countdown.course.name,
-          type: TYPE_META[countdown.course.type].labelKey,
-          professor: countdown.course.prof,
-          room: countdown.course.room,
-          building: countdown.course.building,
-          startH: countdown.course.startH,
-          startM: countdown.course.startM,
-          endH: countdown.course.endH,
-          endM: countdown.course.endM,
-          remaining: countdown.remaining,
-          total: countdown.total,
-          kind,
-          statusLabel: countdownStatus,
-        }),
-      );
-    } else if (lastSyncRef.current !== 0) {
+    const kind: LiveActivityKind = hasCountdown
+      ? countdown.mode === "in-class"
+        ? "in-class"
+        : "pre-class"
+      : "none";
+
+    const liveCourse = countdown.mode === "idle" ? null : countdown.course;
+    const course = liveCourse ?? activeCourse;
+    const remainingSec = countdown.mode === "idle" ? 0 : Math.round(countdown.remaining);
+    const totalSec = countdown.mode === "idle" ? 0 : Math.round(countdown.total);
+
+    const makeInput = () => ({
+      name: course.name,
+      type: TYPE_META[course.type].labelKey,
+      professor: course.prof,
+      room: course.room,
+      building: course.building,
+      startH: course.startH,
+      startM: course.startM,
+      endH: course.endH,
+      endM: course.endM,
+      remaining: remainingSec,
+      total: totalSec,
+      kind,
+      statusLabel: countdownStatus,
+    });
+
+    if (liveCourse) {
+      const sessionKey = `${liveCourse.id}:${countdown.mode}:${liveCourse.startH}${liveCourse.startM}`;
+      // 首次进入该课程/阶段 → 原生 Activity.request 启动灵动岛
+      if (liveSessionKeyRef.current !== sessionKey) {
+        liveSessionKeyRef.current = sessionKey;
+        lastSyncRef.current = remainingSec;
+        syncLiveActivity(buildLiveActivityPayload({ ...makeInput(), control: "start" }));
+        return;
+      }
+      // 已启动 → 每秒 update（不同秒才发，避免无意义桥接）
+      if (lastSyncRef.current === remainingSec) return;
+      lastSyncRef.current = remainingSec;
+      syncLiveActivity(buildLiveActivityPayload({ ...makeInput(), control: "update" }));
+      return;
+    }
+
+    // idle / 今天无课 → 结束当前 Live Activity（若之前启动过）
+    if (liveSessionKeyRef.current) {
+      liveSessionKeyRef.current = null;
       lastSyncRef.current = 0;
       syncLiveActivity(
         buildLiveActivityPayload({
-          name: activeCourse.name,
-          type: TYPE_META[activeCourse.type].labelKey,
-          professor: activeCourse.prof,
-          room: activeCourse.room,
-          building: activeCourse.building,
-          startH: activeCourse.startH,
-          startM: activeCourse.startM,
-          endH: activeCourse.endH,
-          endM: activeCourse.endM,
+          ...makeInput(),
+          kind: "none",
+          control: "end",
           remaining: 0,
           total: 0,
-          kind: "none",
-          statusLabel: countdownStatus,
         }),
       );
     }

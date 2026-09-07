@@ -81,7 +81,7 @@
 - 通知分类：上课/成绩“关键提醒”默认开启（设置页可关：⏰ 上课与成绩提醒）；
   新闻推送由设置页“News notifications”开关控制（默认开启，可关）。
 - 声明与隐私：`LEGAL.md`（免责声明/隐私政策/使用条款/非官方声明），App 内 About → 政策折叠展示。
-- Widget 源码：`ios/App/KazNUHelperWidget/`（锁屏深色卡片 + 圆环 + Dynamic Island compact/expanded/minimal）。
+- Widget 源码：`ios/App/KazNUWidgets/`（锁屏深色卡片 + 圆环 + Dynamic Island compact/expanded/minimal）。
 - 接入步骤（Xcode 建 Widget Extension Target 并把文件加进两个 Target）：见 **`ios/LIVE_ACTIVITY_GUIDE.md`**。
 - ⚠️ 免费个人证书无法签名 App Extension；且 App 被完全杀死后 iOS 只保证本地通知准时触发，
   灵动岛需在 App 进程存活/回前台时启动（详见指南“局限说明”）。
