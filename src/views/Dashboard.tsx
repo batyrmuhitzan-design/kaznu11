@@ -598,7 +598,7 @@ export default function Dashboard({ onOpenProfile, onNavigate, onOpenReviews }: 
         <div className="flex-1 min-h-0 overflow-y-auto px-4 pt-3 pb-28 space-y-3 animate-slide-up">
 
         {/* Main Course Card (2x2) */}
-        <div className="glass squircle-lg p-5 relative overflow-hidden card-shadow" style={{ minHeight: 160 }}>
+        <div className="glass squircle-lg px-5 pt-5 pb-6 relative overflow-hidden card-shadow" style={{ minHeight: 160 }}>
           <div className="absolute inset-0 opacity-10" style={{ background: "linear-gradient(135deg, #0033A0 0%, transparent 60%)" }} />
           {hasCountdown ? (
             <CountdownRing remaining={countdown.remaining} total={countdown.total} ringColor={ringColor} urgent={urgent} />
@@ -644,15 +644,6 @@ export default function Dashboard({ onOpenProfile, onNavigate, onOpenReviews }: 
                     <path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z" />
                   </svg>
                   {t("navigate")}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onOpenReviews?.(activeCourse.prof, activeCourse.name)}
-                  className="haptic-action mt-3 ml-2 px-3 py-1.5 rounded-full text-xs font-semibold inline-flex items-center gap-1.5 transition-opacity active:opacity-70"
-                  style={{ background: "rgba(255,214,10,0.14)", color: "#FFD60A", border: "1px solid rgba(255,214,10,0.32)" }}
-                >
-                  <span aria-hidden="true">⭐</span>
-                  {tr("View Professor Rating", "Оқытушы бағасын қарау", "Рейтинг преподавателя")}
                 </button>
               </>
             )}
