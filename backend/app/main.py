@@ -37,21 +37,33 @@ except ImportError:  # pragma: no cover
 def _make_app() -> FastAPI:
     @asynccontextmanager
     async def _lifespan(_app: FastAPI) -> AsyncIterator[None]:
-        await init_db()
-        if settings.seed_on_startup:
+        # 数据库不可用时**不阻塞进程启动**：/docs 与 /admin 登录页仍可访问，便于在服务器上排查配置。
+        # 评价相关接口会在查询时报错（500），/healthz 的 db_ready 会显示 false。
+        try:
+            await init_db()
+            if settings.seed_on_startup:
+                async with SessionLocal() as session:
+                    await seed_if_empty(session)
+            # 保证内置超级管理员一定存在（应用首次启动时创建）
             async with SessionLocal() as session:
-                await seed_if_empty(session)
-        # 保证内置超级管理员一定存在（应用首次启动时创建）
-        async with SessionLocal() as session:
-            await ensure_super_admin(session)
+                await ensure_super_admin(session)
+            _app.state.db_ready = True
+        except Exception as exc:  # pragma: no cover - 取决于部署环境
+            _app.state.db_ready = False
+            print(
+                "[kaznu] ⚠️ 数据库初始化失败，评价接口暂不可用（/docs 与 /admin 仍可访问）: "
+                f"{type(exc).__name__}: {exc}\n"
+                f"[kaznu]    当前 DATABASE_URL = {settings.database_url}"
+            )
         yield
 
     app = FastAPI(
         title=settings.app_name,
         description=(
             "KazNU Helper 2.0 (test build) — Univer account identity + "
-            "anonymous professor/course ratings. "
-            "Reviews never expose display names, only coarse department tags."
+            "anonymous professor/course ratings (Prof Reviews). "
+            "Reviews never expose display names, only coarse department tags. "
+            "Web 管理后台：/admin （SQLAdmin：评价查看/编辑/删除、举报处理、管理员审批、封禁）。"
         ),
         version=settings.app_version,
         lifespan=_lifespan,
@@ -94,11 +106,24 @@ def _make_app() -> FastAPI:
 
     @app.get("/healthz", tags=["meta"])
     async def healthz() -> dict:
-        return {"status": "ok", "version": settings.app_version}
+        """健康检查：同时报告数据库状态与管理后台路径，便于部署后一眼确认。"""
+        return {
+            "status": "ok",
+            "version": settings.app_version,
+            "db_ready": bool(getattr(app.state, "db_ready", False)),
+            "database": settings.database_url.split("@")[-1],
+            "docs": "/docs",
+            "admin": "/admin",
+        }
 
     @app.get("/", include_in_schema=False)
     async def root() -> dict:
-        return {"status": "online", "message": f"{settings.app_name} {settings.app_version}"}
+        return {
+            "status": "online",
+            "message": f"{settings.app_name} {settings.app_version}",
+            "docs": "/docs",
+            "admin": "/admin",
+        }
 
     return app
 

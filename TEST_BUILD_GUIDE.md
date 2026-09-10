@@ -102,11 +102,23 @@ Artifacts are **unsigned** (CI has no Apple certificate), so a sideloading tool 
 - **付费账号 + Xcode 真机调试**（不走侧载）同样可测：`npx cap open ios` → 选 Team → `⌘R`。
 
 ## 0. 管理后台 (SQLAdmin)
-浏览器打开 `https://<你的统一域名>/admin`（本地则是 `http://127.0.0.1:8000/admin`）。
-- 首次启动自动创建超管：`SUPER_ADMIN_USERNAME`（默认 `superadmin@student.kaznu.kz`），密码=`DEMO_PASSWORD`(123456)。
+浏览器打开 `https://1losion.me/admin`（本地则是 `http://127.0.0.1:8000/admin`）。
+- 入口是仓库根目录的 `main.py`（`uvicorn main:app`）：它把评价系统 `/api/v1/*`、管理后台 `/admin`、
+  文档 `/docs`、健康检查 `/healthz` 与旧版兼容接口挂在同一个应用上。
+- 首次启动自动创建超管：`SUPER_ADMIN_USERNAME` / `SUPER_ADMIN_PASSWORD`（默认 `admin@1losion.me` / `admin123456`）。
 - 学生可在 App/API 用 `POST /api/v1/admin/apply` 申请；超管在 `/admin` 的
   “Admin Applications”面板一键 Approve/Reject；Users 面板可一键 Ban/Unban。
-- role=admin 的账号只能看到 Reviews / Professors / Courses / Reports 内容面板。
+- role=admin 的账号只能看到 Reviews / Professors / Courses / Reports 内容面板；
+  Reviews 面板可查看（含评价正文预览）、编辑、批量删除。
+- 未配置 `DATABASE_URL` 时自动使用本地 SQLite（`kaznu_helper.db`）；DB 不可用时 `/docs` 与 `/admin`
+  登录页仍可访问（`/healthz` 显示 `db_ready:false`）。
+
+部署 / 重启 / 验证（含 openresty 反代片段、无 Postgres 场景）：见 **`backend/README.md`** →
+“统一入口挂载 / 部署 / 自检 / 线上验证”。最快的自检：
+
+```bash
+python backend/tests/check_admin_mount.py     # 无需 Postgres
+```
 
 ## Notes / verification done
 - `python backend/tests/smoke_test.py` → all assertions passed (login, display name,

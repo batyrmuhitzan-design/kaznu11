@@ -1,75 +1,71 @@
-from fastapi import FastAPI, Query
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
+"""KazNU Helper — 统一 FastAPI 入口（生产 / 线上 `uvicorn main:app` 用的就是这个文件）。
 
-app = FastAPI()
+这个入口现在挂载三部分：
 
-# 允许前端跨域请求
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  # 允许所有前端域名访问
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+  1) **完整的 2.0 后端**（`backend/app/`）：Univer 身份 + 教授/课程评价（Prof Reviews）
+     + 举报 + 管理端 API，全部在 `/api/v1/*` 下：
+        /api/v1/auth/*        登录 / 注册（Univer 账号形态校验）
+        /api/v1/me/*          全局显示名 / 部门标签
+        /api/v1/professors    教授列表与检索
+        /api/v1/courses       课程列表与检索
+        /api/v1/reviews       评价：GET 列表 / POST 发表（匿名，一人一教授一条）/ eligibility / like
+        /api/v1/admin/*       管理员申请、审批、封禁（管理端 API）
+        /api/v1/super-admin/* 超管接口
+        /api/v1/reports/*     评价举报
+  2) **Web 管理后台**：SQLAdmin 挂载在 `/admin`
+     （Users / Admin Applications / Professors / Courses / Reviews / Reports；
+       评价可查看/检索/编辑/删除，举报可处理，管理员申请可 Approve/Reject，用户可 Ban/Unban）
+  3) 1.0 原型接口（`/api/v1/schedule`、`/api/v1/grades`）继续保留，避免老客户端 404；
+     旧版 `/api/news`、`/api/schedule`、`/api/gpa` 由 2.0 后端的兼容 router 提供。
+  4) 可选：前端构建产物（`dist/`）挂到 `/app`，方便同源预览静态站（不影响 `/admin` 与 `/api`）。
 
-app = FastAPI(
-    title="KazNU Helper API",
-    description="KazNU Helper 基础后端接口",
-    version="1.0.0"
-)
+启动：
+    uvicorn main:app --host 0.0.0.0 --port 8000
 
-# 允许跨域请求，方便前端 React / iOS 调用
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+常用环境变量（写在仓库根 .env 即可，backend/app/config.py 会自动加载）：
+    DATABASE_URL          # 不设置时退回本地 SQLite 文件（零依赖可跑通）
+    SUPER_ADMIN_USERNAME / SUPER_ADMIN_PASSWORD   # /admin 登录（默认 admin@1losion.me / admin123456）
+    DEMO_PASSWORD         # 学生端 demo 密码（默认 123456）
+    ADMIN_SESSION_SECRET  # 后台会话签名密钥（生产请单独设置）
+"""
+from __future__ import annotations
 
-@app.get("/")
-def read_root():
-    return {"status": "online", "message": "KazNU Helper API 运行正常！"}
+import sys
+from pathlib import Path
 
-# 1. 假数据：课表接口
-@app.get("/api/v1/schedule")
-def get_schedule(student_id: str = Query(..., description="学生学号")):
+from fastapi import Query
+from fastapi.staticfiles import StaticFiles
+
+ROOT_DIR = Path(__file__).resolve().parent
+BACKEND_DIR = ROOT_DIR / "backend"
+WEB_DIR = ROOT_DIR / "dist"
+
+# `backend/` 里有 app 包（backend/app/*），加入 sys.path 后 `import app.main` 才能解析。
+if str(BACKEND_DIR) not in sys.path:
+    sys.path.insert(0, str(BACKEND_DIR))
+
+# ---- 挂载完整的 2.0 后端（含 /api/v1/* 评价路由、SQLAdmin /admin、/healthz、旧版 /api/news 等）----
+from app.main import app  # noqa: E402  (必须在上面的 sys.path 注入之后导入)
+
+
+# =====================================================================
+# 1.0 原型接口（兼容保留：线上一直在提供，留着以免老客户端 404）
+# =====================================================================
+@app.get("/api/v1/schedule", tags=["legacy"], summary="旧版课表原型接口（兼容保留）")
+def legacy_schedule(student_id: str = Query(..., description="学生学号")):
     return {
         "status": "success",
         "student_id": student_id,
         "schedule": [
-            {
-                "id": 1,
-                "time": "09:00 - 10:20",
-                "subject": "Data Structures & Algorithms",
-                "teacher": "Dr. Akhmetov",
-                "room": "304 FIT",
-                "type": "Lecture"
-            },
-            {
-                "id": 2,
-                "time": "10:30 - 11:50",
-                "subject": "Database Systems",
-                "teacher": "Prof. Suleimenov",
-                "room": "208 FIT",
-                "type": "Practice"
-            },
-            {
-                "id": 3,
-                "time": "13:00 - 14:20",
-                "subject": "Web Development",
-                "teacher": "Tutor Bateer",
-                "room": "401 FIT",
-                "type": "Lab"
-            }
-        ]
+            {"id": 1, "time": "09:00 - 10:20", "subject": "Data Structures & Algorithms", "teacher": "Dr. Akhmetov", "room": "304 FIT", "type": "Lecture"},
+            {"id": 2, "time": "10:30 - 11:50", "subject": "Database Systems", "teacher": "Prof. Suleimenov", "room": "208 FIT", "type": "Practice"},
+            {"id": 3, "time": "13:00 - 14:20", "subject": "Web Development", "teacher": "Tutor Bateer", "room": "401 FIT", "type": "Lab"},
+        ],
     }
 
-# 2. 假数据：成绩接口
-@app.get("/api/v1/grades")
-def get_grades(student_id: str = Query(..., description="学生学号")):
+
+@app.get("/api/v1/grades", tags=["legacy"], summary="旧版成绩原型接口（兼容保留）")
+def legacy_grades(student_id: str = Query(..., description="学生学号")):
     return {
         "status": "success",
         "student_id": student_id,
@@ -77,58 +73,19 @@ def get_grades(student_id: str = Query(..., description="学生学号")):
         "courses": [
             {"subject": "Data Structures", "grade": "A", "score": 95},
             {"subject": "Database Systems", "grade": "A-", "score": 91},
-            {"subject": "Linear Algebra", "grade": "B+", "score": 88}
-        ]
+            {"subject": "Linear Algebra", "grade": "B+", "score": 88},
+        ],
     }
 
 
-@app.get("/api/news")
-def get_news():
-    """演示校园新闻接口，后续可替换为校园网抓取结果。"""
-    return [
-        {
-            "id": "news-1",
-            "title": "ҚҰТТЫҚТАЙМЫЗ!!!",
-            "summary": "Әл-Фараби атындағы Қазақ ұлттық университетінің 2025-2026 оқу жылының қысқы емтихан сессиясының қорытындылары бойынша бос білім беру гранттарына тағайындалған келесі студенттер мен магистранттарды құттықтаймыз!!!",
-            "body": "Қазақстан Республикасы Ғылым және жоғары білім министрлігінің 2026 жылғы 20 наурыздағы бұйрығына сәйкес бос білім беру гранттары тағайындалды. Студент кеңсесі тізімде көрсетілген білім алушылардан келісім шартқа қол қоюларын сұрайды.",
-            "published_at": "2026-07-23T14:35:00+05:00",
-            "category": "University",
-            "accent": "#007AFF",
-        },
-        {
-            "id": "news-2",
-            "title": "Құрметті білім алушылар!",
-            "summary": "Жазғы семестрге тіркелу және оқу үдерісін жоспарлау туралы маңызды ақпарат.",
-            "body": "Жазғы семестрге тіркелу Univer жүйесінде ашық. Пәндерді таңдаудан бұрын академиялық кеңесшіңізбен оқу жоспарын нақтылаңыз.",
-            "published_at": "2026-07-23T10:20:00+05:00",
-            "category": "Students",
-            "accent": "#30D158",
-        },
-        {
-            "id": "news-3",
-            "title": "Вакансия",
-            "summary": "Университет бөлімдеріне студенттерді жұмысқа шақырамыз.",
-            "body": "Кампус жобаларына көмекші қажет. Толық ақпарат пен өтінім беру формасы мансап орталығының парақшасында жарияланған.",
-            "published_at": "2026-07-22T15:55:00+05:00",
-            "category": "Career",
-            "accent": "#FF9F0A",
-        },
-        {
-            "id": "news-4",
-            "title": "Coursera 2026",
-            "summary": "Студенттерге арналған жаңа онлайн курстар топтамасы қолжетімді.",
-            "body": "Coursera for Campus бағдарламасы аясында жаңа курстар ашылды. Қатысу үшін университеттік поштаңызбен тіркеліңіз.",
-            "published_at": "2026-06-22T17:12:00+05:00",
-            "category": "Learning",
-            "accent": "#5E5CE6",
-        },
-        {
-            "id": "news-5",
-            "title": "Вебинарлар для студентов",
-            "summary": "Шілде айындағы вебинарлар кестесі жарияланды.",
-            "body": "Апта сайынғы вебинарлар оқу, мансап және студенттік бастамалар тақырыптарына арналады.",
-            "published_at": "2026-06-20T17:39:00+05:00",
-            "category": "Events",
-            "accent": "#FF453A",
-        },
-    ]
+# =====================================================================
+# 前端静态资源（可选）：`npm run build` 之后把 dist/ 挂到 /app
+# =====================================================================
+_WEB_MOUNTED = WEB_DIR.is_dir() and (WEB_DIR / "index.html").is_file()
+if _WEB_MOUNTED:
+    app.mount("/app", StaticFiles(directory=str(WEB_DIR), html=True), name="web")
+
+print(
+    "[kaznu] 入口已就绪 → /docs 接口文档、/admin 管理后台（SQLAdmin）"
+    + ("、/app 前端静态站" if _WEB_MOUNTED else "（未发现 dist/，跳过 /app 挂载：先 npm run build）")
+)

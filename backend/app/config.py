@@ -1,7 +1,8 @@
 """Application settings loaded from environment / .env (python-dotenv).
 
 Central place for:
-  - DATABASE_URL      (PostgreSQL + asyncpg by default)
+  - DATABASE_URL      (PostgreSQL + asyncpg in production; SQLite fallback for a
+                       single-box deploy or local run with no Postgres)
   - Univer demo login
   - anonymous_hash pepper
   - CORS origins
@@ -14,9 +15,13 @@ from functools import lru_cache
 
 from dotenv import load_dotenv
 
-# .env is resolved from: 1) the current working dir, 2) backend/, 3) project root
+_BACKEND_DIR = os.path.dirname(os.path.abspath(__file__))
+_REPO_ROOT = os.path.abspath(os.path.join(_BACKEND_DIR, "..", ".."))
+
+# .env 解析顺序（load_dotenv 不覆盖已存在的变量）：当前工作目录 → backend/.env → 仓库根 .env
 load_dotenv()
-load_dotenv(os.path.join(os.path.dirname(__file__), "..", ".env"))
+load_dotenv(os.path.join(_BACKEND_DIR, "..", ".env"))
+load_dotenv(os.path.join(_REPO_ROOT, ".env"))
 
 
 @dataclass(frozen=True)
@@ -25,11 +30,13 @@ class Settings:
     app_version: str = "2.0.0-beta.1"
     debug: bool = os.getenv("DEBUG", "false").lower() in {"1", "true", "yes"}
 
-    # PostgreSQL (asyncpg). Override via .env for your own cluster:
-    #   DATABASE_URL=postgresql+asyncpg://kaznu:password@localhost:5432/kaznu_helper
+    # 数据库：
+    #  - 生产（docker compose / 自建 Postgres）：设置 DATABASE_URL
+    #      DATABASE_URL=postgresql+asyncpg://kaznu:password@localhost:5432/kaznu_helper
+    #  - 未设置时的兜底：本地 SQLite 文件（零依赖即可跑通评价系统 / 管理后台）
     database_url: str = os.getenv(
         "DATABASE_URL",
-        "postgresql+asyncpg://kaznu:kaznu@localhost:5432/kaznu_helper",
+        "sqlite+aiosqlite:///./kaznu_helper.db",
     )
     db_echo: bool = os.getenv("DB_ECHO", "false").lower() in {"1", "true", "yes"}
 

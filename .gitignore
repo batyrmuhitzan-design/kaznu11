@@ -12,6 +12,14 @@ logs/
 .claude-replay.*
 .tmp-*
 
+# Python 字节码 / 虚拟环境（后端本地运行产生，不入库）
+__pycache__/
+*.pyc
+backend/venv/
+venv/
+.venv/
+*.db
+
 # Platform-managed agentplat state, not project source. In the
 # client-initiated single-repo workspace layout (make's `Path: "."` spec) the
 # repo root IS the workspace root, so these land inside this repo rather than

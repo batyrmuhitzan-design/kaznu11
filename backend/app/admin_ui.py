@@ -41,17 +41,24 @@ def _allowed(request: Request, roles: tuple[str, ...]) -> bool:
 
 
 async def _load_user_for_login(username: str, password: str) -> User | None:
-    """后台登录校验：账号必须存在、未封禁、role ∈ {admin, super_admin}，密码匹配。"""
+    """后台登录校验：账号必须存在、未封禁、role ∈ {admin, super_admin}，密码匹配。
+
+    数据库不可用时返回 None（表现为登录失败），避免直接 500 —— 便于在服务器上先确认 /admin 可达。
+    """
     expected = settings.super_admin_password or settings.demo_password
     if password != expected:
         return None
-    async with SessionLocal() as session:
-        user = await session.scalar(
-            select(User).where(User.univer_username == username.strip().lower())
-        )
-        if not user or user.is_banned or user.role not in (ROLE_ADMIN, ROLE_SUPER_ADMIN):
-            return None
-        return user
+    try:
+        async with SessionLocal() as session:
+            user = await session.scalar(
+                select(User).where(User.univer_username == username.strip().lower())
+            )
+    except Exception as exc:  # pragma: no cover - 取决于部署环境
+        print(f"[kaznu] ⚠️ 管理后台登录时无法访问数据库: {type(exc).__name__}: {exc}")
+        return None
+    if not user or user.is_banned or user.role not in (ROLE_ADMIN, ROLE_SUPER_ADMIN):
+        return None
+    return user
 
 from sqladmin.authentication import AuthenticationBackend
 
@@ -80,8 +87,12 @@ class KaznuAdminAuth(AuthenticationBackend):
         data = request.session.get(SESSION_KEY)
         if not data:
             return False
-        async with SessionLocal() as session:
-            user = await session.get(User, data.get("id"))
+        try:
+            async with SessionLocal() as session:
+                user = await session.get(User, data.get("id"))
+        except Exception as exc:  # pragma: no cover - 取决于部署环境
+            print(f"[kaznu] ⚠️ 管理后台会话校验无法访问数据库: {type(exc).__name__}: {exc}")
+            return False
         if not user or user.is_banned or user.role not in (ROLE_ADMIN, ROLE_SUPER_ADMIN):
             request.session.pop(SESSION_KEY, None)
             return False
@@ -147,6 +158,11 @@ class UserAdmin(ModelView, model=User):
         return _redirect(request, self.identity)
 
 
+def _application_user_label(model: AdminApplication, _attr: str) -> str:
+    """申请列表显示申请人账号，而不是对象地址。"""
+    return model.user.univer_username if model.user else "—"
+
+
 class AdminApplicationAdmin(ModelView, model=AdminApplication):
     """仅 super_admin：管理员申请审批面板。"""
 
@@ -159,6 +175,7 @@ class AdminApplicationAdmin(ModelView, model=AdminApplication):
     can_delete = True
 
     column_list = [AdminApplication.user, AdminApplication.reason, AdminApplication.status, AdminApplication.created_at]
+    column_formatters = {AdminApplication.user: _application_user_label}
     column_searchable_list = [AdminApplication.reason]
     column_default_sort = [("created_at", True)]
 
@@ -222,6 +239,26 @@ class CourseAdmin(ModelView, model=Course):
         return _allowed(request, STAFF_ROLES)
 
 
+def _review_professor_label(model: Review, _attr: str) -> str:
+    """列表/详情里显示教授姓名，而不是 <app.models.Professor object at 0x…>。"""
+    return model.professor.name if model.professor else "—"
+
+
+def _review_course_label(model: Review, _attr: str) -> str:
+    course = model.course
+    if not course:
+        return "—"
+    return f"{course.code} · {course.title}" if course.code else course.title
+
+
+def _review_comment_preview(model: Review, _attr: str) -> str:
+    """把评价正文压成一行短文本，便于在列表里快速审核。"""
+    text = " ".join((model.comment or "").split())
+    if not text:
+        return "—"
+    return text if len(text) <= 60 else text[:60] + "…"
+
+
 class ReviewAdmin(ModelView, model=Review):
     name = "Review"
     name_plural = "Reviews"
@@ -231,6 +268,7 @@ class ReviewAdmin(ModelView, model=Review):
         Review.id,
         Review.professor,
         Review.course,
+        Review.comment,
         Review.rating_quality,
         Review.rating_easy,
         Review.attendance_strictness,
@@ -238,6 +276,12 @@ class ReviewAdmin(ModelView, model=Review):
         Review.user_department_tag,
         Review.created_at,
     ]
+    # 教授/课程列默认会渲染成对象地址，评价正文也需要预览列 —— 审核时可直接看到内容。
+    column_formatters = {
+        Review.professor: _review_professor_label,
+        Review.course: _review_course_label,
+        Review.comment: _review_comment_preview,
+    }
     column_details_list = [Review.id, Review.professor, Review.course, Review.comment, Review.tags,
                            Review.rating_quality, Review.rating_easy, Review.attendance_strictness,
                            Review.user_department_tag, Review.likes_count, Review.created_at]
@@ -283,5 +327,9 @@ def setup_admin_ui(app) -> Admin:
     admin.add_model_view(CourseAdmin)
     admin.add_model_view(ReviewAdmin)
     admin.add_model_view(ReportAdmin)
+    print(
+        "[kaznu] SQLAdmin 管理后台已挂载: /admin"
+        " （Users / Admin Applications / Professors / Courses / Reviews / Reports）"
+    )
     return admin
 

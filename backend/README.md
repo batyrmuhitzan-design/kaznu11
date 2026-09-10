@@ -81,3 +81,66 @@ Default: any **Univer-shaped** student id / `@student.kaznu.kz` account logs in 
 > 环境变量：`SUPER_ADMIN_USERNAME` / `SUPER_ADMIN_PASSWORD` / `ADMIN_SESSION_SECRET`（见 `.env.example`）。
 > 数据库兼容：启动时 `init_db` 会自动给旧 `users` 表补 `role` / `is_banned` 列。
 
+---
+
+## 统一入口挂载（线上 `uvicorn main:app` 用的就是这个）
+
+仓库根目录的 **`main.py`** 是生产入口，它把这些能力挂到同一个 FastAPI 应用上：
+
+| 路径 | 内容 |
+|---|---|
+| `/api/v1/*` | 评价系统 API：`auth` / `me` / `professors` / `courses` / `reviews` / `admin` / `super-admin` / `reports` |
+| `/admin` | **SQLAdmin Web 管理后台**：Reviews 查看·编辑·删除、Reports 处理、Professors/Courses 维护；超管另有 Users 封禁、Admin Applications 审批 |
+| `/docs` | Swagger UI（包含上面全部路由） |
+| `/healthz` | 健康检查：`db_ready` + `admin` 路径（部署后先看它自证） |
+| `/api/news`、`/api/schedule`、`/api/gpa` | 旧版兼容接口（1.3 App 仍在用） |
+| `/api/v1/schedule`、`/api/v1/grades` | 1.0 原型接口（兼容保留，避免老客户端 404） |
+| `/app` | 可选：`npm run build` 产物（存在 `dist/index.html` 时自动挂载，同源预览静态站） |
+
+```bash
+uvicorn main:app --host 0.0.0.0 --port 8000      # 入口
+```
+
+数据库策略：
+- 生产建议 `DATABASE_URL=postgresql+asyncpg://…`（docker 栈已自动注入）；
+- **未配置时自动退回本地 SQLite 文件 `kaznu_helper.db`**（零依赖即可跑通评价 + 管理后台）；
+- 数据库连不上**不会阻塞启动**：`/docs`、`/admin` 登录页仍可访问，`/healthz` 会显示 `db_ready: false`，
+  并在日志里打印当前 `DATABASE_URL` 便于排查。
+
+### 部署 / 重启（服务器）
+```bash
+cd /opt/kaznu11                      # 仓库目录
+git pull --ff-only
+pip install -r requirements.txt      # 首次或依赖更新时（sqladmin / itsdangerous / aiosqlite 必需）
+pkill -f 'uvicorn main:app' || true
+nohup uvicorn main:app --host 127.0.0.1 --port 8000 >/var/log/kaznu-api.log 2>&1 &
+```
+- 用 systemd / aaPanel「Python 项目」托管时，把最后两行换成对应的 restart。
+- 用仓库自带 docker 栈（Postgres + API + Caddy）：`bash update.sh update`。
+  ⚠️ Caddy 会占用 80/443 —— 若服务器上已有 openresty/nginx，**不要同时启动 Caddy**，
+  改用下面的反代片段把请求转发到 `127.0.0.1:8000`。
+
+### openresty / nginx 反代片段（服务器已在用 openresty 时）
+```nginx
+location /api/           { proxy_pass http://127.0.0.1:8000; proxy_set_header Host $host; proxy_set_header X-Forwarded-Proto $scheme; }
+location /admin          { proxy_pass http://127.0.0.1:8000; proxy_set_header Host $host; proxy_set_header X-Forwarded-Proto $scheme; }
+location /docs           { proxy_pass http://127.0.0.1:8000; proxy_set_header Host $host; }
+location = /openapi.json { proxy_pass http://127.0.0.1:8000; }
+location = /healthz      { proxy_pass http://127.0.0.1:8000; }
+```
+`location /admin` 是前缀匹配，已覆盖 `/admin/login`、`/admin/review/list` 等子路径与静态资源。
+
+### 自检（本地也能跑，无需 Postgres）
+```bash
+python backend/tests/check_admin_mount.py     # 断言：/docs、全部评价/管理端路由、/admin、/healthz、旧接口、种子数据、/app
+python backend/tests/smoke_test.py            # 原有业务冒烟（匿名性/一人一评/登录门禁）
+```
+
+### 线上验证
+```bash
+curl -s https://1losion.me/healthz            # 期望 {"status":"ok","db_ready":true,…,"admin":"/admin"}
+curl -s https://1losion.me/openapi.json | grep -c '/api/v1/reviews'
+```
+浏览器打开 `https://1losion.me/docs`（应能看到 professors / courses / reviews / admin / super-admin / reports 分组）
+与 `https://1losion.me/admin`（账号 `SUPER_ADMIN_USERNAME`、密码 `SUPER_ADMIN_PASSWORD`，默认 `admin@1losion.me` / `admin123456`）。
+
