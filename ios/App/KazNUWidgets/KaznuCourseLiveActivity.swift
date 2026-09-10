@@ -220,34 +220,35 @@ struct KaznuCourseLiveActivity: Widget {
             // 锁屏 / 通知横幅（iPhone XR 等无灵动岛机型同样走这里）
             KaznuCourseLockScreenView(context: context)
         } dynamicIsland: { context in
-            let state = context.state
-            let accent = KaznuActivityPalette.color(for: state)
-            return DynamicIsland {
-                // ---------- 展开：左（课程）/ 右（圆环）/ 底（时间 + 进度 + 跳转） ----------
+            // ---------- 展开：左（课程）/ 右（圆环）/ 底（时间 + 进度 + 跳转） ----------
+            DynamicIsland {
                 DynamicIslandExpandedRegion(.leading) {
                     KaznuExpandedLeading(context: context)
                 }
                 DynamicIslandExpandedRegion(.trailing) {
-                    KaznuCountdownRing(state: state, size: 44, lineWidth: 5, showsText: false)
+                    KaznuCountdownRing(state: context.state, size: 44, lineWidth: 5, showsText: false)
                         .padding(.trailing, 2)
                 }
                 DynamicIslandExpandedRegion(.bottom) {
-                    KaznuExpandedBottom(context: context, accent: accent)
+                    KaznuExpandedBottom(
+                        context: context,
+                        accent: KaznuActivityPalette.color(for: context.state)
+                    )
                 }
             } compactLeading: {
                 // 极简品牌标识：书本图标（颜色随倒计时档位变化）
                 Image(systemName: "book.closed.fill")
                     .font(.system(size: 13, weight: .bold))
-                    .foregroundColor(accent)
+                    .foregroundColor(KaznuActivityPalette.color(for: context.state))
             } compactTrailing: {
                 // 迷你圆环进度条 + 剩余分钟数字
-                KaznuCompactRing(state: state)
+                KaznuCompactRing(state: context.state)
             } minimal: {
                 Image(systemName: "book.closed.fill")
                     .font(.system(size: 12, weight: .bold))
-                    .foregroundColor(accent)
+                    .foregroundColor(KaznuActivityPalette.color(for: context.state))
             }
-            .keylineTint(accent)
+            .keylineTint(KaznuActivityPalette.color(for: context.state))
         }
     }
 }
