@@ -45,8 +45,8 @@ Windows cannot compile iOS, so use **GitHub Actions** (recommended) or a local M
 触发方式二选一：
 
 - **自动**：push 到 `main` / `master`（仅 `.md` 与 `deploy/**` 的改动不会触发）；
-- **手动**：Actions → **Build iOS IPA** → *Run workflow*（可选 `runner` 输入，默认 `macos-26`，
-  因为 Capacitor 8 需要 **Xcode 26+**；该镜像自带 Xcode 26.6）。
+- **手动**：Actions → **Build iOS IPA** → *Run workflow*（可选 `runner` 输入，默认 `macos-latest`；
+  实测该镜像为 **macOS 26 + Xcode 26.6 / iOS SDK 26.5**，满足 Capacitor 8 的 Xcode 26+ 要求）。
 
 一次运行会并行产出 **两个未签名 IPA**（都是 `Release` 构建）：
 

@@ -110,7 +110,10 @@ Web 端同步课表后。刷新策略：**只**在换色点（60% / 20%）、整
 
 要点：
 
-- runner 用 `macos-26`（镜像自带 Xcode 26.6；Capacitor 8 要求 **Xcode 26+**）；
+- runner 默认 `macos-latest`（实测 macOS 26 + Xcode 26.6 + iOS SDK 26.5，满足 Capacitor 8 的 Xcode 26+）；
+  Run workflow 时可用 `runner` 输入覆盖（例如 `macos-26`）；
+- `xcodebuild` 依次尝试 3 种调用方式（`-scheme + -destination` → `-target + -sdk` → `-scheme + -sdk` 历史写法），
+  任一成功即继续；失败时把编译错误以 `::error::` 注解输出，并上传 build-log artifact；
 - 构建前跑 `node scripts/verify-ios-live-activity.cjs` 做工程结构守卫，构建后校验
   `.appex` 是否存在（完整包必须有、侧载包必须没有），不一致直接让 CI 失败；
 - 流水线不会 `rm -rf ios`，始终使用仓库里已提交的 Xcode 工程与原生代码。
