@@ -1,44 +1,140 @@
 name: Build iOS IPA
 
+# 一次构建产出两个未签名 IPA（真机安装前用 AltStore / Sideloadly 签名）：
+#  1) KazNUHelper-full-unsigned.ipa     —— App + KazNUWidgets 扩展：Live Activity / 灵动岛 / 桌面小组件
+#     安装需【付费】Apple 开发者账号（免费账号无法签名 App Extension）
+#  2) KazNUHelper-sideload-unsigned.ipa —— 已剥离 Widget 扩展，可用【免费】Apple ID 侧载
+#     代价：没有锁屏倒计时 / 灵动岛 / 桌面小组件，只能测 App 自身功能
 on:
-  push:
-    branches: [ main, master ]
   workflow_dispatch:
+    inputs:
+      runner:
+        description: 'macOS runner 标签（Capacitor 8 需要 Xcode 26+，镜像名为 macos-26）'
+        required: false
+        default: macos-26
+        type: string
+  push:
+    branches: [main, master]
+    paths-ignore:
+      - '**/*.md'
+      - 'deploy/**'
+
+concurrency:
+  group: ios-ipa-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
-  build:
-    runs-on: macos-latest
+  ipa:
+    name: IPA (${{ matrix.variant }})
+    # GitHub 托管镜像 macos-26 自带 Xcode 26.6；手动触发时可在 Actions 页面覆盖 runner
+    runs-on: ${{ github.event.inputs.runner || 'macos-26' }}
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - variant: full
+            artifact: KazNUHelper-full-ipa
+            stripWidget: 'false'
+          - variant: sideload
+            artifact: KazNUHelper-sideload-ipa
+            stripWidget: 'true'
 
     steps:
-    - name: Checkout Code
-      uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: 22
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
 
-    - name: Install Dependencies
-      run: npm ci
+      - name: Show toolchain info
+        run: |
+          xcodebuild -version
+          echo "iOS SDK: $(xcrun --sdk iphoneos --show-sdk-version)"
+          node -v
+          npm -v
 
-    - name: Build Web App
-      run: npx vite build
+      - name: Install dependencies
+        run: npm ci
 
-    - name: Sync Capacitor iOS
-      # 保留仓库内已提交的 ios 工程（含 Info.plist 定位权限、图标、
-      # SPM 插件依赖等原生定制），只做同步，避免生成工程丢失这些配置
-      run: npx cap sync ios
+      - name: Verify native project (structure guard)
+        if: matrix.stripWidget == 'false'
+        run: node scripts/verify-ios-live-activity.cjs
 
-    - name: Build iOS App (Unsigned IPA)
-      run: |
-        cd ios/App
-        xcodebuild -project App.xcodeproj -scheme App -configuration Release -sdk iphoneos CODE_SIGNING_ALLOWED=NO CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO -derivedDataPath build
-        mkdir -p Payload
-        cp -r build/Build/Products/Release-iphoneos/App.app Payload/
-        zip -r KazNUHelper.ipa Payload
+      - name: Build web app
+        run: npm run build
 
-    - name: Upload IPA Artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: KazNUHelper-iOS
-        path: ios/App/KazNUHelper.ipa
+      - name: Strip widget extension (for free-account sideload build)
+        if: matrix.stripWidget == 'true'
+        run: |
+          node scripts/strip-ios-widget-target.cjs
+          node scripts/verify-ios-live-activity.cjs --expect-widget=no
+
+      - name: Sync Capacitor iOS
+        # 保留仓库内已提交的 ios 工程（原生定制 + Widget Target），只做同步
+        run: npx cap sync ios
+
+      - name: Build unsigned app
+        run: |
+          set -o pipefail
+          cd ios/App
+          flags="CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY= CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM="
+          if ! xcodebuild -project App.xcodeproj -scheme App -configuration Release \
+                -destination 'generic/platform=iOS' -derivedDataPath build $flags 2>&1 | tee xcodebuild.log; then
+            echo "::warning::scheme App 构建失败，回退到 -target App"
+            xcodebuild -project App.xcodeproj -target App -configuration Release \
+              -sdk iphoneos $flags 2>&1 | tee -a xcodebuild.log
+          fi
+
+      - name: Package unsigned IPA
+        run: |
+          set -euo pipefail
+          cd ios/App
+          APP=""
+          for candidate in "build/Build/Products/Release-iphoneos/App.app" "build/Release-iphoneos/App.app"; do
+            if [ -d "$candidate" ]; then APP="$candidate"; break; fi
+          done
+          if [ -z "$APP" ]; then
+            echo "::error::找不到构建产物 App.app，请查看上面的 xcodebuild 日志"
+            find . -maxdepth 4 -name "App.app" || true
+            exit 1
+          fi
+
+          echo "产物: $APP"
+          plutil -p "$APP/Info.plist" | grep -E 'CFBundleShortVersionString|CFBundleVersion|NSSupportsLiveActivities' || true
+
+          if [ "${{ matrix.stripWidget }}" = "true" ]; then
+            if [ -d "$APP/PlugIns/KazNUWidgets.appex" ]; then
+              echo "::error::侧载包不应包含 Widget 扩展"; exit 1
+            fi
+            echo "已确认：不含 App Extension（可被免费 Apple ID 重签名）"
+          else
+            if [ ! -d "$APP/PlugIns/KazNUWidgets.appex" ]; then
+              echo "::error::完整包缺少 Widget 扩展，Live Activity 无法渲染"; exit 1
+            fi
+            echo "已确认：包含 KazNUWidgets.appex（Live Activity / 灵动岛 / 桌面小组件）"
+            plutil -p "$APP/PlugIns/KazNUWidgets.appex/Info.plist" | grep -E 'CFBundleIdentifier|NSSupportsLiveActivities' || true
+          fi
+
+          # 清掉 CI 上无法生成的签名残留，得到干净的未签名 IPA
+          find "$APP" -name "_CodeSignature" -type d -prune -exec rm -rf {} + 2>/dev/null || true
+          find "$APP" -name "embedded.mobileprovision" -delete 2>/dev/null || true
+
+          rm -rf Payload
+          mkdir -p Payload
+          cp -R "$APP" Payload/
+          IPA="KazNUHelper-${{ matrix.variant }}-unsigned.ipa"
+          rm -f "$IPA"
+          zip -qry "$IPA" Payload
+          ls -lh "$IPA"
+
+      - name: Upload IPA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: ios/App/KazNUHelper-${{ matrix.variant }}-unsigned.ipa
+          if-no-files-found: error
+          retention-days: 14

@@ -166,29 +166,31 @@ void syncScheduleToWidget({
 
 ## 3. 让 GitHub Actions 出的 IPA 也带上 Widget
 
-**关键**：现在 `build-ios.yml` 每次都 `rm -rf ios && npx cap add ios`，会把 Xcode 加好的
-KazNUWidget Target 清掉。出带 Widget 的包必须**保留仓库里的 ios 工程、只 sync**：
+**关键**：绝对不能在 CI 里 `rm -rf ios && npx cap add ios`，那会把 Xcode 里配好的
+KazNUWidget Target 与原生定制全部清掉。仓库现状（`.github/workflows/build-ios.yml`）已经改为
+**保留仓库里已提交的 ios 工程、只 sync**，并一次产出两个包
+（`KazNUHelper-full-ipa` 含扩展、`KazNUHelper-sideload-ipa` 已剥离扩展给免费账号侧载）：
 
 ```yaml
-    - name: Install Dependencies
+    - name: Install dependencies
       run: npm ci
 
-    - name: Build Web App
-      run: npx vite build
+    - name: Build web app
+      run: npm run build
 
     # 保留已提交 ios 工程（内含 KazNUWidget Target 等原生定制），只做同步
     - name: Sync Capacitor iOS
       run: npx cap sync ios
 
-    - name: Build iOS App (unsigned IPA)
+    - name: Build unsigned app
       run: |
         cd ios/App
-        xcodebuild -project App.xcodeproj -scheme App -configuration Release -sdk iphoneos \
-          CODE_SIGNING_ALLOWED=NO CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO \
-          -derivedDataPath build
-        mkdir -p Payload
-        cp -r build/Build/Products/Release-iphoneos/App.app Payload/
-        zip -r KazNUHelper.ipa Payload
+        xcodebuild -project App.xcodeproj -scheme App -configuration Release \
+          -destination 'generic/platform=iOS' -derivedDataPath build \
+          CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" CODE_SIGN_STYLE=Manual
+        mkdir -p Payload && cp -r build/Build/Products/Release-iphoneos/App.app Payload/
+        zip -r KazNUHelper-full-unsigned.ipa Payload
 ```
-（`xcodebuild` 会连 KazNUWidget 扩展一起编译并嵌入 `App.app/PlugIns/`。）
+（`xcodebuild` 会连 KazNUWidgets 扩展一起编译并嵌入 `App.app/PlugIns/`；
+CI 会校验 `.appex` 是否存在，缺失就判失败，避免出“假完整包”。）
 

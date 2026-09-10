@@ -36,32 +36,70 @@ The app points to `VITE_API_URL` (see `.env` / `src/utils/config.ts`). If the ba
 unreachable on your phone, Prof Reviews works fully offline from its demo catalog and marks
 itself "Demo data".
 
-## 2. Produce the iOS IPA (macOS/Xcode)
-Windows cannot compile iOS. Two options:
+## 2. Build the iOS IPA
 
-**A. GitHub Actions (recommended)** — push this branch (or use *Actions → Build iOS IPA →
-Run workflow*, now enabled via `workflow_dispatch`) → download the `KazNUHelper-iOS` artifact:
-`ios/App/KazNUHelper.ipa`. The workflow already keeps the committed `ios/` project and does
-`vite build` → `cap sync ios` → unsigned `xcodebuild` → `.ipa`.
+Windows cannot compile iOS, so use **GitHub Actions** (recommended) or a local Mac.
 
-**B. Local Mac**
+### A. GitHub Actions（推荐）
+
+触发方式二选一：
+
+- **自动**：push 到 `main` / `master`（仅 `.md` 与 `deploy/**` 的改动不会触发）；
+- **手动**：Actions → **Build iOS IPA** → *Run workflow*（可选 `runner` 输入，默认 `macos-26`，
+  因为 Capacitor 8 需要 **Xcode 26+**；该镜像自带 Xcode 26.6）。
+
+一次运行会并行产出 **两个未签名 IPA**（都是 `Release` 构建）：
+
+| Artifact 名 | 下载到的文件 | 内容 | 安装前提 |
+|---|---|---|---|
+| `KazNUHelper-full-ipa` | `KazNUHelper-full-unsigned.ipa` | App **+ `KazNUWidgets.appex`**：Live Activity / 灵动岛 / 桌面小组件 | **付费** Apple 开发者账号（免费账号无法签名 App Extension） |
+| `KazNUHelper-sideload-ipa` | `KazNUHelper-sideload-unsigned.ipa` | 已剥离 Widget 扩展（同时移除 App Groups 权限） | **免费** Apple ID 即可侧载，但**看不到**锁屏倒计时 / 灵动岛 |
+
+流水线步骤（与 `ios/LIVE_ACTIVITY_GUIDE.md` 一致）：
+
+```
+checkout → node 22 → npm ci → 工程结构自检(node scripts/verify-ios-live-activity.cjs)
+  → npm run build（Web）→ [仅 sideload] 剥离 Widget 扩展
+  → npx cap sync ios（保留仓库里已提交的 ios 工程，只同步）
+  → xcodebuild Release 未签名构建 → 校验 .appex 是否符合预期
+  → 清理 _CodeSignature / embedded.mobileprovision → 打包 ipa → 上传 artifact
+```
+
+### B. Local Mac
+
 ```bash
 npm ci
-npx vite build
+npm run build
 npx cap sync ios
 cd ios/App
-xcodebuild -project App.xcodeproj -scheme App -configuration Release -sdk iphoneos \
-  CODE_SIGNING_ALLOWED=NO CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO -derivedDataPath build
+# 完整包（含扩展）
+xcodebuild -project App.xcodeproj -scheme App -configuration Release \
+  -destination 'generic/platform=iOS' -derivedDataPath build \
+  CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" CODE_SIGN_STYLE=Manual
 mkdir -p Payload && cp -r build/Build/Products/Release-iphoneos/App.app Payload/
-zip -r KazNUHelper.ipa Payload
+zip -r KazNUHelper-full-unsigned.ipa Payload
 ```
 
 ## 3. Install on your iPhone for testing
-The artifact is **unsigned** (no paid Apple certificate in CI). Install with a free signing
-tool on your Mac/PC:
-- **AltStore / AltServer** (Windows OK): right-click the ipa → Install KazNU Helper.
-- or **Sideloadly** (Windows OK) with your Apple ID.
-Bundle id stays `com.kaznu.helper`, version **2.0.0 (13)**.
+
+Artifacts are **unsigned** (CI has no Apple certificate), so a sideloading tool re-signs them:
+
+- **AltStore / AltServer**（Windows / Mac）：右键 ipa → Install。
+- **Sideloadly**（Windows / Mac）：拖入 ipa，填 Apple ID → Start。
+
+选哪个包：
+
+- **免费 Apple ID** → 只能装 `KazNUHelper-sideload-ipa`。
+  Bundle id 仍是 `com.kaznu.helper`，版本 `2.0.0 (13)`。
+  该包已去掉 App Groups 权限（免费账号不支持），App 会自动回退到标准 `UserDefaults` 存课表缓存，
+  功能不受影响（只是没有桌面小组件与 Live Activity）。
+- **付费开发者账号（$99/年）** → 装 `KazNUHelper-full-ipa`，可以测 **Live Activity / 灵动岛**。
+  真机测试步骤：
+  1. 打开 App → 进入 **Schedule** 拉一次课表（会把课表同步给原生）；
+  2. 若恰好在某节课前 30 分钟内 → 直接进入倒计时；否则等到 T-30，
+     或点击 T-60 上课提醒通知上的「开启灵动岛 / Start Live Activity」按钮立即触发；
+  3. 锁屏 / 下拉通知中心看大卡片（圆环倒计时绿→橙→红），长按灵动岛看展开态、退出到桌面看紧凑态。
+- **付费账号 + Xcode 真机调试**（不走侧载）同样可测：`npx cap open ios` → 选 Team → `⌘R`。
 
 ## 0. 管理后台 (SQLAdmin)
 浏览器打开 `https://<你的统一域名>/admin`（本地则是 `http://127.0.0.1:8000/admin`）。

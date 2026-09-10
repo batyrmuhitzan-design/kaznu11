@@ -4,7 +4,8 @@ import WebKit
 
 /// 自定义 CAPBridgeViewController：
 ///  - 注入 `window.__KAZNU_LIVE_ACTIVITY_BRIDGE__`（把 Web payload 投递到原生）；
-///  - 收到后交给 `TimetableLiveActivityController` 启动 / 刷新 / 结束 Live Activity。
+///  - 收到后交给 `KaznuActivityManager` 启动 / 刷新 / 结束 Live Activity。
+///  - 注入 `window.__KAZNU_BG_REMINDER_SYNC__`（课表同步给后台任务 / Live Activity 生命周期计算）。
 final class KaznuBridgeViewController: CAPBridgeViewController, WKScriptMessageHandler {
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -51,10 +52,9 @@ final class KaznuBridgeViewController: CAPBridgeViewController, WKScriptMessageH
         guard let payload = message.body as? [String: Any] else { return }
         switch message.name {
         case "kaznuLiveActivity":
-            DispatchQueue.main.async { [weak self] in
-                guard self != nil else { return }
+            DispatchQueue.main.async {
                 if #available(iOS 16.2, *) {
-                    TimetableLiveActivityController.handle(payload)
+                    _ = KaznuActivityManager.shared.handle(payload)
                 }
             }
         case "kaznuReminderSync":

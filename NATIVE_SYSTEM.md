@@ -72,7 +72,13 @@
   - T-0：排“🔔 上课提醒”通知并自动 `end` 灵动岛；
   - 模块级 `registerReminderLessons` + App 入口 `attachGlobalLiveActivityWatcher` 保证跨页面看护。
 - 原生桥：`ios/App/App/KaznuBridgeViewController.swift`（注入 `window.__KAZNU_LIVE_ACTIVITY_BRIDGE__`
-  + `window.__KAZNU_BG_REMINDER_SYNC__`）+ `TimetableLiveActivityController.swift`（ActivityKit start/update/end）。
+  + `window.__KAZNU_BG_REMINDER_SYNC__`）+ `KaznuActivityManager.swift`（单例，封装 ActivityKit start/update/end）。
+- Live Activity 数据模型：`KaznuCourseAttributes.swift`（App + KazNUWidgets 两份逐字节相同的副本）
+  — 静态属性 `courseName / roomNumber / teacherName`，动态状态 `remainingSeconds / totalSeconds / phase / progress`。
+- Live Activity UI：`ios/App/KazNUWidgets/KaznuCourseLiveActivity.swift`
+  （锁屏大卡片 + 圆环倒计时 + Dynamic Island compact/expanded/minimal；圆环配色 >60% 绿 / 20%~60% 橙 / <20% 红）。
+- 生命周期自动化：`KaznuActivityManager.sync(now:)` — 上课前 30 分钟启动半小时倒计时、上课后倒计时到下课、
+  课中距下节课 <15 分钟自动切到下节课、无课或距下节课很远时自动 `end`。
 - 后台兜底：`ios/App/App/BackgroundReminderScheduler.swift`（BGAppRefreshTask `kz.kaznu.helper.refresh`，
   下一节课开始前 32 分钟唤醒；Info.plist 已声明 `BGTaskSchedulerPermittedIdentifiers` + `UIBackgroundModes=[fetch]`）。
 - T-60 通知为 `interruptionLevel=timeSensitive`，带 Category 按钮“开启灵动岛 / Start Live Activity”；
@@ -81,7 +87,8 @@
 - 通知分类：上课/成绩“关键提醒”默认开启（设置页可关：⏰ 上课与成绩提醒）；
   新闻推送由设置页“News notifications”开关控制（默认开启，可关）。
 - 声明与隐私：`LEGAL.md`（免责声明/隐私政策/使用条款/非官方声明），App 内 About → 政策折叠展示。
-- Widget 源码：`ios/App/KazNUWidgets/`（锁屏深色卡片 + 圆环 + Dynamic Island compact/expanded/minimal）。
+- Widget 源码：`ios/App/KazNUWidgets/`（`KaznuCourseLiveActivity.swift` 锁屏大卡片 + 圆环 + Dynamic Island 三态；
+  `KazNUOverviewWidget.swift` 桌面小组件 + `@main` WidgetBundle）。
 - 接入步骤（Xcode 建 Widget Extension Target 并把文件加进两个 Target）：见 **`ios/LIVE_ACTIVITY_GUIDE.md`**。
 - ⚠️ 免费个人证书无法签名 App Extension；且 App 被完全杀死后 iOS 只保证本地通知准时触发，
   灵动岛需在 App 进程存活/回前台时启动（详见指南“局限说明”）。

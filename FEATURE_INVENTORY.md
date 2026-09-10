@@ -156,7 +156,7 @@
 |---|---|---|---|
 | 触感震动 | 按钮/错误反馈 | Web Vibration → UIImpactFeedback | 🟡 web 版已有 |
 | 本地通知 | 课前 30 分钟提醒 | `@capacitor/local-notifications` | 🔴 |
-| Live Activity | 锁屏倒计时 | ActivityKit（复杂） | 🔴 占位 |
+| Live Activity | 锁屏倒计时 / 灵动岛 | ActivityKit + WidgetKit（`KaznuActivityManager` / `KaznuCourseLiveActivity`） | 🟢 已实现（需付费 Team 签名 + 真机） |
 | 闹钟声音 | 提醒 | Capacitor Audio | 🔴 |
 | 2GIS/Kaspi 深链 | 外部跳转 | `@capacitor/app-launcher` | 🔴 |
 | PDF 导出 | 成绩单 | Filesystem + Sharing | 🟢 jsPDF 生成 + Share Sheet |

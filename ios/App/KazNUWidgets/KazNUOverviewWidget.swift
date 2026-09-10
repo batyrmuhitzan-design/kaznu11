@@ -1,116 +1,9 @@
-import ActivityKit
+import Foundation
 import SwiftUI
 import WidgetKit
 
-// ===================== Live Activity Widget 声明 =====================
-
-@available(iOS 16.1, *)
-struct TimetableLiveActivity: Widget {
-    var body: some WidgetConfiguration {
-        ActivityConfiguration(for: TimetableLiveActivityAttributes.self) { context in
-            // 锁屏 / 通知横幅（iPhone XR 等非灵动岛机型）
-            TimetableLiveActivityLockView(context: context)
-        } dynamicIsland: { context in
-            DynamicIsland {
-                // ---------- 展开视图（长按灵动岛） ----------
-                DynamicIslandExpandedRegion(.leading) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        HStack(spacing: 4) {
-                            Image(systemName: "bell.badge.fill")
-                                .font(.system(size: 9, weight: .bold))
-                            Text(context.state.courseShort.uppercased())
-                                .font(.system(size: 10, weight: .heavy, design: .monospaced))
-                        }
-                        Text(context.state.courseName)
-                            .font(.system(size: 15, weight: .semibold))
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.8)
-                    }
-                }
-
-                DynamicIslandExpandedRegion(.center) {
-                    Text("\(context.state.room) · \(context.state.professor)")
-                        .font(.system(size: 12))
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.8)
-                }
-
-                DynamicIslandExpandedRegion(.trailing) {
-                    CountdownRingView(
-                        total: context.state.totalSeconds,
-                        remaining: context.state.remainingSeconds,
-                        size: 40,
-                        lineWidth: 4,
-                        showDigits: false
-                    )
-                }
-
-                DynamicIslandExpandedRegion(.bottom) {
-                    VStack(alignment: .leading, spacing: 5) {
-                        HStack {
-                            Text(context.state.statusLabel)
-                                .font(.system(size: 11, weight: .medium))
-                                .foregroundColor(.white.opacity(0.75))
-                            Spacer()
-                            Text(context.attributes.countdownEndDate, style: .timer)
-                                .font(.system(size: 17, weight: .semibold, design: .monospaced))
-                                .monospacedDigit()
-                                .multilineTextAlignment(.trailing)
-                                .frame(width: 78, alignment: .trailing)
-                                .foregroundColor(
-                                    TimetableActivityStyle.phaseColor(
-                                        total: context.state.totalSeconds,
-                                        remaining: context.state.remainingSeconds
-                                    )
-                                )
-                        }
-                        // 平滑进度条：随剩余时间从全绿消耗到红
-                        ProgressView(
-                            value: TimetableActivityStyle.fraction(
-                                total: context.state.totalSeconds,
-                                remaining: context.state.remainingSeconds
-                            )
-                        )
-                        .tint(
-                            TimetableActivityStyle.phaseColor(
-                                total: context.state.totalSeconds,
-                                remaining: context.state.remainingSeconds
-                            )
-                        )
-                        if let urlString = context.state.navigationURL,
-                           let url = URL(string: urlString) {
-                            Link(destination: url) {
-                                Label(context.state.navigationLabel ?? "Open", systemImage: "arrow.up.right")
-                                    .font(.system(size: 12, weight: .semibold))
-                            }
-                        }
-                    }
-                }
-            } compactLeading: {
-                // 紧凑视图左侧：课程类型图标 + 简称（如 "Seminar" / "LA"）
-                HStack(spacing: 4) {
-                    Image(systemName: "book.closed.fill")
-                        .font(.system(size: 11, weight: .bold))
-                    Text(context.state.courseShort.uppercased())
-                        .font(.system(size: 12, weight: .heavy, design: .monospaced))
-                        .lineLimit(1)
-                }
-            } compactTrailing: {
-                // 紧凑视图右侧：系统驱动的实时倒计时（无需频繁 content 更新）
-                Text(context.attributes.countdownEndDate, style: .timer)
-                    .font(.system(size: 13, weight: .semibold, design: .monospaced))
-                    .monospacedDigit()
-                    .multilineTextAlignment(.trailing)
-                    .frame(width: 44, alignment: .trailing)
-            } minimal: {
-                // 最紧凑状态：倒计时数字
-                Text(context.attributes.countdownEndDate, style: .timer)
-                    .font(.system(size: 11, weight: .bold, design: .monospaced))
-                    .monospacedDigit()
-            }
-        }
-    }
-}
+// 课程实时活动（锁屏大卡片 / 灵动岛）见同 Target 的 KaznuCourseLiveActivity.swift；
+// 本文件只保留桌面小组件与 @main WidgetBundle 入口。
 
 // ===================== 桌面小组件（Small / Medium） =====================
 
@@ -261,7 +154,9 @@ struct KazNUOverviewWidget: Widget {
 @available(iOS 16.1, *)
 struct KazNUWidgetBundle: WidgetBundle {
     var body: some Widget {
-        TimetableLiveActivity()
+        // 课程实时活动（锁屏大卡片 + 灵动岛）
+        KaznuCourseLiveActivity()
+        // 桌面小组件（Small / Medium）
         KazNUOverviewWidget()
     }
 }

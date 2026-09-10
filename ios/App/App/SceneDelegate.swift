@@ -29,9 +29,9 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     }
 
     func sceneWillEnterForeground(_ scene: UIScene) {
-        // 用户在设置里改动“实时活动/通知”后回到 App：重排 BGTask 并立刻补一次 Activity.request
+        // 用户在设置里改动“实时活动/通知”后回到 App：重排 BGTask 并立刻补一次 Activity 同步
         BackgroundReminderScheduler.scheduleNextIfNeeded()
-        BackgroundReminderScheduler.tryStartLiveActivityIfNeeded()
+        BackgroundReminderScheduler.syncCourseLiveActivityIfNeeded()
     }
 
     func scene(_ scene: UIScene, openURLContexts URLContexts: Set<UIOpenURLContext>) {
