@@ -26,6 +26,14 @@
 	<true/>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>KazNU Helper 使用您的位置判断是否在校内，用于校园服务与课堂路线提醒。</string>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<!-- 只允许 HTTPS：App 内所有后端请求都走 https://1losion.me，不开任何明文例外。 -->
+		<key>NSAllowsArbitraryLoads</key>
+		<false/>
+		<key>NSAllowsLocalNetworking</key>
+		<false/>
+	</dict>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

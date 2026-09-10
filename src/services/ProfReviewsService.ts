@@ -5,9 +5,10 @@
  * When the 2.0 backend is reachable through VITE_API_URL, submissions are
  * mirrored to /api/v1 (login → anonymous_hash → one-rating-per-professor).
  */
-import { API_BASE_URL } from "../utils/config";
+import { API_BASE_URL, blockInsecureRequest } from "../utils/config";
 import { readSavedAccount, readSession } from "../utils/session";
 
+/** 社区后端（Prof Reviews）：统一域名下的 /api/v1 */
 export const RMP_API = `${API_BASE_URL}/api/v1`;
 
 export interface CommunityAccount {
@@ -118,10 +119,13 @@ export function appendExtraReview(review: ExtraReview): void {
 // ---------- Backend (best-effort) ----------
 
 async function apiFetch(path: string, init?: RequestInit, timeoutMs = 3500): Promise<Response | null> {
+  const url = `${RMP_API}${path}`;
+  // 统一域名方案下必须是 https://1losion.me/api/v1/...；明文地址直接拒绝，不发出请求
+  if (blockInsecureRequest(url)) return null;
   try {
     const controller = new AbortController();
     const timer = window.setTimeout(() => controller.abort(), timeoutMs);
-    const res = await fetch(`${RMP_API}${path}`, { ...init, signal: controller.signal });
+    const res = await fetch(url, { ...init, signal: controller.signal });
     window.clearTimeout(timer);
     return res;
   } catch {

@@ -59,6 +59,10 @@ jobs:
       - name: Build web app
         run: npm run build
 
+      - name: Verify API base URL / HTTPS policy
+        # 唯一后端域名 = https://1losion.me；源码/配置/构建产物里不得出现明文 http 后端地址
+        run: node scripts/verify-api-https.cjs
+
       - name: Strip widget extension (for free-account sideload build)
         if: matrix.variant == 'sideload'
         run: |

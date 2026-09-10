@@ -16,19 +16,33 @@
 
 ## 前端如何改地址（不用改源码）
 
-项目根目录新建 `.env`（复制 `.env.example`）：
+地址只有一个来源：`src/utils/config.ts`（默认即 `https://1losion.me`，无需任何配置）。
+需要切换到别的环境时，在项目根目录 `.env`（复制 `.env.example`）覆盖：
 
 ```
-VITE_API_URL=https://你的后端域名
-VITE_GPA_API_URL=https://你的后端域名
+VITE_API_URL=https://1losion.me
+VITE_GPA_API_URL=          # 留空 = 与主后端同源
 VITE_STUDENT_ID=20260001
 ```
 
 改完执行 `npm run build` 再 `npx cap sync ios`。
 
-- Web 预览跑本地：`VITE_API_URL=http://127.0.0.1:8000`
-- 手机与电脑同一 WiFi：把 `127.0.0.1` 换成电脑局域网 IP，后端也要 `uvicorn main:app --host 0.0.0.0 --port 8000` 监听
-- 上线：部署到公网，Vite 环境变量无需在仓库暴露
+### HTTPS 强制策略（重要）
+
+- 任何 `http://` 的 API 地址都会被 `normalizeBaseUrl()` **自动升级成 https://** 并在控制台告警；
+- `src/services/ProfReviewsService.ts` 的 `apiFetch()` 与版本检查都会先过 `blockInsecureRequest()`，
+  生产包里明文请求**不会被发出去**（直接报错返回）；
+- iOS `Info.plist` 已声明 ATS：`NSAllowsArbitraryLoads = false`、`NSAllowsLocalNetworking = false`，
+  即 App 内只允许 HTTPS，不保留任何明文例外；
+- 本机联调若后端只有 HTTP：设 `VITE_ALLOW_INSECURE_HTTP=1`（**仅 dev 构建生效**，真机包无效）。
+
+### 本地联调（可选）
+
+- Web 预览 + 本机后端：`.env` 里 `VITE_API_URL=http://127.0.0.1:8000` 且 `VITE_ALLOW_INSECURE_HTTP=1`
+  （dev 下会被放行并打印警告；不加开关会被拦下）；
+- 手机与电脑同一 WiFi：把 `127.0.0.1` 换成电脑局域网 IP，后端用
+  `uvicorn main:app --host 0.0.0.0 --port 8000` 监听（同样需要上面的开关，且仅 dev 生效）；
+- 线上/真机：保持默认，所有请求走 `https://1losion.me`。
 
 ## 后端要做的真实接口（backend/main.py）
 

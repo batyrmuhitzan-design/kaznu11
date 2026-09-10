@@ -10,6 +10,7 @@
  *  - current < min_supported_version           → 强制更新（阻断页面操作，只有【立即更新】）
  */
 import pkg from "../../package.json";
+import { API_BASE_URL, blockInsecureRequest, normalizeBaseUrl } from "./config";
 
 export const APP_VERSION = pkg.version;
 
@@ -22,7 +23,19 @@ export interface UpdateInfo {
 
 export type UpdateKind = "none" | "optional" | "forced";
 
-const UPDATE_URL = ((import.meta as unknown as { env?: Record<string, string> }).env?.VITE_UPDATE_API_URL) || "version.json";
+/**
+ * 版本元数据地址：默认走统一域名 `https://1losion.me/version.json`（构建产物里就有）。
+ * 需要指向别处时用 VITE_UPDATE_API_URL 覆盖：
+ *  - 写了协议的绝对地址 → 经 normalizeBaseUrl 强制升级为 HTTPS；
+ *  - 相对路径（如 /api/version.json）→ 视为同源，保持原样。
+ */
+function resolveUpdateUrl(): string {
+  const raw = ((import.meta as unknown as { env?: Record<string, string> }).env?.VITE_UPDATE_API_URL ?? "").trim();
+  if (!raw) return `${API_BASE_URL}/version.json`;
+  return /^[a-z][a-z0-9+.-]*:\/\//i.test(raw) ? normalizeBaseUrl(raw) : raw;
+}
+
+const UPDATE_URL = resolveUpdateUrl();
 
 function versionAtLeast(a: string, b: string): boolean {
   const pa = a.split(".").map(Number);
@@ -36,8 +49,10 @@ function versionAtLeast(a: string, b: string): boolean {
 }
 
 export async function fetchUpdateInfo(): Promise<UpdateInfo | null> {
+  const url = `${UPDATE_URL}${UPDATE_URL.includes("?") ? "&" : "?"}_=${Date.now()}`;
+  if (blockInsecureRequest(url)) return null;
   try {
-    const res = await fetch(`${UPDATE_URL}${UPDATE_URL.includes("?") ? "&" : "?"}_=${Date.now()}`, { cache: "no-store" });
+    const res = await fetch(url, { cache: "no-store" });
     if (!res.ok) return null;
     const data = (await res.json()) as UpdateInfo;
     if (!data.latest_version || !data.min_supported_version) return null;
