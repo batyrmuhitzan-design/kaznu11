@@ -13,7 +13,9 @@ import Foundation
 ///
 /// - `preClass`：上课前倒计时（默认窗口 T-30min → T-0，总时长 1800 秒）
 /// - `inClass` ：课中倒计时（到下课时刻）；若距下一节课不足 15 分钟则切到下节课的 `preClass`
-@available(iOS 16.1, *)
+///
+/// 注意：这里**不加** `@available` —— 纯枚举不依赖新系统 API，而 `KaznuCourseMetric`
+/// 等无版本门槛的工具类型会把它用在参数里；反过来给低可用性声明引用高可用性类型会编译失败。
 public enum KaznuCoursePhase: String, Codable, Hashable {
     case preClass
     case inClass
