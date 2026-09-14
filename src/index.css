@@ -391,7 +391,24 @@ button { position: relative; }
   opacity: 0.45;
   box-shadow: none;
 }
-/* ===== App 式吸顶头部：内容下滚时顶部信息保持不动 ===== */
+/* ===== App 式吸顶头部：内容下滚时顶部信息保持不动 =====
+   用法有两种，**都依赖顶层 .app-root 的 padding-top: calc(env(safe-area-inset-top) + 12px)**
+   来让出 iOS 状态栏（刘海/灵动岛/电池），所以本类里不重复加 env()：
+
+   A) 普通页面（推荐）：作为 flex 兄弟节点放在滚动容器**之外**——
+        <div className="app-surface h-full flex flex-col overflow-hidden">
+          <div className="screen-pin px-4 pt-1 shrink-0"> …标题/返回… </div>
+          <div className="flex-1 min-h-0 overflow-y-auto px-4 pt-3 pb-28"> …列表… </div>
+        </div>
+      参考 Dashboard / News / Grades / Materials / Notifications / Profile / ProfReviews。
+
+   B) 覆盖层页面（fixed / absolute inset-0）：这类定位**不受父级 padding 影响**，
+      等于绕过了 .app-root 的安全区，必须自己再让出一次，否则顶栏会被状态栏压住：
+        <div className="fixed inset-0 z-[55] flex flex-col">
+          <div className="screen-pin px-4" style={{ paddingTop: "calc(env(safe-area-inset-top, 0px) + 8px)" }}>
+      参考 ProfReviews 的写评价页（ComposerScreen）。
+
+   反例：把 header 放进自己的滚动容器里 → 下滑会被带走（ProfReviews 详情页曾经就是这样）。 */
 .screen-pin {
   position: sticky;
   top: 0;

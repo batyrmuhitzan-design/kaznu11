@@ -318,10 +318,15 @@ export default function Profile({ onBack }: ProfileProps) {
   if (subpage === "about") return <SwipeBack onBack={() => setSubpage("profile")}><About onBack={() => setSubpage("profile")} /></SwipeBack>;
 
   return (
-    <div className="app-surface h-full overflow-y-auto">
-      <div className="px-4 pt-2 pb-32 space-y-4 animate-slide-up">
+    <div className="app-surface h-full flex flex-col overflow-hidden">
+      {/* 顶部栏（返回）吸顶：移出滚动容器，与同文件 Settings 子页及其他页面保持一致，
+          下滑时不再把返回键带走。安全区由顶层 .app-root 统一让出。 */}
+      <div className="screen-pin px-4 pt-1 shrink-0">
         <BackButton onClick={onBack} />
-        <div className="flex items-center gap-4 pt-2 pb-2">
+      </div>
+
+      <div className="flex-1 min-h-0 overflow-y-auto px-4 pt-3 pb-32 space-y-4 animate-slide-up">
+        <div className="flex items-center gap-4 pb-2">
           <div className="w-16 h-16 rounded-2xl flex items-center justify-center text-white text-lg font-bold" style={{ background: "linear-gradient(135deg, #0033A0, #007AFF)" }}>AB</div>
           <div>
             <h1 className="text-2xl font-bold text-white">Aisha Bekova</h1>

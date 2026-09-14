@@ -449,12 +449,21 @@ function ComposerScreen({
 
   return (
     <div className="fixed inset-0 z-[55] flex flex-col" style={{ background: "var(--app-bg)", color: "var(--app-text)" }}>
-      <div className="px-4 pt-2 pb-3 flex items-center justify-between shrink-0">
+      {/* 这层是 fixed inset-0：绝对定位**不受** .app-root 的 padding-top 影响，等于绕过了
+          全局安全区。所以顶栏必须自己让出 iOS 状态栏（时间/电池/刘海），否则在 iPhone XR 上
+          会被状态栏压住。用 screen-pin 让背景铺到 y=0 并延伸到状态栏下方，更像原生导航栏。 */}
+      <div
+        className="screen-pin px-4 flex items-center justify-between shrink-0"
+        style={{ paddingTop: "calc(env(safe-area-inset-top, 0px) + 8px)" }}
+      >
         <BackChevron label={s.cancel} onBack={onClose} />
         <button type="button" onClick={doSubmit} disabled={!canSubmit} className="haptic-action px-4 py-2 squircle-sm text-xs font-bold disabled:opacity-40" style={{ background: "#007AFF", color: "#fff" }}>{s.submit}</button>
       </div>
 
-      <div className="flex-1 min-h-0 overflow-y-auto px-4 pb-8 space-y-4">
+      <div
+        className="flex-1 min-h-0 overflow-y-auto px-4 pt-1 space-y-4"
+        style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 32px)" }}
+      >
         <div className="glass squircle-lg p-4 flex items-center gap-3">
           <span className="w-11 h-11 squircle-sm flex items-center justify-center text-sm font-bold text-white" style={{ background: `linear-gradient(135deg, ${prof.color}, ${prof.color}aa)` }}>{initialsOf(prof.name)}</span>
           <div className="min-w-0">
@@ -555,8 +564,11 @@ function ProfessorDetail({
 }) {
   const qualityColor = ratingColor(row.quality);
   return (
-    <div className="app-surface h-full overflow-y-auto">
-      <div className="px-4 pt-2 pb-32 animate-slide-up">
+    <div className="app-surface flex-1 min-h-0 flex flex-col overflow-hidden">
+      {/* 顶部栏吸顶：放在滚动容器**之外**的 flex 兄弟节点，下滑时不会再被带走。
+          与 Dashboard / News / Grades 等页的 .screen-pin 约定保持一致。
+          刘海/状态栏安全区由顶层 .app-root 的 padding-top 统一让出，这里不重复加 env()。 */}
+      <div className="screen-pin px-4 pt-1 shrink-0">
         <div className="flex items-center justify-between">
           <BackChevron label={s.professors} onBack={onBack} />
           <span className="text-[9px] font-bold uppercase tracking-wider px-2 py-1 rounded-full flex items-center gap-1"
@@ -565,8 +577,10 @@ function ProfessorDetail({
             {source === "live" ? s.live : s.demoData}
           </span>
         </div>
+      </div>
 
-        <div className="glass squircle-lg p-5 mt-3 relative overflow-hidden card-shadow">
+      <div className="flex-1 min-h-0 overflow-y-auto px-4 pt-3 pb-32 animate-slide-up">
+        <div className="glass squircle-lg p-5 relative overflow-hidden card-shadow">
           <div className="absolute inset-0 opacity-10" style={{ background: `linear-gradient(135deg, ${row.color} 0%, transparent 65%)` }} />
           <div className="relative flex items-center gap-4">
             <span className="w-16 h-16 squircle-lg flex items-center justify-center text-xl font-bold text-white shrink-0" style={{ background: `linear-gradient(135deg, ${row.color}, ${row.color}99)` }}>
@@ -656,10 +670,14 @@ function CourseDetail({
     .sort((a, b) => b.quality - a.quality);
 
   return (
-    <div className="app-surface h-full overflow-y-auto">
-      <div className="px-4 pt-2 pb-32 animate-slide-up">
+    <div className="app-surface flex-1 min-h-0 flex flex-col overflow-hidden">
+      {/* 顶部栏吸顶，与 ProfessorDetail 同一套写法 */}
+      <div className="screen-pin px-4 pt-1 shrink-0">
         <BackChevron label={s.courses} onBack={onBack} />
-        <div className="glass squircle-lg p-5 mt-3 card-shadow" style={{ border: "1px solid rgba(0,122,255,0.18)" }}>
+      </div>
+
+      <div className="flex-1 min-h-0 overflow-y-auto px-4 pt-3 pb-32 animate-slide-up">
+        <div className="glass squircle-lg p-5 card-shadow" style={{ border: "1px solid rgba(0,122,255,0.18)" }}>
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0">
               <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: "#409CFF" }}>{course.code}</p>
@@ -912,7 +930,7 @@ function ProfReviewsView({ onBack, deepLink }: ProfReviewsProps) {
   return (
     <div className="app-surface h-full flex flex-col overflow-hidden">
       {screen === "home" && (
-        <div className="shrink-0 px-4 pt-2 pb-2">
+        <div className="screen-pin px-4 pt-1 shrink-0">
           <div className="flex items-center justify-between gap-2">
             <BackChevron label={t("back")} onBack={onBack} />
             <h1 className="text-xl font-bold text-white flex items-center gap-1.5" style={{ letterSpacing: "-0.4px" }}>

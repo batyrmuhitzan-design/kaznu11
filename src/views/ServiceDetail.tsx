@@ -182,14 +182,17 @@ export default function ServiceDetail({ id, onBack }: { id: ServiceId; onBack: (
   const data = buildData(id);
 
   return (
-    <div className="app-surface h-full overflow-y-auto">
-      <div className="px-4 pt-2 pb-32 animate-slide-up">
+    <div className="app-surface h-full flex flex-col overflow-hidden">
+      {/* 顶部栏（返回）吸顶：移出滚动容器，与其他页面保持一致，下滑时不再滚走 */}
+      <div className="screen-pin px-4 pt-1 shrink-0">
         <button type="button" onClick={onBack} className="haptic-action theme-secondary flex items-center gap-1 text-sm font-semibold">
           <svg viewBox="0 0 20 20" fill="none" className="w-4 h-4"><path d="m12.5 4-5 6 5 6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>
           {t("back")}
         </button>
+      </div>
 
-        <div className="flex items-center gap-3 mt-4 mb-1">
+      <div className="flex-1 min-h-0 overflow-y-auto px-4 pt-3 pb-32 animate-slide-up">
+        <div className="flex items-center gap-3 mb-1">
           <div className="w-12 h-12 squircle-lg flex items-center justify-center text-2xl" style={{ background: `${data.accent}1f`, border: `1px solid ${data.accent}33` }}>{data.icon}</div>
           <h1 className="text-2xl font-bold text-white flex-1" style={{ letterSpacing: "-0.5px" }}>{t(data.key)}</h1>
         </div>
