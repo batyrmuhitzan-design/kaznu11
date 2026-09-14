@@ -138,8 +138,9 @@ App 底部导航第 3 个 Tab（原 Materials 的位置）；**Materials 改为�
 | GET | `/api/v1/club-events?club_name=&include_past=` | 活动列表（只返回已审核，默认隐藏已结束的） |
 | GET | `/api/v1/notifications/latest` | 当前生效的紧急通知；没有则返回 `null` |
 
-**隐私不变量**：匿名帖 / 匿名评论的响应里 `author.name` 恒为 `null`，只保留粗粒度的
-`department_tag`（与评价体系一致）。`check_campus_api.py` 有对应断言，改动不会静默退化。
+**隐私不变量**：匿名帖 / 匿名评论的响应里 `author.name` **与 `author.department_tag` 都为 `null`** ——
+这一点与评价体系**刻意不同**（评价的公开身份就是院系标签，评分需要粗粒度上下文；而校园墙的帖子
+配上院系标签会显著缩小匿名范围）。`check_campus_api.py` 有对应断言，改动不会静默退化。
 > 注意：`/admin` 是**员工界面**，为了追责会显示帖子作者显示名 —— 这是刻意的，与公开 API 是两个不同表面。
 
 **内容治理**：违规内容走 `is_hidden` 软下架（从公开列表消失、其评论接口 404，后台可一键恢复）；

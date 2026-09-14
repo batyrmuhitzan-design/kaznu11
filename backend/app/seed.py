@@ -202,6 +202,7 @@ _DEMO_POSTS: list[dict] = [
             "板书会把每个结构画出来，期末还会给一份题型清单。想拿 A 就老老实实做 lab 3 之后的每一次练习。"
         ),
         "is_anonymous": True,
+        "author_index": 0,
         "likes": 42,
         "hours_ago": 3,
         "media": [],
@@ -218,6 +219,7 @@ _DEMO_POSTS: list[dict] = [
             "如果有同学看到麻烦 comment 一下，谢谢 🙏"
         ),
         "is_anonymous": True,
+        "author_index": 2,
         "likes": 8,
         "hours_ago": 6,
         "media": ["https://picsum.photos/seed/kaznu-bottle/800/520"],
@@ -275,6 +277,7 @@ _DEMO_POSTS: list[dict] = [
         "category": "general",
         "content": "图书馆 4 楼自习室今天人特别少，安静得能听见空调声。要赶 paper 的同学可以来占位 📚",
         "is_anonymous": True,
+        "author_index": 1,
         "likes": 19,
         "hours_ago": 52,
         "media": [],

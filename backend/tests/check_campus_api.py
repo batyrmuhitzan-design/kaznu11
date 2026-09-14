@@ -147,15 +147,16 @@ async def _run() -> None:
         for p in posts:
             author = p.get("author") or {}
             if p.get("is_anonymous"):
-                if author.get("name") is not None:
+                # 匿名帖：name 与 department_tag 都必须为空（比评价体系更严）
+                if author.get("name") is not None or author.get("department_tag") is not None:
                     anon_test_ok = False
             elif author.get("name"):
                 real_names.append(author["name"])
         if anon_test_ok:
-            ok("匿名帖 author.name 全部为 None（隐私不变量成立）")
+            ok("匿名帖 author.name / department_tag 全为 None（隐私不变量成立）")
         else:
-            bad("匿名帖泄露了作者显示名！")
-        note(f"匿名帖只保留 department_tag；实名帖作者：{sorted(set(real_names))}")
+            bad("匿名帖泄露了作者身份（显示名或院系标签）！")
+        note(f"匿名帖只暴露 is_anonymous=True；实名帖作者：{sorted(set(real_names))}")
 
         # 倒序校验（created_at 递减）
         stamps = [p["created_at"] for p in posts]
@@ -311,8 +312,9 @@ async def _run() -> None:
                 bad(f"评论列表异常：{cl.get('total')}")
 
             anon_comment = next((c for c in cl.get("items", []) if c["is_anonymous"]), None)
-            if anon_comment is not None and (anon_comment.get("author") or {}).get("name") is None:
-                ok("匿名评论作者同样为 None（不泄露）")
+            cauthor = (anon_comment or {}).get("author") or {}
+            if anon_comment is not None and cauthor.get("name") is None and cauthor.get("department_tag") is None:
+                ok("匿名评论作者同样全为 None（不泄露）")
             else:
                 bad("匿名评论泄露作者")
 
