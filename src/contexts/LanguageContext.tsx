@@ -130,7 +130,7 @@ const ADDITIONAL_TRANSLATIONS: Record<Language, Record<string, string>> = {
     statusPass: "Passed", statusNotPass: "Not passed", statusInProgress: "In progress", statusPlanned: "Planned", statusOpen: "Open", statusDue: "Due", statusRetake: "Retake",
     actionStart: "Start test", actionRegister: "Register", comingSoon: "Coming soon", univerNote: "Live data will load from Univer.kz",
     serviceStudentAnketa: "Student questionnaire", fullName: "Full name", birthDate: "Date of birth", iin: "IIN", citizenship: "Citizenship", faculty: "Faculty", specialty: "Specialty", groupName: "Group", address: "Address", phone: "Phone", email: "Email",
-    signIn: "Sign in", usernameLabel: "Username / student ID", passwordLabel: "Password", loginHint: "Demo: any username · password 123456", logout: "Log out",
+    signIn: "Sign in", usernameLabel: "Student ID / campus e-mail", passwordLabel: "Password", loginHint: "Demo: student ID (6-12 digits, e.g. 20260001) or …@kaznu.kz · password 123456", logout: "Log out",
     rememberMe: "Remember me & auto sign-in", autoLoginNote: "No password needed for the next 15 days", reverifyHint: "If off, you'll enter your password again next time", themeLight: "Light", themeDark: "Dark", themeAuto: "Auto", loginError: "Incorrect password — try again",
   },
   KZ: {
@@ -146,7 +146,7 @@ const ADDITIONAL_TRANSLATIONS: Record<Language, Record<string, string>> = {
     statusPass: "Өтілді", statusNotPass: "Өтілмеді", statusInProgress: "Жүріп жатыр", statusPlanned: "Жоспарланған", statusOpen: "Ашық", statusDue: "Мерзімі өтті", statusRetake: "Қайта тапсыру",
     actionStart: "Тестті бастау", actionRegister: "Тіркелу", comingSoon: "Жақында", univerNote: "Тірі деректер Univer.kz-тен жүктеледі",
     serviceStudentAnketa: "Студент анкетасы", fullName: "Толық аты-жөні", birthDate: "Туған күні", iin: "ЖСН", citizenship: "Азаматтығы", faculty: "Факультет", specialty: "Мамандық", groupName: "Топ", address: "Мекенжайы", phone: "Телефон", email: "Email",
-    signIn: "Кіру", usernameLabel: "Логин / студент ID", passwordLabel: "Құпиясөз", loginHint: "Демо: кез келген логин · құпиясөз 123456", logout: "Шығу",
+    signIn: "Кіру", usernameLabel: "Студент ID / кампус поштасы", passwordLabel: "Құпиясөз", loginHint: "Демо: студент ID (6-12 сан, мыс. 20260001) немесе …@kaznu.kz · құпиясөз 123456", logout: "Шығу",
     rememberMe: "Есте сақтау және автоматты кіру", autoLoginNote: "Келесі 15 күнде құпиясөз қажет емес", reverifyHint: "Өшірсеңіз, келесі жолы құпиясөзді қайта енгізесіз", themeLight: "Ашық", themeDark: "Қараңғы", themeAuto: "Авто", loginError: "Құпиясөз қате — қайта көріңіз",
     // ---- Campus Hub ----
     campus: "Кампус", campusWall: "Ағым", campusEvents: "Клубтар мен іс-шаралар",
@@ -190,7 +190,7 @@ const ADDITIONAL_TRANSLATIONS: Record<Language, Record<string, string>> = {
     statusPass: "Зачтено", statusNotPass: "Не зачтено", statusInProgress: "В процессе", statusPlanned: "Запланировано", statusOpen: "Открыт", statusDue: "Просрочено", statusRetake: "Пересдача",
     actionStart: "Начать тест", actionRegister: "Записаться", comingSoon: "Скоро", univerNote: "Данные загрузятся с Univer.kz",
     serviceStudentAnketa: "Анкета студента", fullName: "ФИО", birthDate: "Дата рождения", iin: "ИИН", citizenship: "Гражданство", faculty: "Факультет", specialty: "Специальность", groupName: "Группа", address: "Адрес", phone: "Телефон", email: "Email",
-    signIn: "Войти", usernameLabel: "Логин / ID студента", passwordLabel: "Пароль", loginHint: "Демо: любой логин · пароль 123456", logout: "Выйти",
+    signIn: "Войти", usernameLabel: "ID студента / почта кампуса", passwordLabel: "Пароль", loginHint: "Демо: ID студента (6-12 цифр, напр. 20260001) или …@kaznu.kz · пароль 123456", logout: "Выйти",
     rememberMe: "Запомнить меня и входить автоматически", autoLoginNote: "Без пароля в течение следующих 15 дней", reverifyHint: "Если выключено, пароль придётся ввести снова в следующий раз", themeLight: "Светлая", themeDark: "Тёмная", themeAuto: "Авто", loginError: "Неверный пароль — попробуйте ещё раз",
     // ---- Campus Hub ----
     campus: "Кампус", campusWall: "Лента", campusEvents: "Клубы и события",
