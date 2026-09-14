@@ -14,7 +14,7 @@
  *  - 拉不到就回退 `data/campusDemo.ts` 的离线演示数据，并用角标标明（与 ProfReviews 一致）；
  *  - 离线时发帖 / 评论 / 点赞落到本地并标"未同步"，不丢用户输入。
  */
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useI18n } from "../contexts/LanguageContext";
 import { useToast } from "../contexts/ToastContext";
 import {
@@ -34,6 +34,7 @@ import {
   type NewPostInput,
 } from "../services/CampusService";
 import { hapticTap, motorHaptic } from "../utils/haptics";
+import { useKeyboardOpen } from "../utils/keyboard";
 
 type TFn = ReturnType<typeof useI18n>;
 type CategoryFilter = PostCategory | "all";
@@ -254,57 +255,40 @@ export default function CampusView() {
   }
 
   return (
-    <div className="app-surface h-full flex flex-col overflow-hidden">
-      {/* 顶部栏：标题 + live/demo 角标 + 发帖按钮 + 分段控件 */}
+    <div className="app-surface relative h-full flex flex-col overflow-hidden">
+      {/* 顶部栏：标题 + live/demo 角标 + 紧凑分段控件（发帖入口已改为右下角悬浮圆钮 FAB） */}
       <div className="screen-pin px-4 pt-1 shrink-0">
         <div className="flex items-center justify-between gap-2">
           <h1 className="text-xl font-bold text-white flex items-center gap-1.5" style={{ letterSpacing: "-0.4px" }}>
             <span>🎓</span> {t("campus")}
           </h1>
-          <div className="flex items-center gap-2">
-            <span
-              className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded-full"
-              style={{
-                background: source === "live" ? "rgba(48,209,88,0.14)" : "rgba(255,159,10,0.14)",
-                color: source === "live" ? "#30D158" : "#FF9F0A",
-              }}
-            >
-              {source === "live" ? t("live") : t("offlineDemo")}
-            </span>
-            {mode === "wall" && (
-              <button
-                type="button"
-                onClick={() => {
-                  hapticTap();
-                  setComposerOpen(true);
-                }}
-                className="haptic-action px-3 py-1.5 squircle-sm text-[11px] font-bold"
-                style={{ background: "#007AFF", color: "#fff" }}
-              >
-                ✏️ {t("writePost")}
-              </button>
-            )}
-          </div>
+          <span
+            className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded-full"
+            style={{
+              background: source === "live" ? "rgba(48,209,88,0.14)" : "rgba(255,159,10,0.14)",
+              color: source === "live" ? "#30D158" : "#FF9F0A",
+            }}
+          >
+            {source === "live" ? t("live") : t("offlineDemo")}
+          </span>
         </div>
 
-        <div className="flex rounded-full p-1 mt-2.5" style={{ background: "var(--seg-track)" }}>
+        <div className="seg-compact mt-2" role="tablist" aria-label={t("campus")}>
           {(["wall", "events"] as const).map((m) => {
             const active = mode === m;
             return (
               <button
                 key={m}
                 type="button"
+                role="tab"
+                aria-selected={active}
                 onClick={() => {
                   hapticTap();
                   setMode(m);
                 }}
-                className="haptic-action flex-1 py-2 rounded-full text-[11px] font-bold transition-all"
-                style={{
-                  background: active ? "#007AFF" : "transparent",
-                  color: active ? "#fff" : "rgba(235,235,245,0.6)",
-                }}
+                className="haptic-action"
               >
-                {m === "wall" ? `🧱 ${t("campusWall")}` : `🎪 ${t("campusEvents")}`}
+                {m === "wall" ? t("campusWall") : t("campusEvents")}
               </button>
             );
           })}
@@ -347,6 +331,36 @@ export default function CampusView() {
             events.map((e) => <EventCard key={e.id} event={e} onOpen={() => setOpenEvent(e)} />)
           )}
         </div>
+      )}
+
+      {/* 新建动态：右下角悬浮圆钮（FAB）。
+          - absolute（相对本视图根节点，见根节点的 relative）：滚动发生在内层容器里，
+            所以列表怎么划它都钉在右下角；用 fixed 会以窗口为基准、跳出 430px 的 App 列。
+          - z-60 高于卡片、低于 toast（z-70）与顶部吸顶栏（z-45 同级不影响，无重叠）。
+          - 列表底部 pb-28 已预留空间，不遮挡最后一条内容。 */}
+      {mode === "wall" && (
+        <button
+          type="button"
+          aria-label={t("writePost")}
+          onClick={() => {
+            hapticTap();
+            setComposerOpen(true);
+          }}
+          className="fab"
+        >
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={2}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M12 20h9" />
+            <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
+          </svg>
+        </button>
       )}
     </div>
   );
@@ -406,7 +420,7 @@ function CategoryChips({
     ...CAMPUS_CATEGORIES.map((c) => ({ id: c.id as CategoryFilter, label: t(CATEGORY_KEY[c.id]), emoji: c.emoji })),
   ];
   return (
-    <div className="shrink-0 flex gap-2 overflow-x-auto px-4 pb-2.5">
+    <div className="shrink-0 flex gap-1.5 overflow-x-auto px-4 pb-2.5">
       {chips.map((chip) => {
         const active = chip.id === value;
         return (
@@ -414,7 +428,8 @@ function CategoryChips({
             key={chip.id}
             type="button"
             onClick={() => onChange(chip.id)}
-            className="haptic-action shrink-0 px-3 py-1.5 rounded-full text-[11px] font-bold"
+            data-haptic="light"
+            className="haptic-action pill-chip shrink-0"
             style={{
               background: active ? "#007AFF" : "rgba(255,255,255,0.07)",
               color: active ? "#fff" : "rgba(235,235,245,0.7)",
@@ -510,11 +525,19 @@ function Composer({
   onSubmit: (input: NewPostInput) => Promise<void>;
 }) {
   const t = useI18n();
+  const kbOpen = useKeyboardOpen();
+  const contentRef = useRef<HTMLTextAreaElement>(null);
   const [content, setContent] = useState("");
   const [category, setCategory] = useState<PostCategory>("general");
   const [asAnonymous, setAsAnonymous] = useState(true);
   const [mediaText, setMediaText] = useState("");
   const [sending, setSending] = useState(false);
+
+  // 键盘弹出后把正文框滚进可视区：iOS 只会把聚焦元素"顶到一半"，
+  // 配合滚动容器上的 .kb-pad（底部补出键盘高度）再滚一次，保证输入区完整可见。
+  useEffect(() => {
+    if (kbOpen) contentRef.current?.scrollIntoView({ block: "center", behavior: "smooth" });
+  }, [kbOpen]);
 
   const mediaUrls = mediaText
     .split("\n")
@@ -560,8 +583,9 @@ function Composer({
         </div>
       </div>
 
-      <div className="flex-1 min-h-0 overflow-y-auto px-4 pt-3 pb-8 space-y-3">
+      <div className="kb-pad flex-1 min-h-0 overflow-y-auto px-4 pt-3 space-y-3">
         <textarea
+          ref={contentRef}
           value={content}
           onChange={(e) => setContent(e.target.value)}
           rows={5}
@@ -782,9 +806,9 @@ function PostDetail({
         )}
       </div>
 
-      {/* 评论输入条（子屏位于 Tab Bar 之上，底部安全区由 Tab Bar 负责） */}
+      {/* 评论输入条（子屏位于 Tab Bar 之上；.kb-bar 负责键盘弹出时整体上抬） */}
       <div
-        className="shrink-0 px-4 py-2.5 flex items-center gap-2"
+        className="kb-bar shrink-0 px-4 pt-2.5 flex items-center gap-2"
         style={{ borderTop: "1px solid rgba(255,255,255,0.08)", background: "var(--app-bg)" }}
       >
         <button

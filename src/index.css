@@ -776,3 +776,94 @@ html {
   border: 1px solid rgba(0, 0, 122, 0.35);
   color: #ffffff;
 }
+/* =====================================================================
+   ===== 交互细节优化：FAB / 紧凑胶囊 / 软键盘避让 =====
+   ===================================================================== */
+
+/* --- 1) 右下角悬浮操作按钮（FAB, Floating Action Button）---
+   为什么用 absolute 而不是 fixed：`.app-root` 是 max-width:430px 的居中列，
+   fixed 以**窗口**为基准 → 桌面/平板预览时按钮会飘到屏幕最右、脱离 App 范围。
+   absolute 以页面根节点为基准，配合根节点的 position: relative 稳定贴在内容右下角，
+   且因为滚动发生在内层容器里，滑动列表时按钮不会跟着跑。 */
+.fab {
+  position: absolute;
+  right: 16px;
+  bottom: 16px;
+  z-index: 60;
+  width: 54px;
+  height: 54px;
+  padding: 0;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  background: linear-gradient(180deg, #0a84ff, #0071e3);
+  box-shadow: 0 10px 24px rgba(0, 122, 255, 0.38), 0 2px 8px rgba(0, 0, 0, 0.36);
+  transition: transform 220ms cubic-bezier(0.16, 1, 0.3, 1), opacity 180ms ease;
+}
+.fab:active { transform: scale(0.92); } /* 覆盖 .haptic-action 的 0.96，圆钮按压更有分量 */
+.fab svg { width: 24px; height: 24px; display: block; }
+
+/* --- 2) 紧凑分段控件（Segmented Control）/ 胶囊（Pill Chips）---
+   相比原来 flex-1 + py-2 的"大块按钮"：高度约 28px、不再拉伸满宽，视觉更收敛。 */
+.seg-compact {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 999px;
+  background: var(--seg-track);
+}
+.seg-compact > button {
+  padding: 5px 12px;
+  border-radius: 999px;
+  font-size: 11px;
+  line-height: 1.15;
+  font-weight: 700;
+  color: var(--app-muted);
+  background: transparent;
+  transition: background-color 200ms ease, color 200ms ease, transform 160ms ease;
+}
+.seg-compact > button[aria-selected="true"] { background: #007aff; color: #ffffff; }
+.seg-compact > button:active { transform: scale(0.96); }
+
+.pill-chip {
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  line-height: 1.15;
+  font-weight: 700;
+}
+.pill-chip:active { transform: scale(0.96); }
+
+/* --- 3) 软键盘避让 ---
+   `html.kb-open` 与 `--kb-inset` 由 src/utils/keyboard.ts 写入（基于 visualViewport）。 */
+.tab-bar {
+  transition: transform 260ms cubic-bezier(0.16, 1, 0.3, 1), opacity 180ms ease;
+  will-change: transform, opacity;
+}
+/* 键盘弹出 → 底部导航整体下滑收起（被键盘盖住的区域不再露头，也不再被顶到半空） */
+html.kb-open .tab-bar {
+  transform: translateY(120%);
+  opacity: 0;
+  pointer-events: none;
+}
+/* FAB 同时收起，避免压在键盘/输入框上 */
+html.kb-open .fab {
+  opacity: 0;
+  transform: translateY(140%) scale(0.9);
+  pointer-events: none;
+}
+/* 输入区随键盘"优雅抬升"：滚动内容底部补齐键盘高度，最后一项/发送框不会被键盘吞掉 */
+.kb-pad {
+  padding-bottom: calc(28px + var(--kb-inset, 0px));
+  transition: padding-bottom 220ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+/* 底部**吸底输入条**（帖子详情的评论框）同样上抬：
+   键盘盖住的高度直接用 padding 补出来，输入框正好停在键盘上沿。 */
+.kb-bar {
+  padding-bottom: calc(10px + var(--kb-inset, 0px));
+  transition: padding-bottom 220ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+

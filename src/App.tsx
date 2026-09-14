@@ -15,6 +15,7 @@ import LoginScreen from "./views/LoginScreen";
 import { useTheme } from "./contexts/ThemeContext";
 import { syncNativeStatusBar } from "./native/statusBar";
 import { attachHapticDelegate } from "./utils/haptics";
+import { attachKeyboardWatcher } from "./utils/keyboard";
 import UpdateDialog, { type UpdateDialogKind } from "./components/UpdateDialog";
 import SwipeBack from "./components/SwipeBack";
 import { installQuickActionListener, type QuickActionTarget } from "./native/quickActions";
@@ -132,6 +133,10 @@ export default function App() {
   }, [authed, routeQuickAction]);
 
   useEffect(() => attachHapticDelegate(), []);
+  // 软键盘看护：键盘弹出时给 <html> 挂 `.kb-open` 与 `--kb-inset`。
+  // 底部 TabBar / FAB 的收起、输入区的抬升都由 index.css 里的这几条规则自动完成，
+  // 不需要在各页面之间透传状态（TabBar 在 App.tsx、FAB 在 Campus.tsx）。
+  useEffect(() => attachKeyboardWatcher(), []);
   // 全局 Live Activity 看护：课表同步过之后，每 60s / 回到前台检查 T-30 灵动岛
   useEffect(() => attachGlobalLiveActivityWatcher(), []);
   // Live Activity 远程推送：把原生采集的 push token（含 push-to-start）上报后端。
