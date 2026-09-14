@@ -18,7 +18,7 @@ from .config import settings
 from .database import SessionLocal, init_db
 from .deps import limiter
 from .routers import admin as admin_routes
-from .routers import auth, campus, courses, me, professors, reports as report_routes
+from .routers import auth, campus, courses, live_activity, me, professors, reports as report_routes
 from .routers import reviews, super_admin
 from .seed import seed_campus_if_empty, seed_if_empty
 
@@ -58,7 +58,27 @@ def _make_app() -> FastAPI:
                 f"{type(exc).__name__}: {exc}\n"
                 f"[kaznu]    当前 DATABASE_URL = {settings.database_url}"
             )
+        # Live Activity 定时推送：课前 N 分钟由服务器直接拉起锁屏卡片
+        # （App 被划掉也能弹；没配 APNs 凭据时调度器自己会跳过并说明原因）
+        try:
+            from .live_activity_scheduler import scheduler as live_activity_scheduler
+
+            if live_activity_scheduler.start():
+                print(
+                    f"[kaznu] Live Activity 调度已启动：每 {settings.live_activity_tick_seconds}s 一轮，"
+                    f"课前 {settings.live_activity_lead_seconds // 60} 分钟推送"
+                )
+            else:
+                print("[kaznu] Live Activity 调度未启动（LIVE_ACTIVITY_PUSH_ENABLED=false）")
+        except Exception as exc:  # pragma: no cover - 不能因为调度器起不来就挡住 API
+            print(f"[kaznu] ⚠️ Live Activity 调度启动失败: {type(exc).__name__}: {exc}")
         yield
+        try:
+            from .live_activity_scheduler import scheduler as live_activity_scheduler
+
+            await live_activity_scheduler.stop()
+        except Exception:
+            pass
 
     app = FastAPI(
         title=settings.app_name,
@@ -97,6 +117,8 @@ def _make_app() -> FastAPI:
     app.include_router(report_routes.router, prefix="/api/v1")
     # Campus Hub：校园墙 / 社团活动 / 全局紧急通知
     app.include_router(campus.router, prefix="/api/v1")
+    # Live Activity 远程推送：注册 token / 服务器侧课表 / 课前调度
+    app.include_router(live_activity.router, prefix="/api/v1")
 
     # Legacy endpoints the 1.3 frontend already consumes (/api/schedule etc).
     app.include_router(_legacy_router())

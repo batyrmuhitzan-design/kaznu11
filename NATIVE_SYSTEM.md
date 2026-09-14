@@ -91,7 +91,23 @@
   `KazNUOverviewWidget.swift` 桌面小组件 + `@main` WidgetBundle）。
 - 接入步骤（Xcode 建 Widget Extension Target 并把文件加进两个 Target）：见 **`ios/LIVE_ACTIVITY_GUIDE.md`**。
 - ⚠️ 免费个人证书无法签名 App Extension；且 App 被完全杀死后 iOS 只保证本地通知准时触发，
-  灵动岛需在 App 进程存活/回前台时启动（详见指南“局限说明”）。
+  本地启动灵动岛需在 App 进程存活/回前台时启动（详见指南“局限说明”）。
+
+## 10b. Live Activity **远程推送**（APNs）—— 已升级
+- **动机**：本地触发做不到「用户把 App 划掉后，课前仍自动弹卡片」。
+- **链路**：课表同步到服务器 → 后端定时任务（每 60s）→ 课前 15 分钟经 APNs
+  **push-to-start** 拉起卡片 → 上课时刻 `update` 成课中倒计时 → 下课 `end` 收起。
+- 客户端：`KaznuActivityManager` 用 `pushType: .token` 开启远程更新，并采集三类 token
+  （push-to-start / activity / device）；`AppDelegate` 接 device token 回调；
+  `KaznuLiveActivityPlugin.getPushTokens` 把 token 交给 Web 层带鉴权上报。
+- Widget：推送帧用 `Text(timerInterval:)` 由**系统逐秒自走**（无需频繁推送），
+  并用 `stale-date` → `context.isStale` 做「内容已过期」提示；卡片显示 **PUSH** 徽标。
+- 后端：`live_activity_payload.py`（payload 契约，含 Apple 2001 时间基准）、
+  `apns.py`（HTTP/2 + ES256 JWT，无凭据优雅降级）、`live_activity_scheduler.py`（纯函数判定 + 循环）、
+  `routers/live_activity.py`（8 个端点）。
+- ⚠️ **硬门槛**：APNs 需要 Push Notifications entitlement，**免费 Apple ID 无法开启**；
+  没有付费账号时远程链路自动跳过，本地触发照常工作。
+  完整步骤见 **`ios/PUSH_LIVE_ACTIVITY_SETUP.md`**。
 
 ## 11. 真实文件下载 / PDF 导出（本次）
 - 新增插件：`@capacitor/filesystem`、`@capacitor/action-sheet`、`@capacitor/share`、`jspdf`。

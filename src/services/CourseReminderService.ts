@@ -8,15 +8,22 @@
  *     让灵动岛 / 锁屏出现 30 分钟倒计时圆圈（绿→橙→红）；
  *  3) 倒计时归零（T-0）：排一条“🔔 上课提醒”系统通知，并结束 Live Activity。
  *
- * ⚠️ 说明：被用户完全杀死后，iOS 只能保证【系统本地通知】准时触发；
- * “启动 Live Activity”需要 App 进程，因此服务会在 App 每次处于前台/被重新打开时
- * 自动补启动（只要还在 [-30min, 上课) 窗口内）。若需“杀死后仍自动启动灵动岛”，
- * 需接远程推送的 push-to-start Live Activity（付费账号 + 服务器推送），不属本文件范围。
+ * ⚠️ 说明（**已升级**）：本文件负责「本地兜底」链路 ——
+ * 被用户完全杀死后 iOS 只能保证【系统本地通知】准时触发，本地启动 Live Activity 需要进程存活，
+ * 所以这里会在 App 回到前台时自动补启动。
+ *
+ * 「App 完全没运行也能在课前自动弹卡片」已由**远程推送链路**接管（本次实现）：
+ *   课表同步 → 后端定时任务 → 课前 15 分钟经 APNs push-to-start 拉起卡片
+ *   （见 src/services/LiveActivityPushService.ts、backend/app/live_activity_scheduler.py）。
+ *   该链路需要付费 Apple 开发者账号（Push Notifications entitlement）+
+ *   服务器配置 APNs .p8，详见 ios/PUSH_LIVE_ACTIVITY_SETUP.md。
+ *   两条链路互不冲突：远端推起来后，本地的 sync 会复用它（同 courseId + 同 phase 只 update）。
  */
 import { Capacitor } from "@capacitor/core";
 import { LocalNotifications, type LocalNotificationSchema } from "@capacitor/local-notifications";
 import { requestNotificationPermission } from "../native/notifications";
 import { todayWeekdayIndex } from "../utils/calendar";
+import { syncTimetableToServer } from "./LiveActivityPushService";
 import {
   buildLiveActivityPayload,
   syncLiveActivity,
@@ -483,6 +490,23 @@ export function registerReminderLessons(lessons: CourseReminderLesson[]): void {
       /* 原生桥尚未注入时静默，下一次注册会再同步 */
     }
   }
+  // 同时把课表同步到后端：服务器要用它算"课前 15 分钟"的远程推送
+  //（App 被划掉时这条链路才有效；失败不影响本地提醒与本地 Live Activity）
+  void syncTimetableToServer(
+    lessons.map((lesson) => ({
+      id: lesson.id,
+      name: lesson.name,
+      short: lesson.short,
+      room: lesson.room,
+      prof: lesson.prof,
+      weekday: lesson.weekday,
+      startH: lesson.startH,
+      startM: lesson.startM,
+      endH: lesson.endH,
+      endM: lesson.endM,
+    })),
+    areCourseAlertsEnabled(),
+  );
 }
 
 /**

@@ -146,6 +146,39 @@ App 底部导航第 3 个 Tab（原 Materials 的位置）；**Materials 改为�
 **内容治理**：违规内容走 `is_hidden` 软下架（从公开列表消失、其评论接口 404，后台可一键恢复）；
 活动必须 `is_approved=true` 才公开；紧急通知靠 `is_active` 上下线。以上都在 `/admin` 的 Campus Hub 分组里操作。
 
+### Live Activity 远程推送（APNs）
+
+把灵动岛 / 锁屏倒计时从**本地触发**升级为**服务器推送触发** —— 用户把 App 划掉后，
+课前 15 分钟仍能自动弹卡片。完整接入步骤见 **`ios/PUSH_LIVE_ACTIVITY_SETUP.md`**。
+
+**接口**（读需登录、staff 专属的见备注）
+
+| 方法 | 路径 | 用途 |
+|---|---|---|
+| POST | `/api/v1/live-activity/registration` | App 上报 device token / **push-to-start token**（按 user+设备覆盖） |
+| POST | `/api/v1/live-activity/session` | 上报某个 Live Activity 的 push token（服务器据此 update / end） |
+| DELETE | `/api/v1/live-activity/session/{activity_id}` | Activity 结束，注销 token |
+| POST | `/api/v1/lessons/sync` | 整表同步课表（服务器端需要它才能算"课前 15 分钟"） |
+| GET | `/api/v1/live-activity/status` | App 自检：我的注册 / 在跑的卡片 / APNs 状态 |
+| POST | `/api/v1/live-activity/test-push` | **立刻**给自己推一条 15 分钟演示卡片（验全链路，不用等上课） |
+| GET | `/api/v1/live-activity/apns-status` | 运维自检（staff）：凭据 / topic / 调度器 |
+| POST | `/api/v1/live-activity/run-scheduler` | 手动跑一轮调度（staff） |
+
+**三个必须知道的实现细节**（都已在测试里锁住）：
+
+1. **Date 用 Apple 2001 基准**：ActivityKit 解 `content-state` 走默认 `JSONDecoder`，
+   Swift 的 `Date` 编码为「距 2001-01-01 的秒数」。服务端若按 Unix 时间戳发，
+   锁屏计时器会跑到 1970 年附近 → 统一用 `apple_reference_seconds()`。
+2. **`event: "start"` 必须带 `attributes-type` 与 `attributes`**，否则 iOS 静默丢弃整条推送。
+3. **`stale-date` 只影响"过期样式"，倒计时靠系统计时器自走** ——
+   所以一条推送就能跑完整个 15 分钟，无需高频推送。
+
+**调度幂等**：`live_activity_push_log` 用 `(user_id, occurrence_key, event)` 唯一约束去重
+（`occurrence_key` 含日期，避免"下周同一节课"被误判为重复）。
+
+**优雅降级**：未配置 APNs 凭据时后端照常运行，调度与 `test-push` 返回
+`apns-not-configured` 并说明原因；App 端本地触发链路不受影响。
+
 ### 管理后台多语言（EN / RU / ZH）
 
 `/admin` 导航栏与登录页都有语言切换器（🌐 下拉），支持 **EN / RU / ZH** 三种语言：
@@ -228,11 +261,13 @@ location = /healthz      { proxy_pass http://127.0.0.1:8000; }
 
 ### 自检（本地也能跑，无需 Postgres）
 ```bash
-python backend/tests/check_admin_mount.py      # 断言：/docs、全部评价/管理端路由、/admin、/healthz、旧接口、种子数据、/app
-python backend/tests/check_admin_i18n.py       # 断言：管理后台多语言（语言包注册、切换器、cookie、EN/RU/ZH 页面文案）
-python backend/tests/check_campus_api.py       # 断言：Campus Hub 全部端点（匿名脱敏 / 分页 / 点赞开关 / 软下架 / 通知轮转 / 后台页面）
-python backend/tests/check_campus_contract.py  # 断言：前端 TS 接口 ↔ 后端 OpenAPI 字段逐一对齐（防前后端类型漂移）
-python backend/tests/smoke_test.py             # 原有业务冒烟（匿名性/一人一评/登录门禁）
+python backend/tests/check_admin_mount.py          # 断言：/docs、全部评价/管理端路由、/admin、/healthz、旧接口、种子数据、/app
+python backend/tests/check_admin_i18n.py           # 断言：管理后台多语言（语言包注册、切换器、cookie、EN/RU/ZH 页面文案）
+python backend/tests/check_campus_api.py           # 断言：Campus Hub 全部端点（匿名脱敏 / 分页 / 点赞开关 / 软下架 / 通知轮转 / 后台页面）
+python backend/tests/check_campus_contract.py      # 断言：前端 TS 接口 ↔ 后端 OpenAPI 字段逐一对齐（防前后端类型漂移）
+python backend/tests/check_live_activity_api.py    # 断言：Live Activity 注册 / 课表 / 调度判定（幂等、时区、课前 15 分钟）/ APNs payload
+python backend/tests/check_live_activity_contract.py  # 断言：Swift ContentState ↔ APNs payload 字段双向一致（含 Apple 2001 时间基准）
+python backend/tests/smoke_test.py                 # 原有业务冒烟（匿名性/一人一评/登录门禁）
 ```
 
 ### 线上验证

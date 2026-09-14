@@ -119,6 +119,8 @@
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>fetch</string>
+		<!-- APNs 静默推送 / Live Activity 远程更新所需（配合 aps-environment entitlement） -->
+		<string>remote-notification</string>
 	</array>
 </dict>
 </plist>

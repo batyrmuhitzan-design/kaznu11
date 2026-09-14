@@ -135,6 +135,25 @@ interface KaznuLiveActivityNativePlugin {
   start(payload: LiveActivityPayload): Promise<KaznuLiveActivityNativeResult>;
   update(payload: LiveActivityPayload): Promise<KaznuLiveActivityNativeResult>;
   end(payload: LiveActivityPayload): Promise<KaznuLiveActivityNativeResult>;
+  /** 原生采集到的推送 token 快照（iOS 16.2+ 才有实现） */
+  getPushTokens(): Promise<LiveActivityPushTokens>;
+}
+
+/** 原生侧采集到的推送 token。字段名与 Swift `pushTokensSnapshot()` 一一对应。 */
+export interface LiveActivityPushTokens {
+  /** 本次安装的稳定标识（后端用它区分同一用户的多台设备） */
+  deviceId: string;
+  /** 设备级 APNs token（普通推送用） */
+  deviceToken: string;
+  /**
+   * **应用级 push-to-start token**（iOS 17.2+）。
+   * 服务器用它发 `event: start`，就能在 App 完全没运行时把倒计时卡片推到锁屏/灵动岛。
+   */
+  pushToStartToken: string;
+  /** activityId → 该 Activity 的 push token（服务器用它 update / end 那张已有卡片） */
+  activities: Record<string, string>;
+  /** 设备当前时区（IANA），后端据此算"课前 15 分钟" */
+  timeZone: string;
 }
 
 /** 官方注册表：native 端由 KaznuLiveActivityPlugin（App target）在 viewDidLoad 注册 */
@@ -212,6 +231,21 @@ function scheduleBridgeRetry(): void {
     }
   };
   bridgeRetryTimer = window.setTimeout(tick, 1000);
+}
+
+/**
+ * 取原生侧采集到的推送 token（device / push-to-start / 各 Activity）。
+ *
+ * 原生不可用（Web 预览、旧系统、插件未注册）时返回 null，调用方跳过上报即可 ——
+ * 这条链路不通不影响 App 内的本地触发的 Live Activity。
+ */
+export async function fetchLiveActivityPushTokens(): Promise<LiveActivityPushTokens | null> {
+  if (!Capacitor.isNativePlatform() || !hasCapacitorLiveActivityPlugin()) return null;
+  try {
+    return await KaznuLiveActivity.getPushTokens();
+  } catch {
+    return null;
+  }
 }
 
 /**

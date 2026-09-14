@@ -286,3 +286,150 @@ class GlobalNotification(Base):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, index=True, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, index=True)
 
+
+# =====================================================================
+# Live Activity 远程推送（APNs）
+# =====================================================================
+
+#: APNs 环境：开发构建用 sandbox，TestFlight / App Store 用 production
+APNS_ENVIRONMENTS = ("sandbox", "production")
+
+
+class UserLesson(Base):
+    """用户的课表条目（服务器侧副本）。
+
+    为什么服务器也要存课表：Live Activity 的「课前自动弹卡片」必须由**服务器定时任务**
+    发起，而 App 那时可能已被划掉、完全不在运行。客户端通过 ``POST /lessons/sync``
+    把课表同步上来，调度器据此计算每节课的开课时刻。
+
+    ``course_key`` 是客户端与服务器共用的稳定键（同一门课同一时间段 = 同一个 key），
+    用于推送去重与 Activity 复用。
+    """
+
+    __tablename__ = "user_lessons"
+    __table_args__ = (
+        UniqueConstraint("user_id", "course_key", name="uq_user_lesson_key"),
+        Index("ix_user_lesson_weekday_start", "weekday", "start_h", "start_m"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    user_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    #: 稳定键（课程 + 星期 + 开始时刻），与 Swift KaznuLesson.id 对应
+    course_key: Mapped[str] = mapped_column(String(120), nullable=False, index=True)
+    name: Mapped[str] = mapped_column(String(200), nullable=False)
+    short: Mapped[str | None] = mapped_column(String(24), nullable=True)
+    room: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    teacher: Mapped[str | None] = mapped_column(String(160), nullable=True)
+    #: 0 = 周一 … 6 = 周日（与 Swift KaznuLesson.weekday 保持一致）
+    weekday: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+    start_h: Mapped[int] = mapped_column(Integer, nullable=False)
+    start_m: Mapped[int] = mapped_column(Integer, nullable=False)
+    end_h: Mapped[int] = mapped_column(Integer, nullable=False)
+    end_m: Mapped[int] = mapped_column(Integer, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, onupdate=_now)
+
+    def start_minutes(self) -> int:
+        return self.start_h * 60 + self.start_m
+
+    def end_minutes(self) -> int:
+        return self.end_h * 60 + self.end_m
+
+
+class LiveActivityRegistration(Base):
+    """一台设备的 Live Activity 推送注册信息（每个用户 + 设备一条）。
+
+    两类 token 用途完全不同，不能混用：
+
+    * ``push_to_start_token``：**应用级** token（iOS 17.2+ 的
+      ``Activity.pushToStartTokenUpdates``）。服务器用它发 ``event: start``，
+      就能在 App **完全没运行**时把倒计时卡片直接推到锁屏 / 灵动岛
+      —— 这正是"用户不打开 App 也能弹卡片"的关键。
+    * ``device_token``：设备级 APNs token（``didRegisterForRemoteNotifications``），
+      用于普通通知推送（本模块只做登记，便于以后复用）。
+    """
+
+    __tablename__ = "live_activity_registrations"
+    __table_args__ = (
+        UniqueConstraint("user_id", "device_id", name="uq_la_reg_user_device"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    user_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    #: 客户端自生成的安装标识（卸载重装会变），用于区分同一用户的多台设备
+    device_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    device_token: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    push_to_start_token: Mapped[str | None] = mapped_column(String(200), nullable=True, index=True)
+    #: sandbox | production
+    apns_environment: Mapped[str] = mapped_column(String(16), default="sandbox", nullable=False)
+    #: 客户端上报的时区（IANA，如 Asia/Almaty）；调度器按用户本地时间算上课时刻
+    timezone: Mapped[str] = mapped_column(String(64), default="Asia/Almaty", nullable=False)
+    #: App 语言（EN / KZ / RU）—— 推送过来的文案由**服务器**生成，
+    #: 所以必须在这里记住用户语言，否则锁屏卡片只会显示英文
+    locale: Mapped[str] = mapped_column(String(8), default="EN", nullable=False)
+    #: 是否开启课程提醒（与 App 内开关联动）
+    alerts_enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    last_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
+class LiveActivitySession(Base):
+    """一条正在运行的 Live Activity（每个 activity_id 一条）。
+
+    ``push_token`` 来自 ``activity.pushTokenUpdates``，**生命周期与 Activity 绑定**：
+    只有用它才能发 ``event: update`` / ``event: end`` 去刷新或收起那一张卡片。
+    Activity 结束后由客户端 ``DELETE``（服务器也会按 ``ended_at`` 清理历史）。
+    """
+
+    __tablename__ = "live_activity_sessions"
+    __table_args__ = (
+        Index("ix_la_session_user_ended", "user_id", "ended_at"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    activity_id: Mapped[str] = mapped_column(String(120), unique=True, nullable=False, index=True)
+    user_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    push_token: Mapped[str] = mapped_column(String(200), nullable=False)
+    course_key: Mapped[str | None] = mapped_column(String(120), nullable=True, index=True)
+    phase: Mapped[str] = mapped_column(String(16), default="preClass", nullable=False)
+    #: 当前阶段结束时刻（= 上课时刻 或 下课时刻），调度器据此决定 update / end
+    stage_end: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    apns_environment: Mapped[str] = mapped_column(String(16), default="sandbox", nullable=False)
+    #: push = 服务器推起来的（push-to-start）；local = App 自己起的
+    started_by: Mapped[str] = mapped_column(String(16), default="local", nullable=False)
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, onupdate=_now)
+    ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class LiveActivityPushLog(Base):
+    """已发出的推送记录 —— 调度器去重（幂等）用。
+
+    调度循环每分钟跑一次，绝不能对同一节课重复发 ``start``；
+    这里用 ``(user_id, course_key, event)`` 唯一约束兜底。
+    """
+
+    __tablename__ = "live_activity_push_log"
+    __table_args__ = (
+        UniqueConstraint("user_id", "course_key", "event", name="uq_la_push_dedupe"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    user_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    course_key: Mapped[str] = mapped_column(String(120), nullable=False)
+    #: start | update | end
+    event: Mapped[str] = mapped_column(String(16), nullable=False)
+    #: APNs 返回的 HTTP 状态码（200 = 成功；410 = token 失效会被清掉）
+    apns_status: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    detail: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    pushed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
+

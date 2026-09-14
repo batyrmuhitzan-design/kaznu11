@@ -69,6 +69,31 @@ class Settings:
     # Seed the local catalog on first boot.
     seed_on_startup: bool = os.getenv("SEED_ON_STARTUP", "true").lower() in {"1", "true", "yes"}
 
+    # ---------- APNs / Live Activity 远程推送 ----------
+    # 没配置任何凭据时 live activity 推送自动跳过（configured=False），
+    # 后端照常运行 —— App 端本地触发兜底依然有效。
+    apns_key_id: str = os.getenv("APNS_KEY_ID", "")
+    apns_team_id: str = os.getenv("APNS_TEAM_ID", "")
+    #: .p8 私钥路径（推荐），或直接用 APNS_KEY_P8 内联
+    apns_key_path: str = os.getenv("APNS_KEY_PATH", "")
+    apns_key_p8: str = os.getenv("APNS_KEY_P8", "")
+    #: 主 App 的 Bundle ID（Live Activity topic = <bundle>.push-type.liveactivity）
+    apns_bundle_id: str = os.getenv("APNS_BUNDLE_ID", "com.kaznu.helper")
+    #: 开发构建/直接侧载用 sandbox；TestFlight 与 App Store 用 production
+    apns_use_sandbox: bool = os.getenv("APNS_USE_SANDBOX", "true").lower() in {"1", "true", "yes"}
+    #: 课前提前多久推送（秒）。需求是 15 分钟。
+    live_activity_lead_seconds: int = int(os.getenv("LIVE_ACTIVITY_LEAD_SECONDS", str(15 * 60)))
+    #: 是否在定时任务里真的发推送（本地调试可关）
+    live_activity_push_enabled: bool = os.getenv(
+        "LIVE_ACTIVITY_PUSH_ENABLED", "true"
+    ).lower() in {"1", "true", "yes"}
+    #: start 事件是否附带 alert（会弹普通通知；用户没授权通知时 iOS 会自动忽略）
+    live_activity_alert_on_start: bool = os.getenv(
+        "LIVE_ACTIVITY_ALERT_ON_START", "true"
+    ).lower() in {"1", "true", "yes"}
+    #: 调度循环间隔（秒）
+    live_activity_tick_seconds: int = int(os.getenv("LIVE_ACTIVITY_TICK_SECONDS", "60"))
+
 
 @lru_cache
 def get_settings() -> Settings:

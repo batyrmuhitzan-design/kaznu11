@@ -72,10 +72,24 @@ struct KaznuCountdownRing: View {
         .frame(width: size, height: size)
     }
 
-    /// 圆环内的剩余时间：`29m`（粗粒度）→ `09:59`（系统逐秒自走）
+    /// 圆环内的剩余时间：
+    ///  - **推送帧**：用 `Text(timerInterval:countsDown:)` 让**系统逐秒自走** ——
+    ///    App 可能完全没运行，静态的 `15m` 会一直停在 15m，必须交给系统计时器；
+    ///  - 本地帧：`29m`（粗粒度，App 每分钟 update 一次）→ 最后 10 分钟切 `09:59`。
     @ViewBuilder
     private func ringLabel(accent: Color) -> some View {
-        if state.remainingSeconds > KaznuCourseMetric.detailedTextThreshold {
+        if state.source == .push {
+            // 注意用 min/max 兜底，避免脏数据造成 stageStart > stageEnd 的非法区间崩溃
+            Text(
+                timerInterval: min(state.stageStart, state.stageEnd)...state.stageEnd,
+                countsDown: true
+            )
+            .font(.system(size: size * 0.26, weight: .bold, design: .rounded))
+            .monospacedDigit()
+            .foregroundColor(accent)
+            .lineLimit(1)
+            .minimumScaleFactor(0.5)
+        } else if state.remainingSeconds > KaznuCourseMetric.detailedTextThreshold {
             Text(state.ringText)
                 .font(.system(size: size * 0.30, weight: .bold, design: .rounded))
                 .monospacedDigit()
@@ -171,6 +185,16 @@ struct KaznuCourseLockScreenView: View {
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
                         .background(Capsule().fill(accent.opacity(0.22)))
+                    if state.source == .push {
+                        // 远程推送帧的可见凭据：看到 PUSH 就说明
+                        // "服务器 → APNs → 锁屏" 这条链路是通的（本地触发不会有这个标）
+                        Text("PUSH")
+                            .font(.system(size: 8, weight: .heavy, design: .monospaced))
+                            .foregroundColor(.white.opacity(0.9))
+                            .padding(.horizontal, 5)
+                            .padding(.vertical, 2)
+                            .background(Capsule().fill(Color.white.opacity(0.18)))
+                    }
                 }
                 .foregroundColor(.white.opacity(0.85))
 
@@ -195,6 +219,14 @@ struct KaznuCourseLockScreenView: View {
                 Text(state.statusLabel)
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundColor(accent)
+
+                if context.isStale {
+                    // 已到服务器给的 stale-date：该阶段没有后续推送了。
+                    // 数字仍由系统计时器自走，这里只提示"内容已过期"，避免误以为还在刷新。
+                    Text("Updated \(state.updatedAt, style: .relative) ago")
+                        .font(.system(size: 10))
+                        .foregroundColor(.white.opacity(0.45))
+                }
 
                 KaznuProgressBar(progress: state.progress)
                     .padding(.top, 2)

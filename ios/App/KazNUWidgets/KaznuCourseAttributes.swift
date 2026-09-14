@@ -30,6 +30,17 @@ public enum KaznuCourseTier: String, Codable, Hashable {
     case critical
 }
 
+/// 一帧 ContentState 的来源。
+///
+/// 这个字段是**远程推送链路是否打通**的可观测证据：卡片上会据此显示 `PUSH` 标记。
+/// 服务器下发的 payload 里 `source` 恒为 `"push"`（见 backend/app/live_activity_payload.py）。
+public enum KaznuActivitySource: String, Codable, Hashable {
+    /// App 内本地触发（ActivityKit 直接 start / update）
+    case local
+    /// 服务器经 APNs 推送下发（App 没运行也算）
+    case push
+}
+
 /// 进度、档位、文案的**唯一**计算源。
 ///
 /// 同时被 App（安排刷新时机）与 Widget（渲染）编译，避免两边算法漂移。
@@ -119,6 +130,10 @@ public struct KaznuCourseAttributes: ActivityAttributes {
         /// 展开视图的跳转按钮（如“打开课表” → kaznuhelper://schedule）
         public var navigationLabel: String?
         public var navigationURL: String?
+        /// 这一帧内容由谁产生：App 本地 or 服务器 APNs 推送（卡片上据此显示 PUSH 标记）
+        public var source: KaznuActivitySource
+        /// 这一帧的生成时刻（服务器推送时为服务器时间）；配合 staleDate 用来显示“已过期”
+        public var updatedAt: Date
 
         public init(
             remainingSeconds: Double,
@@ -130,7 +145,9 @@ public struct KaznuCourseAttributes: ActivityAttributes {
             courseShort: String,
             statusLabel: String,
             navigationLabel: String? = nil,
-            navigationURL: String? = nil
+            navigationURL: String? = nil,
+            source: KaznuActivitySource = .local,
+            updatedAt: Date = Date()
         ) {
             self.remainingSeconds = remainingSeconds
             self.totalSeconds = totalSeconds
@@ -142,6 +159,8 @@ public struct KaznuCourseAttributes: ActivityAttributes {
             self.statusLabel = statusLabel
             self.navigationLabel = navigationLabel
             self.navigationURL = navigationURL
+            self.source = source
+            self.updatedAt = updatedAt
         }
 
         /// 颜色档位（绿 / 橙 / 红）
@@ -152,6 +171,69 @@ public struct KaznuCourseAttributes: ActivityAttributes {
 
         /// 阶段剩余时间（以 `stageEnd` 为准，避免快照过期）
         public func remaining(at date: Date) -> Double { max(0, stageEnd.timeIntervalSince(date)) }
+
+        // MARK: - Codable（= 与后端 APNs payload 的契约）
+
+        /// 字段名必须与 `backend/app/live_activity_payload.py` 的
+        /// `build_content_state()` 完全一致 ——
+        /// `backend/tests/check_live_activity_contract.py` 会自动比对两边。
+        private enum CodingKeys: String, CodingKey {
+            case remainingSeconds
+            case totalSeconds
+            case phase
+            case progress
+            case stageStart
+            case stageEnd
+            case courseShort
+            case statusLabel
+            case navigationLabel
+            case navigationURL
+            case source
+            case updatedAt
+        }
+
+        /// 容错解码：**缺字段时用默认值兜底**，而不是让整条推送被系统静默丢弃。
+        ///
+        /// 为什么要手写：ActivityKit 解 `content-state` 走的是默认 `JSONDecoder`，
+        /// 只要有一个非可选字段缺失，整次 update 都会被丢掉且**没有任何报错**，
+        /// 排查起来非常难受。这里对每个字段都做 `decodeIfPresent`，
+        /// 所以后端以后新增字段（或旧版本服务器少发字段）都不会让卡片失效。
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            remainingSeconds = try container.decodeIfPresent(Double.self, forKey: .remainingSeconds) ?? 0
+            totalSeconds = try container.decodeIfPresent(Double.self, forKey: .totalSeconds) ?? 1800
+            phase = try container.decodeIfPresent(KaznuCoursePhase.self, forKey: .phase) ?? .preClass
+            stageStart = try container.decodeIfPresent(Date.self, forKey: .stageStart) ?? Date()
+            stageEnd = try container.decodeIfPresent(Date.self, forKey: .stageEnd) ?? stageStart
+            // progress 缺省时按剩余/总反推，保证圆环仍然正确
+            progress = try container.decodeIfPresent(Double.self, forKey: .progress)
+                ?? KaznuCourseMetric.progress(
+                    totalSeconds: totalSeconds,
+                    remainingSeconds: remainingSeconds
+                )
+            courseShort = try container.decodeIfPresent(String.self, forKey: .courseShort) ?? ""
+            statusLabel = try container.decodeIfPresent(String.self, forKey: .statusLabel) ?? ""
+            navigationLabel = try container.decodeIfPresent(String.self, forKey: .navigationLabel)
+            navigationURL = try container.decodeIfPresent(String.self, forKey: .navigationURL)
+            source = try container.decodeIfPresent(KaznuActivitySource.self, forKey: .source) ?? .local
+            updatedAt = try container.decodeIfPresent(Date.self, forKey: .updatedAt) ?? Date()
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(remainingSeconds, forKey: .remainingSeconds)
+            try container.encode(totalSeconds, forKey: .totalSeconds)
+            try container.encode(phase, forKey: .phase)
+            try container.encode(progress, forKey: .progress)
+            try container.encode(stageStart, forKey: .stageStart)
+            try container.encode(stageEnd, forKey: .stageEnd)
+            try container.encode(courseShort, forKey: .courseShort)
+            try container.encode(statusLabel, forKey: .statusLabel)
+            try container.encodeIfPresent(navigationLabel, forKey: .navigationLabel)
+            try container.encodeIfPresent(navigationURL, forKey: .navigationURL)
+            try container.encode(source, forKey: .source)
+            try container.encode(updatedAt, forKey: .updatedAt)
+        }
     }
 
     /// 课程唯一键（换课 / 换阶段时用于判断是否复用同一个 Activity）

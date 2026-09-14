@@ -147,9 +147,13 @@ public final class KaznuActivityManager {
             let activity = try Activity<KaznuCourseAttributes>.request(
                 attributes: attributes,
                 content: ActivityContent(state: state, staleDate: state.stageEnd),
-                pushType: nil
+                // .token = 允许服务器后续用 APNs 远程 update / end 这张卡片。
+                // （push-to-start 另走 Activity.pushToStartTokenUpdates，见 startPushToStartObservation）
+                pushType: .token
             )
             storeActivityID(activity.id)
+            // 拿到该 Activity 的 push token 并上报后端（token 可能在几秒后才下发）
+            observePushTokens(for: activity)
             scheduleRefresh(for: state, now: now)
             return succeed("Live Activity started (\(phase.rawValue)) id=\(activity.id)")
         } catch {
@@ -465,6 +469,109 @@ public final class KaznuActivityManager {
         return lessons.count
     }
 
+    // MARK: - 远程推送（APNs）token 采集
+    //
+    // 三类 token 用途不同，别搞混：
+    //   1. push-to-start token（应用级，iOS 17.2+）→ 服务器能在 App **完全没运行**时 start 新卡片；
+    //   2. activity push token（每个 Activity 一个）→ 服务器 update / end 那张已有卡片；
+    //   3. device token（每个安装一个）→ 普通推送（本模块只登记，便于以后复用）。
+    // token 全部落在 App Group UserDefaults，由 JS 通过 KaznuLiveActivity.getPushTokens 读走并上报后端。
+
+    private static let pushToStartTokenKey = "kaznu.push.pushToStartToken"
+    private static let deviceTokenKey = "kaznu.push.deviceToken"
+    private static let activityTokenPrefix = "kaznu.push.activity."
+    private static let deviceIDKey = "kaznu.push.deviceID"
+
+    /// push-to-start token 的监听任务（幂等，只建一次）
+    private var pushToStartTask: Task<Void, Never>?
+
+    /// App Group UserDefaults（与课表缓存同一个 group）
+    private var store: UserDefaults {
+        UserDefaults(suiteName: KaznuLessonStore.appGroupID) ?? .standard
+    }
+
+    /// 本次安装的稳定标识（卸载重装会变），后端用它区分同一用户的多台设备
+    public var deviceID: String {
+        if let saved = store.string(forKey: Self.deviceIDKey), !saved.isEmpty { return saved }
+        let fresh = UUID().uuidString
+        store.set(fresh, forKey: Self.deviceIDKey)
+        return fresh
+    }
+
+    /// 向系统注册远程通知以便拿到 device token。
+    ///
+    /// 注意：Live Activity 的 push token **不依赖**用户是否授权通知
+    ///（ActivityKit 自己会下发）；但 push-to-start 需要一次有效的设备注册，
+    /// 所以启动时调一次是必要的。这里不主动弹权限框（权限由 App 的提醒开关触发）。
+    public func registerForRemoteNotifications() {
+        startPushToStartObservation()
+        DispatchQueue.main.async {
+            UIApplication.shared.registerForRemoteNotifications()
+        }
+    }
+
+    /// AppDelegate 回调：device token 到手（token 会变，每次都要覆盖）
+    public func handleDeviceToken(_ data: Data) {
+        let hex = data.map { String(format: "%02x", $0) }.joined()
+        store.set(hex, forKey: Self.deviceTokenKey)
+        lastMessage = "device token updated (\(hex.count) chars)"
+        NotificationCenter.default.post(name: .kaznuPushTokensChanged, object: nil)
+    }
+
+    /// AppDelegate 回调：注册失败（多半是缺少 aps-environment entitlement）
+    public func handleRemoteNotificationFailure(_ error: Error) {
+        lastMessage = "remote notification registration failed: \(error.localizedDescription)"
+        NotificationCenter.default.post(name: .kaznuPushTokensChanged, object: nil)
+    }
+
+    /// 监听 push-to-start token（iOS 17.2+）——**"App 没打开也能自动弹卡片"的关键**。
+    /// 幂等，可反复调用（App 启动 / 回前台 / 启动 Activity 时都调一次没坏处）。
+    public func startPushToStartObservation() {
+        guard #available(iOS 17.2, *) else { return }
+        if pushToStartTask != nil { return }
+        pushToStartTask = Task { [weak self] in
+            for await tokenData in Activity<KaznuCourseAttributes>.pushToStartTokenUpdates {
+                let hex = tokenData.map { String(format: "%02x", $0) }.joined()
+                await MainActor.run {
+                    self?.store.set(hex, forKey: Self.pushToStartTokenKey)
+                    NotificationCenter.default.post(name: .kaznuPushTokensChanged, object: nil)
+                }
+            }
+        }
+    }
+
+    /// 监听某个 Activity 的 push token（服务器据此 update / end 这张卡片）
+    private func observePushTokens(for activity: Activity<KaznuCourseAttributes>) {
+        let activityID = activity.id
+        Task { [weak self] in
+            for await tokenData in activity.pushTokenUpdates {
+                let hex = tokenData.map { String(format: "%02x", $0) }.joined()
+                await MainActor.run {
+                    self?.store.set(hex, forKey: Self.activityTokenPrefix + activityID)
+                    NotificationCenter.default.post(name: .kaznuPushTokensChanged, object: nil)
+                }
+            }
+        }
+    }
+
+    /// 供 JS 读取的 token 快照（`KaznuLiveActivity.getPushTokens`）。
+    /// 缺 token 的字段给空串，JS 侧统一按"没有"处理。
+    public func pushTokensSnapshot() -> [String: Any] {
+        var activities: [String: String] = [:]
+        for activity in Activity<KaznuCourseAttributes>.activities {
+            if let token = store.string(forKey: Self.activityTokenPrefix + activity.id) {
+                activities[activity.id] = token
+            }
+        }
+        return [
+            "deviceId": deviceID,
+            "deviceToken": store.string(forKey: Self.deviceTokenKey) ?? "",
+            "pushToStartToken": store.string(forKey: Self.pushToStartTokenKey) ?? "",
+            "activities": activities,
+            "timeZone": TimeZone.current.identifier,
+        ]
+    }
+
     // MARK: - 装配 / 工具
 
     /// 由剩余 / 总秒数推导阶段起止并拼装 ContentState
@@ -475,7 +582,8 @@ public final class KaznuActivityManager {
         courseShort: String,
         statusLabel: String?,
         navigation: (label: String, url: String)?,
-        now: Date
+        now: Date,
+        source: KaznuActivitySource = .local
     ) -> KaznuCourseAttributes.ContentState {
         let stageEnd = now.addingTimeInterval(remainingSeconds)
         let stageStart = now.addingTimeInterval(-(totalSeconds - remainingSeconds))
@@ -489,7 +597,9 @@ public final class KaznuActivityManager {
             courseShort: courseShort,
             statusLabel: statusLabel ?? KaznuCourseMetric.statusText(phase: phase, remainingSeconds: remainingSeconds),
             navigationLabel: navigation?.label,
-            navigationURL: navigation?.url
+            navigationURL: navigation?.url,
+            source: source,
+            updatedAt: now
         )
     }
 
@@ -532,6 +642,14 @@ public final class KaznuActivityManager {
         if let text = value as? String { return Double(text) }
         return nil
     }
+}
+
+// MARK: - 推送 token 变化通知
+
+public extension Notification.Name {
+    /// device / push-to-start / activity 任一 token 变化时发出。
+    /// Web 侧监听到即可立刻把 token 上报后端（见 src/services/LiveActivityPushService.ts）。
+    static let kaznuPushTokensChanged = Notification.Name("kaznu:pushTokensChanged")
 }
 
 // MARK: - 课表数据层（App Target 共用；不做版本门槛，BackgroundReminderScheduler 也用它）

@@ -13,8 +13,39 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         //（课前 30 分钟 / 正在上课 → 拉起倒计时；无课或距下节课很远 → 自动收起）
         BackgroundReminderScheduler.scheduleNextIfNeeded()
         BackgroundReminderScheduler.syncCourseLiveActivityIfNeeded()
+        // 远程推送：注册设备并开始监听 push-to-start token
+        //（iOS 17.2+ 才有的"App 没打开也能被服务器拉起 Live Activity"能力）
+        if #available(iOS 16.2, *) {
+            KaznuActivityManager.shared.registerForRemoteNotifications()
+        }
         // Override point for customization after application launch.
         return true
+    }
+
+    // MARK: - 远程推送回调（Live Activity 走 APNs 时必需）
+
+    /// 系统下发 device token。注意 push-to-start token 是另一条通道
+    /// （Activity.pushToStartTokenUpdates，见 KaznuActivityManager.startPushToStartObservation），
+    /// 两者都要上报后端，但用途不同。
+    func application(
+        _ application: UIApplication,
+        didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data
+    ) {
+        if #available(iOS 16.2, *) {
+            KaznuActivityManager.shared.handleDeviceToken(deviceToken)
+        }
+    }
+
+    /// 注册失败：最常见原因是 **缺少 aps-environment entitlement**
+    ///（免费 Apple ID 无法开启 Push Notifications，需付费账号，见 ios/PUSH_LIVE_ACTIVITY_SETUP.md）。
+    func application(
+        _ application: UIApplication,
+        didFailToRegisterForRemoteNotificationsWithError error: Error
+    ) {
+        if #available(iOS 16.2, *) {
+            KaznuActivityManager.shared.handleRemoteNotificationFailure(error)
+        }
+        print("[kaznu] ⚠️ registerForRemoteNotifications 失败：\(error.localizedDescription)")
     }
 
     // 兜底：某些系统路径会把主屏快捷操作直接派发给 AppDelegate（场景路径走 SceneDelegate）。

@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!--
+	  ⚠️ 这是**可选**的推送 entitlement 文件，默认**没有**接进 Xcode 工程。
+
+	  为什么不直接写进 App.entitlements：
+	  `App.entitlements` 已被 pbxproj 的 CODE_SIGN_ENTITLEMENTS 引用，往里加 aps-environment
+	  会让构建**要求带推送能力的 provisioning profile** —— 而免费 Apple ID 无法开启
+	  Push Notifications，仓库现有的"免费账号侧载 IPA"流程会直接签名失败。
+
+	  启用步骤（需要付费 Apple Developer 账号）：
+	    1. Xcode → Target「App」→ Signing & Capabilities → + Capability → Push Notifications
+	       （Xcode 会自动写好 aps-environment 并把文件挂上，最简单）
+	    2. 或手动：Build Settings → CODE_SIGN_ENTITLEMENTS 改成 App/App.push.entitlements
+	    3. 服务器侧配好 APNS_KEY_ID / APNS_TEAM_ID / APNS_KEY_PATH(.p8) 后即可远程推送
+
+	  详见 ios/PUSH_LIVE_ACTIVITY_SETUP.md
+	-->
+	<key>aps-environment</key>
+	<string>development</string>
+	<key>com.apple.security.application-groups</key>
+	<array>
+		<string>group.com.kaznu.helper</string>
+	</array>
+</dict>
+</plist>

@@ -22,6 +22,7 @@ import { APP_VERSION, classifyUpdate, fetchUpdateInfo, isOptionalSkipped, skipOp
 import { captureDeviceContext } from "./native/device";
 import { requestNotificationPermission } from "./native/notifications";
 import { attachGlobalLiveActivityWatcher, enableClassReminderNotificationActions } from "./services/CourseReminderService";
+import { attachLiveActivityPushSync } from "./services/LiveActivityPushService";
 
 const TABS = [
   { id: "dashboard", label: "Home", icon: "house.fill" },
@@ -133,6 +134,12 @@ export default function App() {
   useEffect(() => attachHapticDelegate(), []);
   // 全局 Live Activity 看护：课表同步过之后，每 60s / 回到前台检查 T-30 灵动岛
   useEffect(() => attachGlobalLiveActivityWatcher(), []);
+  // Live Activity 远程推送：把原生采集的 push token（含 push-to-start）上报后端。
+  // 登录后才做（要带鉴权），并在回前台 / 原生 token 变化时自动重报。
+  useEffect(() => {
+    if (!authed) return;
+    return attachLiveActivityPushSync();
+  }, [authed]);
   // 点击 T-60 通知或“开启灵动岛”按钮 → 立即启动 Live Activity
   useEffect(() => {
     enableClassReminderNotificationActions();

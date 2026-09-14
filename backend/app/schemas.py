@@ -355,3 +355,128 @@ class GlobalNotificationOut(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
+
+# =====================================================================
+# Live Activity 远程推送（APNs）+ 服务器侧课表
+# =====================================================================
+
+
+class LiveActivityRegistrationIn(BaseModel):
+    """App 上报的推送注册信息（token 变更时重复调用即可，按 user+device 覆盖）。"""
+
+    device_id: str = Field(min_length=4, max_length=64)
+    device_token: str | None = Field(default=None, max_length=200)
+    push_to_start_token: str | None = Field(default=None, max_length=200)
+    environment: str = "sandbox"
+    timezone: str = Field(default="Asia/Almaty", max_length=64)
+    locale: str = Field(default="EN", max_length=8)
+    alerts_enabled: bool = True
+
+    @field_validator("environment")
+    @classmethod
+    def check_environment(cls, v: str) -> str:
+        from .models import APNS_ENVIRONMENTS
+
+        value = (v or "sandbox").strip().lower()
+        if value not in APNS_ENVIRONMENTS:
+            raise ValueError(f"environment 必须是 {list(APNS_ENVIRONMENTS)} 之一")
+        return value
+
+    @field_validator("locale")
+    @classmethod
+    def check_locale(cls, v: str) -> str:
+        value = (v or "EN").strip().upper()
+        return value if value in {"EN", "KZ", "RU"} else "EN"
+
+
+class LiveActivityRegistrationOut(BaseModel):
+    device_id: str
+    has_device_token: bool
+    has_push_to_start_token: bool
+    environment: str
+    timezone: str
+    locale: str
+    alerts_enabled: bool
+    updated_at: datetime
+
+
+class LiveActivitySessionIn(BaseModel):
+    """App 启动 / 发现 Live Activity 后上报它的 push token。"""
+
+    activity_id: str = Field(min_length=4, max_length=120)
+    push_token: str = Field(min_length=8, max_length=200)
+    course_key: str | None = Field(default=None, max_length=120)
+    phase: str = "preClass"
+    stage_end: datetime | None = None
+    environment: str = "sandbox"
+    #: push = 服务器推起来的；local = App 自己起的
+    started_by: str = "local"
+
+    @field_validator("phase")
+    @classmethod
+    def check_phase(cls, v: str) -> str:
+        value = (v or "preClass").strip()
+        return value if value in {"preClass", "inClass"} else "preClass"
+
+
+class LiveActivitySessionOut(BaseModel):
+    activity_id: str
+    course_key: str | None
+    phase: str
+    stage_end: datetime | None
+    environment: str
+    started_by: str
+    started_at: datetime
+    ended_at: datetime | None
+
+
+class LessonIn(BaseModel):
+    """课表条目（与 Swift ``KaznuLesson`` 字段一一对应）。"""
+
+    course_key: str = Field(min_length=1, max_length=120)
+    name: str = Field(min_length=1, max_length=200)
+    short: str | None = Field(default=None, max_length=24)
+    room: str | None = Field(default=None, max_length=80)
+    teacher: str | None = Field(default=None, max_length=160)
+    #: 0 = 周一 … 6 = 周日
+    weekday: int = Field(ge=0, le=6)
+    start_h: int = Field(ge=0, le=23)
+    start_m: int = Field(ge=0, le=59)
+    end_h: int = Field(ge=0, le=23)
+    end_m: int = Field(ge=0, le=59)
+
+
+class LessonsSyncIn(BaseModel):
+    """整表同步（先删后插）：比增量合并更简单，也不会留下幽灵课程。"""
+
+    lessons: list[LessonIn] = Field(default_factory=list, max_length=80)
+    #: 是否同时开启课程提醒
+    alerts_enabled: bool = True
+
+
+class LessonsSyncOut(BaseModel):
+    message: str
+    count: int
+    alerts_enabled: bool
+
+
+class LiveActivityStatusOut(BaseModel):
+    """App 的自检面板用：我的注册 / 在跑的 Activity / APNs 服务端状态。"""
+
+    registrations: list[LiveActivityRegistrationOut]
+    sessions: list[LiveActivitySessionOut]
+    lesson_count: int
+    lead_seconds: int
+    apns: dict
+
+
+class SchedulerRunOut(BaseModel):
+    """手动触发一轮调度（管理员调试用）。"""
+
+    at: str
+    planned: int
+    sent: int
+    failed: int
+    skipped: str | None = None
+    details: list[dict] = []
+

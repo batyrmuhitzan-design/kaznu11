@@ -28,6 +28,9 @@ babel>=2.10              # /admin 多语言（EN/RU/ZH）：sqladmin 的 i18n �
 # ---------- 数据库（Async SQLAlchemy + PostgreSQL asyncpg） ----------
 sqlalchemy[asyncio]>=2.0.30,<3.0
 asyncpg>=0.29
+# Windows / 精简镜像里没有系统时区库时，zoneinfo 需要它才能解析 Asia/Almaty
+# （Live Activity 调度按用户时区计算"课前 15 分钟"）
+tzdata>=2024.1
 
 # ---------- Univer.kz 校园网抓取（backend/scraper.py） ----------
 requests>=2.31
@@ -39,3 +42,11 @@ reportlab>=4.1
 # ---------- 开发 / 测试（不在生产环境运行也安全） ----------
 httpx>=0.27        # backend/tests/smoke_test.py 使用
 aiosqlite>=0.20    # 无 PostgreSQL 时的本地冒烟测试（DATABASE_URL=sqlite+aiosqlite）
+
+# ---------- 可选：Live Activity 远程推送（APNs）----------
+# 默认**不装**：代码对它们是惰性导入，缺失时 apns.py 会优雅降级（configured=false）。
+# 只有真的要用服务器推送 Live Activity 时才需要装（并配 APNS_* 环境变量）：
+#   python3 -m pip install --break-system-packages "httpx[http2]" "PyJWT[crypto]"
+# 说明：APNs 强制 HTTP/2（需要 h2）与 ES256 JWT（需要 PyJWT + cryptography）。
+# httpx[http2]>=0.27
+# PyJWT[crypto]>=2.8

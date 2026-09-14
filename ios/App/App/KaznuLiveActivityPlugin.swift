@@ -13,7 +13,44 @@ public class KaznuLiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "start", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "update", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "end", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "getPushTokens", returnType: CAPPluginReturnPromise),
     ]
+
+    /// 原生拿到新 token（device / push-to-start / activity）→ 通知 Web 层立刻上报后端。
+    /// Swift 只负责采集，上报带鉴权、由 Web 层做（见 src/services/LiveActivityPushService.ts）。
+    public override func load() {
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handlePushTokensChanged),
+            name: .kaznuPushTokensChanged,
+            object: nil
+        )
+    }
+
+    @objc private func handlePushTokensChanged() {
+        notifyListeners("pushTokensChanged", data: [:])
+    }
+
+    /// Web 侧读取推送 token 快照（device / push-to-start / 各 Activity 的 push token）。
+    ///
+    /// 为什么由 JS 上报而不是原生直接传：App 的登录态在 Web 层（localStorage 里的
+    /// Bearer token），原生端不保存凭据更安全。JS 拿到快照后带鉴权 POST 给后端，
+    /// 见 `src/services/LiveActivityPushService.ts`。
+    @objc public func getPushTokens(_ call: CAPPluginCall) {
+        DispatchQueue.main.async {
+            if #available(iOS 16.2, *) {
+                call.resolve(KaznuActivityManager.shared.pushTokensSnapshot())
+            } else {
+                call.resolve([
+                    "deviceId": "",
+                    "deviceToken": "",
+                    "pushToStartToken": "",
+                    "activities": [String: String](),
+                    "timeZone": TimeZone.current.identifier,
+                ])
+            }
+        }
+    }
 
     private func handle(_ payload: [String: Any], _ call: CAPPluginCall) {
         DispatchQueue.main.async {
