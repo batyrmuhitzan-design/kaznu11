@@ -8,4 +8,5 @@ python-dotenv>=1.0
 slowapi>=0.1.9
 sqladmin>=0.18,<1.0
 itsdangerous>=2.1   # SQLAdmin 登录会话签名
+babel>=2.10         # SQLAdmin i18n 运行时依赖：/admin 多语言（EN/RU/ZH）需要它
 pydantic>=2.7

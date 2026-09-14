@@ -1,0 +1,51 @@
+# =====================================================================
+# KazNU Helper — FastAPI 服务（uvicorn main:app）systemd 单元
+#
+# 目的：服务器重启后自动拉起，并且进程崩溃时自动重启（替代裸 nohup）。
+#
+# 安装（在服务器上以 root 执行）：
+#   cp /opt/kaznu11-main/deploy/systemd/kaznu-api.service /etc/systemd/system/
+#   systemctl daemon-reload
+#   systemctl enable --now kaznu-api
+#   systemctl status kaznu-api --no-pager
+#
+# 常用操作：
+#   systemctl restart kaznu-api      # 改了代码 / .env 之后重启
+#   systemctl stop kaznu-api         # 停（注意：先停掉旧的 nohup 进程，避免抢 8000 端口）
+#   journalctl -u kaznu-api -n 50    # 看 systemd 视角的日志
+#   tail -f /var/log/kaznu-api.log   # 看应用日志
+# =====================================================================
+
+[Unit]
+Description=KazNU Helper API (FastAPI + SQLAdmin, uvicorn main:app)
+Documentation=https://1losion.me/docs
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+
+# 入口 main.py 在仓库根，配置 .env 也是按工作目录解析的，所以这里必须锁定目录。
+WorkingDirectory=/opt/kaznu11-main
+
+# 日志不要缓冲，否则 journalctl / 日志文件里看不到实时输出。
+Environment=PYTHONUNBUFFERED=1
+
+# uvicorn 的绝对路径（用 `command -v uvicorn` 确认；本机为 /usr/local/bin/uvicorn）。
+# 只监听 127.0.0.1 —— 对外由 1Panel 的 openresty 反代（80/443）转发进来。
+ExecStart=/usr/local/bin/uvicorn main:app --host 127.0.0.1 --port 8000
+
+# 崩溃 / 被杀自动拉起（含开机后首次启动失败重试）。
+Restart=always
+RestartSec=3
+
+# 日志沿用原来的文件，方便继续用 tail -f 看。
+StandardOutput=append:/var/log/kaznu-api.log
+StandardError=append:/var/log/kaznu-api.log
+
+# uvicorn 响应 SIGINT 优雅退出（等在途请求结束）。
+KillSignal=SIGINT
+TimeoutStopSec=20
+
+[Install]
+WantedBy=multi-user.target

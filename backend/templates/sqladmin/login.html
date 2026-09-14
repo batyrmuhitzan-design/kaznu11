@@ -1,0 +1,76 @@
+{% extends "sqladmin/base.html" %}
+{#
+  覆盖 SQLAdmin 自带的 sqladmin/login.html —— 唯一目的是把**语言切换器也放到登录页**。
+
+  背景：SQLAdmin 内置的切换器在 layout.html 的 topbar 块里，而登录页继承的是
+  base.html（登录页没有导航栏），所以默认情况下登录页会"锁定"在默认语言，用户必须
+  先登录才能切语言。这里复制原模板并加上同一个下拉框（链接形如 ?lang=zh，由
+  LocaleMiddleware 写入 cookie 持久化）。
+
+  为什么只用一个文件就够了：sqladmin/application.py 的 init_templating_engine() 把项目
+  的 templates_dir 放在 ChoiceLoader 的**第一位**：
+
+      loaders = [FileSystemLoader(self.templates_dir), PrefixLoader(...), PackageLoader(...)]
+
+  同名模板优先命中本文件，其余模板继续回退到 SQLAdmin 包内的版本，不必 vendor 整套模板。
+
+  维护提示：表单部分与 SQLAdmin 0.31.1 的原始 login.html 保持一致；升级 SQLAdmin 时
+  请对比原文件（sqladmin/templates/sqladmin/login.html），只在顶部增加切换器。
+#}
+{% block body %}
+{% set codes = i18n_config.language_switcher or [] %}
+{% if codes | length > 1 %}
+<div class="position-fixed top-0 end-0 p-3" style="z-index: 1080;">
+  <div class="dropdown">
+    <a href="#" class="btn btn-outline-secondary dropdown-toggle d-flex align-items-center px-3"
+      data-bs-toggle="dropdown" aria-expanded="false" title="{{ _('Language') }}">
+      <i class="fa fa-language me-2"></i>
+      <span>{{ get_locale_display_name(get_locale()) }}</span>
+    </a>
+    <div class="dropdown-menu dropdown-menu-end">
+      {% for code in codes %}
+      <a class="dropdown-item {% if code == get_locale() %}active{% endif %}"
+        href="{{ request.url.include_query_params(lang=code) }}">
+        {{ get_locale_display_name(code) }}
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<div class="d-flex align-items-center justify-content-center vh-100">
+  <form class="Fcol-lg-6 col-md-6 card card-md" action="{{ url_for('admin:login') }}" method="POST" autocomplete="off">
+    <div class="card-body">
+      <h2 class="card-title text-center mb-4">{{ _("Login to %(title)s", title=admin.title) }}</h2>
+      <div class="mb-3">
+        <label class="form-label">{{ _("Username") }}</label>
+        {% if error %}
+        <input name="username" type="text" class="form-control is-invalid" placeholder="{{ _('Enter username') }}"
+          autocomplete="off">
+        <div class="invalid-feedback">{{ error }}</div>
+        {% else %}
+        <input name="username" type="text" class="form-control" placeholder="{{ _('Enter username') }}" autocomplete="off">
+        {% endif %}
+      </div>
+      <div class="mb-2">
+        <label class="form-label">
+          {{ _("Password") }}
+        </label>
+        <div class="input-group input-group-flat">
+          {% if error %}
+          <input name="password" type="password" class="form-control is-invalid" placeholder="{{ _('Password') }}"
+            autocomplete="off">
+          <div class="invalid-feedback">{{ error }}</div>
+          {% else %}
+          <input name="password" type="password" class="form-control" placeholder="{{ _('Password') }}" autocomplete="off">
+          {% endif %}
+        </div>
+      </div>
+      <div class="form-footer">
+        <button type="submit" class="btn btn-primary w-100">{{ _("Login") }}</button>
+      </div>
+    </div>
+  </form>
+</div>
+{% endblock %}

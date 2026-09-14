@@ -1,0 +1,183 @@
+# KazNU Helper 管理后台中文语言包（SQLAdmin 界面文案）
+#
+# SQLAdmin 0.31.1 只内置 en / de / az / ru / tr，没有中文，所以这份 catalog 由本仓库提供：
+#   backend/app/i18n.py :: register_catalogs()  在 Admin(...) 构造前把它注册进
+#   sqladmin.i18n.translations / SUPPORTED_LOCALES，使 ?lang=zh 生效。
+#
+# 修改后必须编译（.po → .mo），否则不生效：
+#   python scripts/compile_admin_i18n.py
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: KazNU Helper Admin\\n"
+"Report-Msgid-Bugs-To: kaznu11\\n"
+"MIME-Version: 1.0\\n"
+"Content-Type: text/plain; charset=utf-8\\n"
+"Content-Transfer-Encoding: 8bit\\n"
+"Language: zh\\n"
+"Language-Team: Chinese\\n"
+"Plural-Forms: nplurals=1; plural=0;\\n"
+
+#, python-format
+msgid "%(imported)s imported, %(skipped)s skipped, %(processed)s/%(total)s rows processed"
+msgstr "已导入 %(imported)s 条，跳过 %(skipped)s 条，已处理 %(processed)s/%(total)s 行"
+
+#, python-format
+msgid "%(imported)s imported, %(skipped)s skipped, %(processed)s/%(total)s rows processed - saving valid rows... (%(seconds)ss)"
+msgstr "已导入 %(imported)s 条，跳过 %(skipped)s 条，已处理 %(processed)s/%(total)s 行 — 正在保存有效行…（%(seconds)s 秒）"
+
+#, python-format
+msgid "%(processed)s/%(total)s rows processed"
+msgstr "已处理 %(processed)s/%(total)s 行"
+
+#, python-format
+msgid "%(size)s / Page"
+msgstr "每页 %(size)s 条"
+
+msgid "Actions"
+msgstr "操作"
+
+msgid "Apply Filter"
+msgstr "应用筛选"
+
+msgid "Cancel"
+msgstr "取消"
+
+msgid "Choose CSV file"
+msgstr "选择 CSV 文件"
+
+msgid "Clear filter"
+msgstr "清除筛选"
+
+msgid "Close"
+msgstr "关闭"
+
+msgid "Column"
+msgstr "列"
+
+msgid "Delete"
+msgstr "删除"
+
+msgid "Delete selected items"
+msgstr "删除选中项"
+
+msgid "Done"
+msgstr "完成"
+
+msgid "Download CSV"
+msgstr "下载 CSV"
+
+msgid "Download TXT"
+msgstr "下载 TXT"
+
+msgid "Edit"
+msgstr "编辑"
+
+#, python-format
+msgid "Edit %(name)s"
+msgstr "编辑 %(name)s"
+
+msgid "Enter username"
+msgstr "请输入用户名"
+
+msgid "Export"
+msgstr "导出"
+
+msgid "Filters"
+msgstr "筛选"
+
+msgid "Go Back"
+msgstr "返回"
+
+msgid "Import"
+msgstr "导入"
+
+msgid "Import CSV"
+msgstr "导入 CSV"
+
+msgid "Import progress"
+msgstr "导入进度"
+
+msgid "Import result"
+msgstr "导入结果"
+
+msgid "Language"
+msgstr "语言"
+
+msgid "Login"
+msgstr "登录"
+
+#, python-format
+msgid "Login to %(title)s"
+msgstr "登录 %(title)s"
+
+msgid "Logout"
+msgstr "退出登录"
+
+msgid "Missed rows"
+msgstr "被跳过的行"
+
+#, python-format
+msgid "New %(name)s"
+msgstr "新建 %(name)s"
+
+msgid "No file selected"
+msgstr "未选择文件"
+
+msgid "Password"
+msgstr "密码"
+
+msgid "Please confirm"
+msgstr "请确认"
+
+msgid "Refresh list"
+msgstr "刷新列表"
+
+msgid "Save"
+msgstr "保存"
+
+msgid "Save and add another"
+msgstr "保存并新建下一条"
+
+msgid "Save and continue editing"
+msgstr "保存并继续编辑"
+
+msgid "Save as new"
+msgstr "另存为新记录"
+
+msgid "Search"
+msgstr "搜索"
+
+msgid "Select all"
+msgstr "全选"
+
+msgid "Select item"
+msgstr "选择此项"
+
+msgid "Show"
+msgstr "查看"
+
+#, python-format
+msgid "Showing %(start)s to %(end)s of %(count)s items"
+msgstr "显示第 %(start)s–%(end)s 条，共 %(count)s 条"
+
+msgid "Skip invalid rows and continue import"
+msgstr "跳过无效行并继续导入"
+
+msgid "Username"
+msgstr "用户名"
+
+msgid "Value"
+msgstr "值"
+
+msgid "View"
+msgstr "详情"
+
+msgid "Yes"
+msgstr "确定"
+
+msgid "next"
+msgstr "下一页"
+
+msgid "prev"
+msgstr "上一页"

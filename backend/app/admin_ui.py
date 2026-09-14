@@ -7,6 +7,8 @@ Permissions:
 """
 from __future__ import annotations
 
+from pathlib import Path
+
 from fastapi import Request
 from sqladmin import Admin, ModelView, action
 from sqladmin.authentication import AuthenticationBackend
@@ -16,6 +18,14 @@ from starlette.responses import RedirectResponse
 from .admin_service import get_application_or_404, handle_application, set_user_banned
 from .config import settings
 from .database import SessionLocal, engine
+from .i18n import (
+    ADMIN_LOCALES,
+    DEFAULT_LOCALE,
+    L,
+    build_i18n_config,
+    make_column_labels,
+    register_catalogs,
+)
 from .models import (
     ROLE_ADMIN,
     ROLE_SUPER_ADMIN,
@@ -110,9 +120,10 @@ def _redirect(request: Request, identity: str) -> RedirectResponse:
 class UserAdmin(ModelView, model=User):
     """仅 super_admin：用户管理 + 一键封禁/解封。"""
 
-    name = "User"
-    name_plural = "Users"
-    category = "Super Admin"
+    # 名称/分类用 L() 包装：渲染时才解析语言（见 app/i18n.py）
+    name = L("User")
+    name_plural = L("Users")
+    category = L("Super Admin")
     icon = "fa-solid fa-users"
 
     column_list = [
@@ -124,6 +135,17 @@ class UserAdmin(ModelView, model=User):
         User.is_banned,
         User.created_at,
     ]
+    column_labels = make_column_labels(
+        {
+            User.id: "ID",
+            User.univer_username: "Univer Username",
+            User.global_display_name: "Display Name",
+            User.department_tag: "Department Tag",
+            User.role: "Role",
+            User.is_banned: "Banned",
+            User.created_at: "Created At",
+        }
+    )
     column_searchable_list = [User.univer_username, User.global_display_name]
     column_default_sort = [("created_at", True)]
     form_excluded_columns = [User.id, User.created_at, User.updated_at]
@@ -133,8 +155,8 @@ class UserAdmin(ModelView, model=User):
 
     @action(
         name="ban",
-        label="🚫 Ban",
-        confirmation_message="Ban the selected users?",
+        label=L("🚫 Ban"),
+        confirmation_message=L("Ban the selected users?"),
         add_in_detail=True,
     )
     async def ban_users(self, request: Request) -> RedirectResponse:
@@ -146,8 +168,8 @@ class UserAdmin(ModelView, model=User):
 
     @action(
         name="unban",
-        label="✅ Unban",
-        confirmation_message="Unban the selected users?",
+        label=L("✅ Unban"),
+        confirmation_message=L("Unban the selected users?"),
         add_in_detail=True,
     )
     async def unban_users(self, request: Request) -> RedirectResponse:
@@ -166,15 +188,23 @@ def _application_user_label(model: AdminApplication, _attr: str) -> str:
 class AdminApplicationAdmin(ModelView, model=AdminApplication):
     """仅 super_admin：管理员申请审批面板。"""
 
-    name = "Admin Application"
-    name_plural = "Admin Applications"
-    category = "Super Admin"
+    name = L("Admin Application")
+    name_plural = L("Admin Applications")
+    category = L("Super Admin")
     icon = "fa-solid fa-file-circle-check"
     can_create = False
     can_edit = False
     can_delete = True
 
     column_list = [AdminApplication.user, AdminApplication.reason, AdminApplication.status, AdminApplication.created_at]
+    column_labels = make_column_labels(
+        {
+            AdminApplication.user: "Applicant",
+            AdminApplication.reason: "Reason",
+            AdminApplication.status: "Status",
+            AdminApplication.created_at: "Created At",
+        }
+    )
     column_formatters = {AdminApplication.user: _application_user_label}
     column_searchable_list = [AdminApplication.reason]
     column_default_sort = [("created_at", True)]
@@ -184,8 +214,8 @@ class AdminApplicationAdmin(ModelView, model=AdminApplication):
 
     @action(
         name="approve",
-        label="✅ Approve",
-        confirmation_message="Approve: promote the applicants to admin?",
+        label=L("✅ Approve"),
+        confirmation_message=L("Approve: promote the applicants to admin?"),
         add_in_detail=True,
     )
     async def approve_applications(self, request: Request) -> RedirectResponse:
@@ -198,8 +228,8 @@ class AdminApplicationAdmin(ModelView, model=AdminApplication):
 
     @action(
         name="reject",
-        label="❌ Reject",
-        confirmation_message="Reject the selected applications?",
+        label=L("❌ Reject"),
+        confirmation_message=L("Reject the selected applications?"),
         add_in_detail=True,
     )
     async def reject_applications(self, request: Request) -> RedirectResponse:
@@ -214,11 +244,21 @@ class AdminApplicationAdmin(ModelView, model=AdminApplication):
 class ProfessorAdmin(ModelView, model=Professor):
     """admin & super_admin：教师内容管理。"""
 
-    name = "Professor"
-    name_plural = "Professors"
-    category = "Content"
+    name = L("Professor")
+    name_plural = L("Professors")
+    category = L("Content")
     icon = "fa-solid fa-chalkboard-user"
     column_list = [Professor.id, Professor.name, Professor.department, Professor.rating_easy, Professor.rating_quality, Professor.created_at]
+    column_labels = make_column_labels(
+        {
+            Professor.id: "ID",
+            Professor.name: "Name",
+            Professor.department: "Department",
+            Professor.rating_easy: "Easy Rating",
+            Professor.rating_quality: "Quality Rating",
+            Professor.created_at: "Created At",
+        }
+    )
     column_searchable_list = [Professor.name, Professor.department]
     column_default_sort = [("name", False)]
 
@@ -227,11 +267,20 @@ class ProfessorAdmin(ModelView, model=Professor):
 
 
 class CourseAdmin(ModelView, model=Course):
-    name = "Course"
-    name_plural = "Courses"
-    category = "Content"
+    name = L("Course")
+    name_plural = L("Courses")
+    category = L("Content")
     icon = "fa-solid fa-book"
     column_list = [Course.id, Course.code, Course.title, Course.department, Course.credits]
+    column_labels = make_column_labels(
+        {
+            Course.id: "ID",
+            Course.code: "Code",
+            Course.title: "Title",
+            Course.department: "Department",
+            Course.credits: "Credits",
+        }
+    )
     column_searchable_list = [Course.code, Course.title, Course.department]
     column_default_sort = [("code", False)]
 
@@ -260,9 +309,9 @@ def _review_comment_preview(model: Review, _attr: str) -> str:
 
 
 class ReviewAdmin(ModelView, model=Review):
-    name = "Review"
-    name_plural = "Reviews"
-    category = "Content"
+    name = L("Review")
+    name_plural = L("Reviews")
+    category = L("Content")
     icon = "fa-solid fa-star"
     column_list = [
         Review.id,
@@ -276,6 +325,21 @@ class ReviewAdmin(ModelView, model=Review):
         Review.user_department_tag,
         Review.created_at,
     ]
+    column_labels = make_column_labels(
+        {
+            Review.id: "ID",
+            Review.professor: "Professor",
+            Review.course: "Course",
+            Review.comment: "Comment",
+            Review.rating_quality: "Quality",
+            Review.rating_easy: "Easy",
+            Review.attendance_strictness: "Attendance",
+            Review.likes_count: "Likes",
+            Review.user_department_tag: "Department Tag",
+            Review.created_at: "Created At",
+            Review.tags: "Tags",
+        }
+    )
     # 教授/课程列默认会渲染成对象地址，评价正文也需要预览列 —— 审核时可直接看到内容。
     column_formatters = {
         Review.professor: _review_professor_label,
@@ -294,12 +358,20 @@ class ReviewAdmin(ModelView, model=Review):
 
 
 class ReportAdmin(ModelView, model=Report):
-    name = "Report"
-    name_plural = "Reports"
-    category = "Content"
+    name = L("Report")
+    name_plural = L("Reports")
+    category = L("Content")
     icon = "fa-solid fa-flag"
     can_create = False
     column_list = [Report.id, Report.review_id, Report.reason, Report.created_at]
+    column_labels = make_column_labels(
+        {
+            Report.id: "ID",
+            Report.review_id: "Review ID",
+            Report.reason: "Reason",
+            Report.created_at: "Created At",
+        }
+    )
     column_searchable_list = [Report.reason]
     column_default_sort = [("created_at", True)]
 
@@ -308,8 +380,21 @@ class ReportAdmin(ModelView, model=Report):
 
 
 def setup_admin_ui(app) -> Admin:
-    """挂载 SQLAdmin 管理后台到 /admin。"""
+    """挂载 SQLAdmin 管理后台到 /admin（含 EN / RU / ZH 语言切换器）。"""
     secret = settings.admin_session_secret or settings.anon_hash_secret
+
+    # 1) 先把本仓库自带的中文语言包注册进 SQLAdmin 的 i18n 运行时。
+    #    必须在 Admin(...) 之前调用：LocaleMiddleware 与 set_locale() 都是
+    #    在请求时读取 sqladmin.i18n.SUPPORTED_LOCALES / translations 的。
+    #    SQLAdmin 只内置 en / de / az / ru / tr，没有中文与哈萨克语。
+    registered = register_catalogs()
+
+    # 2) 自定义模板目录（backend/templates）。SQLAdmin 的 Jinja loader 把项目目录放在
+    #    第一位，因此这里只需放一个 sqladmin/login.html 就能给登录页也加上语言切换器，
+    #    其余模板自动回退到 SQLAdmin 包内版本。父目录是 backend/，所以用绝对路径，
+    #    不受启动时工作目录影响。
+    templates_dir = str(Path(__file__).resolve().parents[1] / "templates")
+
     admin = Admin(
         app,
         engine=engine,
@@ -318,6 +403,10 @@ def setup_admin_ui(app) -> Admin:
         title="KazNU Helper Admin",
         logo_url=None,
         base_url="/admin",
+        templates_dir=templates_dir,
+        # 语言切换器：language_switcher 长度 > 1 时 SQLAdmin 会在导航栏渲染下拉框，
+        # 链接形如 /admin/...?lang=zh，由 LocaleMiddleware 写入 cookie 持久化。
+        i18n_config=build_i18n_config(),
     )
     # Super Admin 专属
     admin.add_model_view(UserAdmin)
@@ -330,6 +419,13 @@ def setup_admin_ui(app) -> Admin:
     print(
         "[kaznu] SQLAdmin 管理后台已挂载: /admin"
         " （Users / Admin Applications / Professors / Courses / Reviews / Reports）"
+    )
+    print(
+        "[kaznu] 管理后台语言: "
+        + " / ".join(ADMIN_LOCALES)
+        + f"（默认 {DEFAULT_LOCALE}"
+        + (f"，自带语言包 {', '.join(registered)}" if registered else "，无自带语言包")
+        + "）"
     )
     return admin
 

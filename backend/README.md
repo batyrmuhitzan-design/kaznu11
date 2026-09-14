@@ -107,15 +107,72 @@ uvicorn main:app --host 0.0.0.0 --port 8000      # 入口
 - 数据库连不上**不会阻塞启动**：`/docs`、`/admin` 登录页仍可访问，`/healthz` 会显示 `db_ready: false`，
   并在日志里打印当前 `DATABASE_URL` 便于排查。
 
-### 部署 / 重启（服务器）
+### 管理后台多语言（EN / RU / ZH）
+
+`/admin` 导航栏与登录页都有语言切换器（🌐 下拉），支持 **EN / RU / ZH** 三种语言：
+
+| 组件 | 位置 | 说明 |
+|---|---|---|
+| 语言注册 | `backend/app/i18n.py` → `register_catalogs()` | SQLAdmin 0.31.1 内置 catalog **只有 en/de/az/ru/tr**，`zh` 由本仓库提供；运行时追加进 `sqladmin.i18n.SUPPORTED_LOCALES` / `translations` |
+| 中文语言包 | `backend/locales/translations/zh/LC_MESSAGES/admin.{po,mo}` | SQLAdmin 自身的 52 条界面文案（登出/保存/搜索/分页/模态框…） |
+| 业务文案 | `backend/app/i18n.py` → `APP_STRINGS` + `L()` | 菜单名、分类、动作按钮、确认弹窗、列标题（不在 SQLAdmin 的 catalog 里） |
+| 登录页切换器 | `backend/templates/sqladmin/login.html` | 覆盖 SQLAdmin 自带模板（loader 首位 = 项目 `templates_dir`），登录后导航栏的切换器是 SQLAdmin 内置的 |
+
+选择语言的三条路径（优先级从高到低，见 `sqladmin.i18n.LocaleMiddleware`）：
+
+1. URL 查询参数 `?lang=zh`（并写入 `kaznu_admin_lang` cookie 持久化，有效期 1 年）；
+2. `kaznu_admin_lang` cookie；
+3. `Accept-Language` 请求头 —— 所以**浏览器语言是中文的用户，登录页直接就是中文**，无需先登录再切换。
+
+⚠️ 改了 `.po` 必须重新编译，否则加载的还是旧 `.mo`：
+
 ```bash
-cd /opt/kaznu11                      # 仓库目录
+python scripts/compile_admin_i18n.py        # .po → .mo（全部语言）
+python scripts/compile_admin_i18n.py zh     # 只编译指定语言
+python backend/tests/check_admin_i18n.py    # 自检：注册、切换器、cookie、三种语言的页面文案
+```
+
+### 部署 / 重启（服务器）
+
+**推荐：systemd 托管（开机自启 + 崩溃自动拉起）**
+
+单元文件在仓库里：`deploy/systemd/kaznu-api.service`（`/opt/kaznu11-main` + `127.0.0.1:8000` + `/var/log/kaznu-api.log`）。
+
+```bash
+# 首次安装
+cp /opt/kaznu11-main/deploy/systemd/kaznu-api.service /etc/systemd/system/
+systemctl daemon-reload
+systemctl enable --now kaznu-api
+systemctl status kaznu-api --no-pager
+
+# 日常更新代码后
+cd /opt/kaznu11-main
 git pull --ff-only
-pip install -r requirements.txt      # 首次或依赖更新时（sqladmin / itsdangerous / aiosqlite 必需）
+pip install -r requirements.txt          # 首次或依赖更新时（sqladmin / itsdangerous / babel / aiosqlite 必需）
+python scripts/compile_admin_i18n.py     # 改了管理后台语言包时
+systemctl restart kaznu-api
+curl -s http://127.0.0.1:8000/healthz    # 期望 {"status":"ok","db_ready":true,…,"admin":"/admin"}
+```
+
+⚠️ **两种方式不要混用**：`nohup` 起的进程不在 systemd 管理下，会和 systemd 抢 8000 端口。
+从 nohup 迁移到 systemd 时先清掉旧进程：
+
+```bash
+pkill -f 'uvicorn main:app' || true
+ss -ltnp | grep 8000 || echo "8000 已释放"
+```
+
+**备选：手动 nohup（临时调试用）**
+
+```bash
+cd /opt/kaznu11-main
+git pull --ff-only
+pip install -r requirements.txt
 pkill -f 'uvicorn main:app' || true
 nohup uvicorn main:app --host 127.0.0.1 --port 8000 >/var/log/kaznu-api.log 2>&1 &
 ```
-- 用 systemd / aaPanel「Python 项目」托管时，把最后两行换成对应的 restart。
+
+- 用 aaPanel「Python 项目」托管时，把 restart 换成面板里的操作。
 - 用仓库自带 docker 栈（Postgres + API + Caddy）：`bash update.sh update`。
   ⚠️ Caddy 会占用 80/443 —— 若服务器上已有 openresty/nginx，**不要同时启动 Caddy**，
   改用下面的反代片段把请求转发到 `127.0.0.1:8000`。
@@ -133,6 +190,7 @@ location = /healthz      { proxy_pass http://127.0.0.1:8000; }
 ### 自检（本地也能跑，无需 Postgres）
 ```bash
 python backend/tests/check_admin_mount.py     # 断言：/docs、全部评价/管理端路由、/admin、/healthz、旧接口、种子数据、/app
+python backend/tests/check_admin_i18n.py      # 断言：管理后台多语言（语言包注册、切换器、cookie、EN/RU/ZH 页面文案）
 python backend/tests/smoke_test.py            # 原有业务冒烟（匿名性/一人一评/登录门禁）
 ```
 
@@ -142,5 +200,19 @@ curl -s https://1losion.me/healthz            # 期望 {"status":"ok","db_ready"
 curl -s https://1losion.me/openapi.json | grep -c '/api/v1/reviews'
 ```
 浏览器打开 `https://1losion.me/docs`（应能看到 professors / courses / reviews / admin / super-admin / reports 分组）
-与 `https://1losion.me/admin`（账号 `SUPER_ADMIN_USERNAME`、密码 `SUPER_ADMIN_PASSWORD`，默认 `admin@1losion.me` / `admin123456`）。
+与 `https://1losion.me/admin`（账号密码见下）。
+
+> **管理后台登录凭据（实测确认）**
+>
+> | 部署方式 | 用户名 | 密码 |
+> |---|---|---|
+> | **未配置 `.env`**（服务器当前状态） | `superadmin@student.kaznu.kz` | `123456` |
+> | 配置了仓库根 `.env` 里的 `SUPER_ADMIN_PASSWORD` | `SUPER_ADMIN_USERNAME` | `SUPER_ADMIN_PASSWORD` |
+>
+> 规则：`SUPER_ADMIN_USERNAME` 默认 `superadmin@student.kaznu.kz`；`SUPER_ADMIN_PASSWORD` 默认为**空**，
+> 为空时**复用 `DEMO_PASSWORD`**（默认 `123456`）—— 见 `backend/app/config.py` 与 `backend/app/admin_ui.py:48`。
+> 密码是**全局唯一**的（直接与环境变量明文比对，不按用户存哈希），所有 `role ∈ {admin, super_admin}` 的用户共用它。
+>
+> ⚠️ `123456` 同时是学生端 demo 密码，**生产环境务必在 `.env` 里改掉**
+> （`SUPER_ADMIN_PASSWORD` + `DEMO_PASSWORD` + `ADMIN_SESSION_SECRET`）。
 
