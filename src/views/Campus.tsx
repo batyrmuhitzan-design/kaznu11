@@ -33,6 +33,8 @@ import {
   togglePostLike,
   type NewPostInput,
 } from "../services/CampusService";
+import { startConversation, type Conversation } from "../services/ChatService";
+import { MAX_UPLOAD_FILES, uploadImages } from "../services/UploadService";
 import { hapticTap, motorHaptic } from "../utils/haptics";
 import { useKeyboardOpen } from "../utils/keyboard";
 
@@ -143,7 +145,17 @@ function EmptyState({ icon, title, hint }: { icon: string; title: string; hint: 
 // 主视图
 // =====================================================================
 
-export default function CampusView() {
+export default function CampusView({
+  focusPostId = null,
+  onFocusHandled,
+  onOpenConversation,
+}: {
+  /** 从通知 / 推送点进来的帖子 id（App 传入），Feed 加载完成后自动打开该帖 */
+  focusPostId?: string | null;
+  onFocusHandled?: () => void;
+  /** 点「私信」后把会话交给 App 打开（Campus 自己不持有私信路由） */
+  onOpenConversation?: (conversation: Conversation) => void;
+}) {
   const t = useI18n();
   const toast = useToast();
 
@@ -180,6 +192,36 @@ export default function CampusView() {
   useEffect(() => {
     void refresh(category);
   }, [category, refresh]);
+
+  // 从通知 / 推送点进来的帖子：Feed 加载完成后自动打开（live / demo 数据都适用）
+  useEffect(() => {
+    if (!focusPostId || loading) return;
+    const target = posts.find((p) => p.id === focusPostId);
+    if (target) setOpenPost(target);
+    // 告诉 App 标记已消费，避免切回 Campus 又弹一次
+    onFocusHandled?.();
+  }, [focusPostId, loading, posts, onFocusHandled]);
+
+  /**
+   * 「私信」某位帖主。
+   *
+   * 只对**实名帖**可用：匿名帖后端不会返回作者 id（返回了就等于匿名作废），
+   * 所以这里拿不到 id 就直接提示，不静默失败。
+   */
+  const handleMessageAuthor = async (post: CampusPost) => {
+    const peerId = post.author.id ?? undefined;
+    if (!peerId) {
+      toast.push(t("dmFailed"), "error");
+      return;
+    }
+    const conversation = await startConversation({ peerId });
+    if (!conversation) {
+      toast.push(t("dmFailed"), "error");
+      return;
+    }
+    motorHaptic();
+    onOpenConversation?.(conversation);
+  };
 
   const patchPost = useCallback((updated: CampusPost) => {
     setPosts((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
@@ -233,6 +275,7 @@ export default function CampusView() {
           onBack={() => setOpenPost(null)}
           onLike={() => void handleLike(openPost)}
           onCommentCountChange={(count) => handleCommentCount(openPost.id, count)}
+          onMessage={() => void handleMessageAuthor(openPost)}
         />
       </div>
     );
@@ -318,7 +361,13 @@ export default function CampusView() {
               <EmptyState icon="🧱" title={t("noPosts")} hint={t("noPostsHint")} />
             ) : (
               posts.map((p) => (
-                <PostCard key={p.id} post={p} onOpen={() => setOpenPost(p)} onLike={() => void handleLike(p)} />
+                <PostCard
+                  key={p.id}
+                  post={p}
+                  onOpen={() => setOpenPost(p)}
+                  onLike={() => void handleLike(p)}
+                  onMessage={() => void handleMessageAuthor(p)}
+                />
               ))
             )}
           </div>
@@ -448,14 +497,17 @@ function PostCard({
   post,
   onOpen,
   onLike,
+  onMessage,
 }: {
   post: CampusPost;
   onOpen: () => void;
   onLike: () => void;
+  /** 「私信作者」——仅实名帖会显示（匿名帖后端不返回作者 id） */
+  onMessage: () => void;
 }) {
   const t = useI18n();
   return (
-    <div className="glass squircle-lg p-4">
+    <div className={`glass squircle-lg p-4${post.is_official ? " post-card-official" : ""}`}>
       <div className="flex items-center gap-2.5">
         <span
           className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0"
@@ -480,9 +532,13 @@ function PostCard({
             {timeAgo(post.created_at)}
           </p>
         </div>
-        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0" style={{ background: "rgba(255,255,255,0.07)", color: "rgba(235,235,245,0.65)" }}>
-          {categoryEmoji(post.category)} {t(CATEGORY_KEY[post.category])}
-        </span>
+        {post.is_official ? (
+          <span className="official-badge shrink-0">📢 {t("officialBadge")}</span>
+        ) : (
+          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0" style={{ background: "rgba(255,255,255,0.07)", color: "rgba(235,235,245,0.65)" }}>
+            {categoryEmoji(post.category)} {t(CATEGORY_KEY[post.category])}
+          </span>
+        )}
       </div>
 
       <button type="button" onClick={onOpen} className="block w-full text-left mt-2.5">
@@ -511,6 +567,18 @@ function PostCard({
           <span>💬</span>
           {post.comment_count}
         </button>
+        {/* 实名帖才有作者 id → 才能私信（匿名帖这个按钮不出现） */}
+        {!post.is_anonymous && post.author.id && (
+          <button
+            type="button"
+            onClick={onMessage}
+            className="haptic-action ml-auto flex items-center gap-1.5 text-xs font-bold"
+            style={{ color: "#409CFF" }}
+          >
+            <span>✉️</span>
+            {t("dmAuthor")}
+          </button>
+        )}
       </div>
     </div>
   );
@@ -525,12 +593,16 @@ function Composer({
   onSubmit: (input: NewPostInput) => Promise<void>;
 }) {
   const t = useI18n();
+  const toast = useToast();
   const kbOpen = useKeyboardOpen();
   const contentRef = useRef<HTMLTextAreaElement>(null);
+  const photoRef = useRef<HTMLInputElement>(null);
   const [content, setContent] = useState("");
   const [category, setCategory] = useState<PostCategory>("general");
   const [asAnonymous, setAsAnonymous] = useState(true);
-  const [mediaText, setMediaText] = useState("");
+  /** 已上传成功的图片 URL（本地相册 → canvas 压缩 → POST /uploads/image） */
+  const [mediaUrls, setMediaUrls] = useState<string[]>([]);
+  const [uploading, setUploading] = useState(false);
   const [sending, setSending] = useState(false);
 
   // 键盘弹出后把正文框滚进可视区：iOS 只会把聚焦元素"顶到一半"，
@@ -539,12 +611,20 @@ function Composer({
     if (kbOpen) contentRef.current?.scrollIntoView({ block: "center", behavior: "smooth" });
   }, [kbOpen]);
 
-  const mediaUrls = mediaText
-    .split("\n")
-    .map((line) => line.trim())
-    .filter((line) => /^https?:\/\//i.test(line))
-    .slice(0, 6);
-  const canSubmit = content.trim().length > 0 && !sending;
+  const canSubmit = content.trim().length > 0 && !sending && !uploading;
+
+  /**
+   * 相册选图：压缩 → 上传 → 拿到可渲染 URL。
+   * 上传失败的只提示，用户仍可只发文字（不能让一张超限的图把整条帖子卡死）。
+   */
+  const pickPhotos = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    setUploading(true);
+    const { images, failed } = await uploadImages(Array.from(files));
+    setMediaUrls((prev) => [...prev, ...images.map((img) => img.url)].slice(0, MAX_UPLOAD_FILES));
+    setUploading(false);
+    if (failed.length) toast.push(`${failed.length} ${t("uploadFailed")}`, "error");
+  };
 
   const submit = async () => {
     if (!canSubmit) return;
@@ -641,20 +721,53 @@ function Composer({
           </span>
         </button>
 
+        {/* 相册选图（自动压缩后上传，最多 6 张）——取代了原来"手贴图片链接"的输入框 */}
         <div className="glass squircle-lg p-4">
           <p className="text-[10px] font-bold uppercase tracking-wider mb-2" style={{ color: "rgba(235,235,245,0.5)" }}>
-            {t("mediaLinks")}
+            {t("addPhotos")}
           </p>
-          <textarea
-            value={mediaText}
-            onChange={(e) => setMediaText(e.target.value)}
-            rows={3}
-            placeholder="https://…"
-            className="w-full bg-transparent outline-none text-xs text-white placeholder:text-xs resize-none"
-            style={{ fontFamily: "JetBrains Mono" }}
+          <input
+            ref={photoRef}
+            type="file"
+            accept="image/*"
+            multiple
+            className="hidden"
+            onChange={(e) => {
+              void pickPhotos(e.target.files);
+              e.target.value = "";
+            }}
           />
-          <p className="text-[10px] mt-1" style={{ color: "rgba(235,235,245,0.4)" }}>
-            {t("mediaLinksHint")}
+          <div className="flex flex-wrap gap-2">
+            {mediaUrls.map((url) => (
+              <span key={url} className="photo-thumb">
+                <img src={url} alt="" />
+                <button
+                  type="button"
+                  aria-label={t("removePhoto")}
+                  className="haptic-action photo-thumb-remove"
+                  onClick={() => setMediaUrls((prev) => prev.filter((item) => item !== url))}
+                >
+                  ✕
+                </button>
+              </span>
+            ))}
+            {mediaUrls.length < MAX_UPLOAD_FILES && (
+              <button
+                type="button"
+                aria-label={t("addPhotos")}
+                onClick={() => {
+                  hapticTap();
+                  photoRef.current?.click();
+                }}
+                className="haptic-action photo-thumb flex items-center justify-center text-2xl"
+                style={{ color: "rgba(235,235,245,0.55)" }}
+              >
+                {uploading ? "…" : "+"}
+              </button>
+            )}
+          </div>
+          <p className="text-[10px] mt-2" style={{ color: "rgba(235,235,245,0.4)" }}>
+            {uploading ? t("uploading") : t("uploadHint")}
           </p>
         </div>
       </div>
@@ -668,11 +781,13 @@ function PostDetail({
   onBack,
   onLike,
   onCommentCountChange,
+  onMessage,
 }: {
   post: CampusPost;
   onBack: () => void;
   onLike: () => void;
   onCommentCountChange: (count: number) => void;
+  onMessage: () => void;
 }) {
   const t = useI18n();
   const toast = useToast();
@@ -729,7 +844,7 @@ function PostDetail({
             {t("back")}
           </button>
           <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: "rgba(255,255,255,0.07)", color: "rgba(235,235,245,0.65)" }}>
-            {categoryEmoji(post.category)} {t(CATEGORY_KEY[post.category])}
+            {post.is_official ? `📢 ${t("officialBadge")}` : `${categoryEmoji(post.category)} ${t(CATEGORY_KEY[post.category])}`}
           </span>
         </div>
       </div>
@@ -753,6 +868,18 @@ function PostDetail({
                 {timeAgo(post.created_at)}
               </p>
             </div>
+            {/* 实名帖：直接私信帖主（匿名帖没有 author.id，不显示） */}
+            {!post.is_anonymous && post.author.id && (
+              <button
+                type="button"
+                onClick={onMessage}
+                className="haptic-action ml-auto shrink-0 flex items-center gap-1.5 text-xs font-bold"
+                style={{ color: "#409CFF" }}
+              >
+                <span>✉️</span>
+                {t("dmAuthor")}
+              </button>
+            )}
           </div>
           <p className="text-sm leading-relaxed whitespace-pre-line mt-3" style={{ color: "rgba(235,235,245,0.92)" }}>
             {post.content}

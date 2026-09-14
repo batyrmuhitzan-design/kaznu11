@@ -18,6 +18,17 @@ type ExtendedTranslationKey =
   | "spots" | "present" | "noClasses" | "syncing" | "mon" | "tue" | "wed" | "thu" | "fri" | "sat"
   | "library" | "dorm" | "unicard" | "scholarship" | "cafeteria" | "medical" | "electricity" | "water" | "internet" | "on" | "off";
 type NewsTranslationKey = "news" | "published" | "loadingNews" | "live" | "latestNews" | "viewAll" | "newsNotifications" | "muted" | "markAllRead" | "newMessages";
+/** 私信 / 通知中心 / 图片上传 / 官方徽章（本轮补齐的社交功能） */
+type ChatTranslationKey =
+  | "messages" | "chatPlaceholder" | "chatSearch" | "chatEmpty" | "chatEmptyHint" | "chatNoMessageYet"
+  | "chatTyping" | "chatSayHi" | "chatSayHiHint" | "chatSending" | "chatDelivered" | "chatRead"
+  | "chatWillRetry" | "chatQueued" | "chatQueuedHint" | "chatUnreadShort" | "chatAllRead"
+  | "chatConnecting" | "chatOffline" | "chatAuthExpired"
+  | "addPhotos" | "removePhoto" | "uploading" | "uploadFailed" | "uploadHint"
+  | "official" | "officialBadge" | "dmAuthor" | "dmSelf" | "dmFailed"
+  | "notifCenter" | "notifEmpty" | "notifEmptyHint" | "notifAllReadDone"
+  | "notifLike" | "notifComment" | "notifMessage" | "notifOfficial" | "notifSystem"
+  | "broadcastLabel" | "latestAnnouncement" | "fromOfficial";
 type ExtraTranslationKey =
   | "noMoreToday" | "degreePlan" | "targetStandard" | "justGraduate" | "magna" | "summa"
   | "futureAvg" | "ectsLeft" | "degreeProgress" | "avgPerSem" | "reachable" | "needsPerfect"
@@ -40,7 +51,7 @@ type ExtraTranslationKey =
   | "organizer" | "where" | "when" | "rsvp"
   | "noPosts" | "noPostsHint" | "noEvents" | "noEventsHint"
   | "offlineDemo" | "notSynced" | "postPublished" | "commentPosted" | "campusLoadFailed";
-export type AllTranslationKey = TranslationKey | ExtendedTranslationKey | NewsTranslationKey | ExtraTranslationKey;
+export type AllTranslationKey = TranslationKey | ExtendedTranslationKey | NewsTranslationKey | ExtraTranslationKey | ChatTranslationKey;
 
 interface LanguageContextType {
   language: Language;
@@ -77,7 +88,7 @@ const TRANSLATIONS: Record<Language, Record<string, string>> = {
   },
 };
 
-const ADDITIONAL_TRANSLATIONS: Record<Language, Record<ExtraTranslationKey, string>> = {
+const ADDITIONAL_TRANSLATIONS: Record<Language, Record<string, string>> = {
   EN: {
     // ---- Campus Hub ----
     campus: "Campus", campusWall: "Wall", campusEvents: "Clubs & Events",
@@ -88,6 +99,25 @@ const ADDITIONAL_TRANSLATIONS: Record<Language, Record<ExtraTranslationKey, stri
     organizer: "Organizer", where: "Location", when: "Time", rsvp: "RSVP / Register",
     noPosts: "Nothing on the wall yet", noPostsHint: "Be the first to post!", noEvents: "No upcoming events", noEventsHint: "Club events show up here once approved.",
     offlineDemo: "Offline demo data", notSynced: "Not synced", postPublished: "Posted to the campus wall", commentPosted: "Comment added", campusLoadFailed: "Couldn't reach the server",
+    // ---- 私信 / 通知中心 / 图片上传（EN）----
+    messages: "Messages", chatPlaceholder: "Message…", chatSearch: "Search people",
+    chatEmpty: "No conversations yet", chatEmptyHint: "Tap “Message” on a campus post to start chatting.",
+    chatNoMessageYet: "No messages yet", chatTyping: "typing…",
+    chatSayHi: "Say hi 👋", chatSayHiHint: "This is the start of your conversation.",
+    chatSending: "Sending…", chatDelivered: "Delivered", chatRead: "Read",
+    chatWillRetry: "Will send when online", chatQueued: "Offline — will send automatically",
+    chatQueuedHint: "message(s) waiting to send", chatUnreadShort: "unread", chatAllRead: "All read",
+    chatConnecting: "Connecting", chatOffline: "Offline", chatAuthExpired: "Session expired",
+    addPhotos: "Add photos", removePhoto: "Remove", uploading: "Uploading photos…",
+    uploadFailed: "photo(s) failed to upload", uploadHint: "Pick from your library — compressed automatically (max 6)",
+    official: "Official", officialBadge: "Official announcement",
+    dmAuthor: "Message", dmSelf: "This is you", dmFailed: "Couldn't open the chat",
+    notifCenter: "Notifications", notifEmpty: "Nothing here yet",
+    notifEmptyHint: "Likes, comments, messages and official posts land here.",
+    notifAllReadDone: "All marked as read",
+    notifLike: "liked your post", notifComment: "commented on your post", notifMessage: "sent you a message",
+    notifOfficial: "official announcement", notifSystem: "KazNU Helper",
+    broadcastLabel: "Campus-wide", latestAnnouncement: "Latest announcement", fromOfficial: "KazNU Official",
     noMoreToday: "No more classes today 🎉", degreePlan: "Graduation Plan", targetStandard: "Target",
     justGraduate: "Just Graduate", magna: "Magna Cum Laude", summa: "Summa Cum Laude",
     futureAvg: "avg GPA needed in remaining semesters", ectsLeft: "ECTS left", degreeProgress: "Degree progress",
@@ -127,6 +157,25 @@ const ADDITIONAL_TRANSLATIONS: Record<Language, Record<ExtraTranslationKey, stri
     organizer: "Ұйымдастырушы", where: "Орын", when: "Уақыты", rsvp: "Тіркелу",
     noPosts: "Ағымда әзірге ештеңе жоқ", noPostsHint: "Бірінші болып жазыңыз!", noEvents: "Алдағы іс-шара жоқ", noEventsHint: "Клуб іс-шаралары мақұлданған соң көрінеді.",
     offlineDemo: "Офлайн демо деректер", notSynced: "Синхрондалмаған", postPublished: "Ағымға жарияланды", commentPosted: "Пікір қосылды", campusLoadFailed: "Серверге қосылу мүмкін болмады",
+    // ---- 私信 / 通知中心 / 图片上传（KZ）----
+    messages: "Хабарламалар", chatPlaceholder: "Хабарлама жазыңыз…", chatSearch: "Адам іздеу",
+    chatEmpty: "Әзірге сөйлесу жоқ", chatEmptyHint: "Кампус жазбасындағы «Хабарласу» түймесін басыңыз.",
+    chatNoMessageYet: "Хабарлама жоқ", chatTyping: "жазып жатыр…",
+    chatSayHi: "Сәлемдесіңіз 👋", chatSayHiHint: "Бұл сөйлесудің басы.",
+    chatSending: "Жіберілуде…", chatDelivered: "Жеткізілді", chatRead: "Оқылды",
+    chatWillRetry: "Желі қосылғанда жіберіледі", chatQueued: "Офлайн — автоматты жіберіледі",
+    chatQueuedHint: "хабарлама кезекте", chatUnreadShort: "оқылмаған", chatAllRead: "Барлығы оқылды",
+    chatConnecting: "Қосылуда", chatOffline: "Офлайн", chatAuthExpired: "Сессия бітті",
+    addPhotos: "Сурет қосу", removePhoto: "Жою", uploading: "Суреттер жүктелуде…",
+    uploadFailed: "сурет жүктелмеді", uploadHint: "Галереядан таңдаңыз — автоматты сығылады (макс 6)",
+    official: "Ресми", officialBadge: "Ресми хабарлама",
+    dmAuthor: "Хабарласу", dmSelf: "Бұл сіз", dmFailed: "Чатты ашу мүмкін болмады",
+    notifCenter: "Хабарландырулар", notifEmpty: "Әзірге бос",
+    notifEmptyHint: "Лайк, пікір, хабарлама және ресми жарияланымдар осында.",
+    notifAllReadDone: "Барлығы оқылды деп белгіленді",
+    notifLike: "жазбаңызды ұнатты", notifComment: "жазбаңызға пікір қалдырды", notifMessage: "сізге хабарлама жіберді",
+    notifOfficial: "ресми хабарлама", notifSystem: "KazNU Helper",
+    broadcastLabel: "Жалпы кампус", latestAnnouncement: "Соңғы хабарлама", fromOfficial: "KazNU ресми",
   },
   RU: {
     noMoreToday: "На сегодня занятий больше нет 🎉", degreePlan: "План до диплома", targetStandard: "Цель",
@@ -152,6 +201,25 @@ const ADDITIONAL_TRANSLATIONS: Record<Language, Record<ExtraTranslationKey, stri
     organizer: "Организатор", where: "Место", when: "Время", rsvp: "Записаться",
     noPosts: "На стене пока ничего нет", noPostsHint: "Будьте первым!", noEvents: "Нет предстоящих событий", noEventsHint: "События клубов появятся после одобрения.",
     offlineDemo: "Офлайн демо-данные", notSynced: "Не синхронизировано", postPublished: "Опубликовано на стене", commentPosted: "Комментарий добавлен", campusLoadFailed: "Не удалось связаться с сервером",
+    // ---- 私信 / 通知中心 / 图片上传（RU）----
+    messages: "Сообщения", chatPlaceholder: "Сообщение…", chatSearch: "Поиск людей",
+    chatEmpty: "Пока нет диалогов", chatEmptyHint: "Нажмите «Написать» на записи в кампусе.",
+    chatNoMessageYet: "Сообщений нет", chatTyping: "печатает…",
+    chatSayHi: "Поздоровайтесь 👋", chatSayHiHint: "Это начало вашего диалога.",
+    chatSending: "Отправка…", chatDelivered: "Доставлено", chatRead: "Прочитано",
+    chatWillRetry: "Отправится при подключении", chatQueued: "Офлайн — отправится автоматически",
+    chatQueuedHint: "сообщений в очереди", chatUnreadShort: "непрочитанных", chatAllRead: "Всё прочитано",
+    chatConnecting: "Подключение", chatOffline: "Офлайн", chatAuthExpired: "Сессия истекла",
+    addPhotos: "Добавить фото", removePhoto: "Удалить", uploading: "Загрузка фото…",
+    uploadFailed: "фото не загрузилось", uploadHint: "Выберите из галереи — сжатие автоматически (макс. 6)",
+    official: "Официально", officialBadge: "Официальное объявление",
+    dmAuthor: "Написать", dmSelf: "Это вы", dmFailed: "Не удалось открыть чат",
+    notifCenter: "Уведомления", notifEmpty: "Здесь пока пусто",
+    notifEmptyHint: "Лайки, комментарии, сообщения и официальные объявления появятся здесь.",
+    notifAllReadDone: "Все отмечены прочитанными",
+    notifLike: "лайкнул(а) вашу запись", notifComment: "прокомментировал(а) вашу запись", notifMessage: "отправил(а) вам сообщение",
+    notifOfficial: "официальное объявление", notifSystem: "KazNU Helper",
+    broadcastLabel: "Общекампусное", latestAnnouncement: "Последнее объявление", fromOfficial: "Официально от KazNU",
   },
 };
 
@@ -171,8 +239,9 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
     window.localStorage.setItem("language", nextLanguage);
   }
 
-  const t = (key: TranslationKey | ExtendedTranslationKey | NewsTranslationKey | ExtraTranslationKey) =>
-    ADDITIONAL_TRANSLATIONS[language][key as ExtraTranslationKey] ?? TRANSLATIONS[language][key];
+  const t = (
+    key: TranslationKey | ExtendedTranslationKey | NewsTranslationKey | ExtraTranslationKey | ChatTranslationKey,
+  ) => ADDITIONAL_TRANSLATIONS[language][key] ?? TRANSLATIONS[language][key];
   return <LanguageContext.Provider value={{ language, setLanguage, t }}>{children}</LanguageContext.Provider>;
 }
 

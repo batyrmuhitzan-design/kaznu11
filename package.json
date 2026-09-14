@@ -8,6 +8,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "format": "oxfmt",
+    "verify:social": "node scripts/verify-chat-ui.cjs",
     "postinstall": "node scripts/patch-capacitor-system-sound.cjs"
   },
   "dependencies": {

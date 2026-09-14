@@ -239,13 +239,16 @@ class Page(BaseModel, Generic[T]):
 class PostAuthorOut(BaseModel):
     """帖子 / 评论的作者信息。
 
-    匿名时 ``name`` 必须为 ``None`` —— 后端不会把匿名作者的显示名发出去，
-    只给校友看的 ``department_tag``（与评价体系一致）。
+    匿名时 ``name`` / ``department_tag`` / ``id`` **都必须为 None** —— 后端不会把匿名作者
+    的任何身份信息发出去（``id`` 也一样：带着它就能反查用户，等于把匿名废掉）。
+    实名时额外返回 ``id``，供前端"私信作者"入口调用 ``POST /chat/conversations``（peer_id）。
     """
 
     is_anonymous: bool
     name: str | None = None
     department_tag: str | None = None
+    #: 用户 id —— **仅实名帖返回**（匿名帖恒为 None）
+    id: str | None = None
 
 
 class PostIn(BaseModel):

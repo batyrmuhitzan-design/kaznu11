@@ -2,6 +2,8 @@ import { useState } from "react";
 import ThemeSwitcher from "../components/ThemeSwitcher";
 import { useLanguage, useI18n, type Language } from "../contexts/LanguageContext";
 import { clearSession } from "../utils/session";
+import { unregisterNotificationDevice } from "../services/PushRegistrationService";
+import { closeChatSocket } from "../services/ChatService";
 import { loadCommunityAccount, saveCommunityAccount } from "../services/ProfReviewsService";
 import { tr } from "../utils/locale";
 import { applyCourseAlertsPreference } from "../services/CourseReminderService";
@@ -185,8 +187,17 @@ function Settings({ onBack }: { onBack: () => void }) {
           onClick={() => {
             // 先整屏淡出成底色，再清会话并回到登录页
             screenFadeOut(undefined, () => {
-              clearSession();
-              window.location.reload();
+              void (async () => {
+                // 注销推送设备：否则退出登录后这台手机还会继续收到上一个账号的通知。
+                // 网络慢时用 1.5s 兜底，不能让用户卡在退出页等。
+                await Promise.race([
+                  unregisterNotificationDevice(),
+                  new Promise((resolve) => window.setTimeout(resolve, 1500)),
+                ]).catch(() => undefined);
+                closeChatSocket();
+                clearSession();
+                window.location.reload();
+              })();
             });
           }}
           className="haptic-action w-full py-3.5 squircle-md text-sm font-bold"

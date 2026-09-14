@@ -9,7 +9,23 @@ import Profile from "./views/Profile";
 import ProfReviews, { type RmpDeepLink } from "./views/ProfReviews";
 import { useI18n } from "./contexts/LanguageContext";
 import News, { NewsDetail, type NewsItem } from "./views/News";
-import Notifications from "./views/Notifications";
+import NotificationCenter from "./views/NotificationCenter";
+import ChatList, { ChatDetail } from "./views/Chat";
+import {
+  attachChatRealtime,
+  listConversations,
+  subscribeChatEvents,
+  type Conversation,
+} from "./services/ChatService";
+import {
+  fetchNotificationUnread,
+  handleRealtimeNotificationEvent,
+  notifyRealtimeChange,
+  subscribeBanner,
+  type InAppBanner,
+} from "./services/NotificationService";
+import { attachPushRegistration } from "./services/PushRegistrationService";
+import { applyPushRoute, attachPushRouteListener, consumePushRoute, readNativePushRoute } from "./services/PushRouteService";
 import { isSessionValid, touchSession } from "./utils/session";
 import LoginScreen from "./views/LoginScreen";
 import { useTheme } from "./contexts/ThemeContext";
@@ -83,6 +99,13 @@ export default function App() {
   const [activeTab, setActiveTab] = useState("dashboard");
   const [authed, setAuthed] = useState(() => isSessionValid());
   const [selectedNews, setSelectedNews] = useState<NewsItem | null>(null);
+  /** 私信：正在打开的会话（null = 显示会话列表）。进入详情前的 Tab 由 chatsReturnRef 记住 */
+  const [openConversation, setOpenConversation] = useState<Conversation | null>(null);
+  const chatsReturnRef = useRef("dashboard");
+  /** 全局应用内 Banner（全校广播 / 新通知），任意 Tab 都可见 */
+  const [banner, setBanner] = useState<InAppBanner | null>(null);
+  /** 从通知点进来的帖子 id：Campus 加载完 Feed 后自动打开该帖 */
+  const [campusFocusPostId, setCampusFocusPostId] = useState<string | null>(null);
   const { resolvedTheme } = useTheme();
   const t = useI18n();
   const tabLabels = { dashboard: t("home"), news: t("news"), campus: t("campus"), schedule: t("schedule"), services: t("services") };
@@ -145,6 +168,82 @@ export default function App() {
     if (!authed) return;
     return attachLiveActivityPushSync();
   }, [authed]);
+
+  // ===================================================================
+  // 社交模块（本轮补齐）：私信实时通道 / 推送设备注册 / 事件桥 / 点击路由
+  // ===================================================================
+
+  // 私信实时通道：登录后建连（断线自动重连、回前台补未读、离线消息自动补发）
+  useEffect(() => {
+    if (!authed) return;
+    return attachChatRealtime();
+  }, [authed]);
+
+  // 普通通知的设备注册：把 APNs device token 上报后端（topic 与 Live Activity 分开）
+  useEffect(() => {
+    if (!authed) return;
+    return attachPushRegistration();
+  }, [authed]);
+
+  // 全局 WebSocket 事件桥：同一条连接同时喂"私信"与"通知"两个模块。
+  // 通知帧 → NotificationService（红点 +1 + 应用内 Banner）；私信帧 → 让会话列表重取。
+  useEffect(() => {
+    if (!authed) return;
+    void fetchNotificationUnread();
+    return subscribeChatEvents((event) => {
+      if (handleRealtimeNotificationEvent(event)) return;
+      if (event.type === "message" || event.type === "read" || event.type === "read-ack") {
+        notifyRealtimeChange();
+      }
+    });
+  }, [authed]);
+
+  // 应用内 Banner：订阅 + 6 秒后自动收起（用户点 × 走 dismissBanner）
+  useEffect(() => subscribeBanner(setBanner), []);
+  useEffect(() => {
+    if (!banner) return;
+    const timer = window.setTimeout(() => setBanner(null), 6000);
+    return () => window.clearTimeout(timer);
+  }, [banner]);
+
+  // 用会话 id 打开私信：推送点击只带 id，对端信息要从会话列表里取
+  const openConversationById = useCallback(async (conversationId: string) => {
+    const page = await listConversations(50, 0);
+    const found = page?.items.find((item) => item.id === conversationId);
+    if (found) setOpenConversation(found);
+  }, []);
+
+  const activeTabRef = useRef(activeTab);
+  activeTabRef.current = activeTab;
+
+  /** 推送 / 通知点击 → 页内路由（切 Tab，私信还会直接打开对应会话） */
+  const routePush = useCallback(
+    (route: string, routeId: string | null) => {
+      const target = applyPushRoute(route, routeId);
+      if (!target) return;
+      if (target.tab === "chat") {
+        chatsReturnRef.current =
+          activeTabRef.current === "chat" ? chatsReturnRef.current : activeTabRef.current;
+        setOpenConversation(null);
+        setActiveTab("chat");
+        if (target.id) void openConversationById(target.id);
+        return;
+      }
+      if (target.tab === "campus" && target.id) setCampusFocusPostId(target.id);
+      setActiveTab(target.tab);
+    },
+    [openConversationById],
+  );
+
+  // 启动时消费"App 没运行时点的那条推送"；运行中由原生事件实时触发
+  useEffect(() => {
+    const pending = consumePushRoute();
+    if (pending) routePush(pending.route, pending.routeId);
+    void readNativePushRoute().then((route) => {
+      if (route) routePush(route.route, route.routeId);
+    });
+  }, [routePush]);
+  useEffect(() => attachPushRouteListener((route) => routePush(route.route, route.routeId)), [routePush]);
   // 点击 T-60 通知或“开启灵动岛”按钮 → 立即启动 Live Activity
   useEffect(() => {
     enableClassReminderNotificationActions();
@@ -195,11 +294,37 @@ export default function App() {
       {/* Main Content */}
       <div className="flex-1 overflow-hidden relative">
         {activeTab === "dashboard" && (
-          <Dashboard onOpenProfile={() => setActiveTab("profile")} onNavigate={setActiveTab} onOpenReviews={openReviews} />
+          <Dashboard
+            onOpenProfile={() => setActiveTab("profile")}
+            onNavigate={setActiveTab}
+            onOpenReviews={openReviews}
+            onOpenChat={() => {
+              chatsReturnRef.current = "dashboard";
+              setOpenConversation(null);
+              setActiveTab("chat");
+            }}
+          />
         )}
         {activeTab === "notifications" && (
           <SwipeBack onBack={() => setActiveTab("dashboard")}>
-            <Notifications onBack={() => setActiveTab("dashboard")} onNavigate={setActiveTab} />
+            <NotificationCenter
+              onBack={() => setActiveTab("dashboard")}
+              onOpenRoute={(route, routeId) => routePush(route, routeId)}
+            />
+          </SwipeBack>
+        )}
+        {/* 私信：列表 ↔ 会话详情都由本层路由（从通知/推送点进来也能直达具体会话） */}
+        {activeTab === "chat" && !openConversation && (
+          <SwipeBack onBack={() => setActiveTab(chatsReturnRef.current)}>
+            <ChatList
+              onBack={() => setActiveTab(chatsReturnRef.current)}
+              onOpenConversation={(conversation) => setOpenConversation(conversation)}
+            />
+          </SwipeBack>
+        )}
+        {activeTab === "chat" && openConversation && (
+          <SwipeBack onBack={() => setOpenConversation(null)}>
+            <ChatDetail conversation={openConversation} onBack={() => setOpenConversation(null)} />
           </SwipeBack>
         )}
         {activeTab === "grades" && (
@@ -210,7 +335,18 @@ export default function App() {
         {/* Materials 已从底部 Tab 移除，改由首页 NEXT DEADLINE 卡片进入 */}
         {activeTab === "materials" && <Materials onBack={() => setActiveTab("dashboard")} />}
         {activeTab === "schedule" && <Schedule onOpenReviews={openReviews} />}
-        {activeTab === "campus" && <Campus />}
+        {activeTab === "campus" && (
+          <Campus
+            focusPostId={campusFocusPostId}
+            onFocusHandled={() => setCampusFocusPostId(null)}
+            onOpenConversation={(conversation) => {
+              // 从帖子点「私信」→ 记住来路是 Campus，返回时回到校园墙
+              chatsReturnRef.current = "campus";
+              setOpenConversation(conversation);
+              setActiveTab("chat");
+            }}
+          />
+        )}
         {activeTab === "services" && <Services onOpenReviews={openReviews} />}
         {activeTab === "prof-reviews" && <ProfReviews onBack={() => setActiveTab(reviewsReturnRef.current)} deepLink={rmpDeepLink} />}
         {activeTab === "profile" && (
@@ -250,6 +386,33 @@ export default function App() {
           );
         })}
       </div>
+
+      {/* 应用内 Banner：全校广播 / 新通知到达时的全局浮层（任意 Tab 都可见） */}
+      {banner && (
+        <div className={`app-banner app-banner-${banner.level}`} role="status" aria-live="polite">
+          <span className="app-banner-icon">
+            {banner.level === "danger"
+              ? "🚨"
+              : banner.level === "warning"
+                ? "⚠️"
+                : banner.origin === "broadcast"
+                  ? "📣"
+                  : "🔔"}
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="app-banner-title">{banner.title}</p>
+            {banner.message && <p className="app-banner-text">{banner.message}</p>}
+          </div>
+          <button
+            type="button"
+            aria-label={t("hide")}
+            onClick={() => setBanner(null)}
+            className="app-banner-close"
+          >
+            ✕
+          </button>
+        </div>
+      )}
 
       {/* 自动更新弹窗（可选/强制）与后台状态模拟面板 */}
       <UpdateDialog

@@ -4,6 +4,8 @@ import { API_URLS } from "../utils/config";
 import { Capacitor } from "@capacitor/core";
 import { buildLiveActivityPayload, syncLiveActivity, type LiveActivityKind } from "../native/liveActivity";
 import { postClassReminderBannerNow } from "../native/notifications";
+import { useNotificationUnread } from "../services/NotificationService";
+import { useChatUnread } from "./Chat";
 import { motorHaptic } from "../utils/haptics";
 import { tr } from "../utils/locale";
 import { playAlarmSound } from "../utils/alarm";
@@ -410,9 +412,11 @@ function GpaCard({ onNavigate }: { onNavigate: (tab: string) => void }) {
   );
 }
 
-export default function Dashboard({ onOpenProfile, onNavigate, onOpenReviews }: { onOpenProfile: () => void; onNavigate: (tab: string) => void; onOpenReviews?: (professorName?: string, courseName?: string) => void }) {
+export default function Dashboard({ onOpenProfile, onNavigate, onOpenReviews, onOpenChat }: { onOpenProfile: () => void; onNavigate: (tab: string) => void; onOpenReviews?: (professorName?: string, courseName?: string) => void; onOpenChat: () => void }) {
   const [pressed, setPressed] = useState<string | null>(null);
-  const [unreadNotifications, setUnreadNotifications] = useState(() => Math.max(0, 3 - (JSON.parse(localStorage.getItem("readNotificationIds") || "[]") as string[]).length));
+  const unreadNotifications = useNotificationUnread();
+  /** 私信未读（与私信列表共用同一个 store，红点永远一致） */
+  const unreadMessages = useChatUnread();
   const t = useI18n();
   const realNow = useNow(1000);
   const now = realNow;
@@ -573,6 +577,24 @@ export default function Dashboard({ onOpenProfile, onNavigate, onOpenReviews }: 
             </h1>
           </div>
           <div className="relative flex items-center gap-2.5">
+            {/* 私信入口：红点来自 WebSocket 实时未读数（与私信列表同源） */}
+            <button
+              type="button"
+              aria-label={t("messages")}
+              title={t("messages")}
+              onClick={() => onOpenChat()}
+              data-haptic="light"
+              className="haptic-action icon-button relative"
+            >
+              <div className="w-8 h-8 flex items-center justify-center" style={{ color: "rgba(235,235,245,0.6)" }}>
+                <svg viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6">
+                  <path d="M12 3C6.99 3 3 6.36 3 10.5c0 2.16 1.05 4.1 2.73 5.44-.16 1.05-.66 2.06-1.5 2.9a.6.6 0 0 0 .5 1.02c1.9-.14 3.4-.8 4.44-1.44.9.22 1.86.34 2.83.34 5.01 0 9-3.36 9-7.5S17.01 3 12 3Z" />
+                </svg>
+              </div>
+              {unreadMessages > 0 && (
+                <span className="badge-dot">{unreadMessages > 99 ? "99+" : unreadMessages}</span>
+              )}
+            </button>
             <button type="button" aria-label="Notifications" onClick={() => onNavigate("notifications")} className="haptic-action icon-button relative">
               <div className="w-8 h-8 flex items-center justify-center" style={{ color: "rgba(235,235,245,0.6)" }}>
                 <svg viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6">

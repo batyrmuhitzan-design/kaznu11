@@ -64,18 +64,22 @@ _LIKE_REMOVED = "Like removed."
 def _author_out(user: User | None, is_anonymous: bool) -> PostAuthorOut:
     """作者信息脱敏。
 
-    匿名帖 / 匿名评论：``name`` 与 ``department_tag`` **都不返回**。
+    匿名帖 / 匿名评论：``name``、``department_tag``、``id`` **全部不返回**。
 
     这一点与评价体系**刻意不同**：评价的公开身份就是院系标签（评分需要粗粒度上下文
     才有参考价值），而校园墙的帖子配上院系标签会显著缩小匿名范围
     （"这节课 + 这个院"往往就能定位到人），所以这里连院系标签一并隐藏。
+
+    实名帖才给 ``id`` —— 前端"私信作者"入口需要它（``peer_id``），
+    匿名帖给了 id 就等于匿名作废（能反查用户）。
     """
     if is_anonymous:
-        return PostAuthorOut(is_anonymous=True, name=None, department_tag=None)
+        return PostAuthorOut(is_anonymous=True, name=None, department_tag=None, id=None)
     return PostAuthorOut(
         is_anonymous=False,
         name=user.global_display_name if user else None,
         department_tag=user.department_tag if user else None,
+        id=user.id if user else None,
     )
 
 

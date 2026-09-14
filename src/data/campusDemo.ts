@@ -19,11 +19,14 @@ export type PostCategory =
   | "club"
   | "general";
 
-/** 作者信息：匿名帖的 name 恒为 null（后端不返回匿名作者身份）。 */
+/** 作者信息：匿名帖的 name 恒为 null（后端不返回匿名作者身份）。
+ *  ``id`` 同样是**仅实名帖**才有 —— 前端拿它做"私信作者"入口（peer_id）；匿名帖给了
+ *  id 就等于把匿名废掉，所以后端对匿名帖一律返回 null。 */
 export interface CampusAuthor {
   is_anonymous: boolean;
   name: string | null;
   department_tag: string | null;
+  id?: string | null;
 }
 
 export interface CampusPost {
