@@ -16,6 +16,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from typing import Any
@@ -467,10 +468,12 @@ class LiveActivityScheduler:
         if task is None:
             return
         task.cancel()
-        try:
+        # ⚠️ 必须把 CancelledError 一起吞掉：Python 3.8 起它继承 **BaseException**
+        #    而不是 Exception，`except Exception` 拦不住 → 会在 lifespan 关闭时冒出
+        #    "ERROR: Application shutdown failed. Exiting."（线上踩过）。
+        #    这类异常只在关停时出现，不影响业务，但会让日志变脏、systemd 看到非干净退出。
+        with contextlib.suppress(asyncio.CancelledError, Exception):
             await task
-        except Exception:
-            pass
 
     async def _loop(self) -> None:
         tick = max(15, settings.live_activity_tick_seconds)

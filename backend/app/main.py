@@ -77,7 +77,10 @@ def _make_app() -> FastAPI:
             from .live_activity_scheduler import scheduler as live_activity_scheduler
 
             await live_activity_scheduler.stop()
-        except Exception:
+        except BaseException:  # noqa: BLE001
+            # 用 BaseException 而不是 Exception：关停路径上的 CancelledError 继承
+            # BaseException，漏掉它会让 uvicorn 打 "Application shutdown failed. Exiting."
+            # 并让 systemd 看到非干净退出（scheduler.stop() 内部也已自吞，这里是双保险）。
             pass
 
     app = FastAPI(

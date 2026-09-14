@@ -455,8 +455,42 @@ async def _run() -> None:
         bad("update payload 结构错误")
 
 
+async def _check_scheduler_stop_is_clean() -> None:
+    """回归：调度器 start→stop 必须干净退出。
+
+    坑：``scheduler.stop()`` 里会 ``task.cancel()` + ``await task``，而 ``await`` 一个被取消的
+    task 会抛 ``asyncio.CancelledError`` —— 它继承 **BaseException** 而不是 Exception，
+    所以 ``except Exception`` 拦不住，会在 lifespan 关闭时冒成
+    ``ERROR: Application shutdown failed. Exiting.``（线上已踩过，见 103b6bb 那次重启）。
+    """
+    from app.live_activity_scheduler import LiveActivityScheduler
+
+    sched = LiveActivityScheduler()
+    if not sched.start():
+        bad("调度器 start() 未启动（LIVE_ACTIVITY_PUSH_ENABLED 应为 true）")
+        return
+    if not sched.running:
+        bad("start() 之后 running 应为 True")
+    await asyncio.sleep(0.1)
+    try:
+        await sched.stop()
+    except BaseException as exc:  # noqa: BLE001 - 这里就是要抓住 BaseException
+        bad(
+            "scheduler.stop() 抛异常（关停时 uvicorn 会报 shutdown failed）："
+            f"{type(exc).__name__}: {exc}"
+        )
+        return
+    if sched.running:
+        bad("stop() 之后 running 应为 False")
+        return
+    # 再 stop 一次应当是无副作用的空操作
+    await sched.stop()
+    ok("调度器 start→stop 干净退出（不冒 CancelledError），重复 stop 安全")
+
+
 def main() -> None:
     asyncio.run(_run())
+    asyncio.run(_check_scheduler_stop_is_clean())
     print("\n===== Live Activity 远程推送自检（注册 / 课表 / 调度 / payload）=====")
     print("\n".join(notes))
     if failures:
