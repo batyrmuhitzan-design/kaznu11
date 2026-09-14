@@ -119,7 +119,14 @@ function DownloadIcon({ filled }: { filled: boolean }) {
   );
 }
 
-export default function Materials() {
+/**
+ * Course Materials。
+ *
+ * ⚠️ 它已不在底部 Tab Bar 里（第 3 个 Tab 换成了 Campus Hub），
+ * 入口是首页「NEXT DEADLINE / 作业提醒」卡片 → `onNavigate("materials")`。
+ * 因此这里接一个可选的 `onBack`：从首页进来时显示返回键，避免"进去出不来"。
+ */
+export default function Materials({ onBack }: { onBack?: () => void }) {
   const t = useI18n();
   const toast = useToast();
   const [query, setQuery] = useState("");
@@ -280,6 +287,18 @@ export default function Materials() {
   return (
     <div className="app-surface h-full flex flex-col overflow-hidden">
       <div className="screen-pin px-4 pt-1 space-y-3">
+          {onBack && (
+            <button
+              type="button"
+              onClick={onBack}
+              className="haptic-action theme-secondary flex items-center gap-1 text-sm font-semibold"
+            >
+              <svg viewBox="0 0 20 20" fill="none" className="w-4 h-4">
+                <path d="m12.5 4-5 6 5 6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              {t("back")}
+            </button>
+          )}
           <div className="flex items-center justify-between">
             <div>
               <p className="text-xs font-medium" style={{ color: "rgba(235,235,245,0.5)" }}>{t("fall")} 2026</p>

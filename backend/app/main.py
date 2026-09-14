@@ -18,9 +18,9 @@ from .config import settings
 from .database import SessionLocal, init_db
 from .deps import limiter
 from .routers import admin as admin_routes
-from .routers import auth, courses, me, professors, reports as report_routes
+from .routers import auth, campus, courses, me, professors, reports as report_routes
 from .routers import reviews, super_admin
-from .seed import seed_if_empty
+from .seed import seed_campus_if_empty, seed_if_empty
 
 # SlowAPI rate limiter — optional import keeps the app runnable if the wheel
 # can't be installed on an exotic Python build (fallback = no limiting).
@@ -41,12 +41,15 @@ def _make_app() -> FastAPI:
         # 评价相关接口会在查询时报错（500），/healthz 的 db_ready 会显示 false。
         try:
             await init_db()
-            if settings.seed_on_startup:
-                async with SessionLocal() as session:
-                    await seed_if_empty(session)
-            # 保证内置超级管理员一定存在（应用首次启动时创建）
             async with SessionLocal() as session:
-                await ensure_super_admin(session)
+                if settings.seed_on_startup:
+                    await seed_if_empty(session)
+                # 保证内置超级管理员一定存在（应用首次启动时创建）
+                admin_user = await ensure_super_admin(session)
+                # Campus Hub 示例数据：需要超管作为发帖人，所以放在其后；
+                # 独立判空（不走 seed_if_empty 的教授判空），保证已上线库也会补数据
+                if settings.seed_on_startup:
+                    await seed_campus_if_empty(session, admin_user)
             _app.state.db_ready = True
         except Exception as exc:  # pragma: no cover - 取决于部署环境
             _app.state.db_ready = False
@@ -92,6 +95,8 @@ def _make_app() -> FastAPI:
     app.include_router(admin_routes.router, prefix="/api/v1")
     app.include_router(super_admin.router, prefix="/api/v1")
     app.include_router(report_routes.router, prefix="/api/v1")
+    # Campus Hub：校园墙 / 社团活动 / 全局紧急通知
+    app.include_router(campus.router, prefix="/api/v1")
 
     # Legacy endpoints the 1.3 frontend already consumes (/api/schedule etc).
     app.include_router(_legacy_router())

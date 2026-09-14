@@ -75,3 +75,25 @@ def require_staff(user: User = Depends(get_current_user)) -> User:
             detail="Staff privileges required",
         )
     return user
+
+
+async def get_optional_user(
+    authorization: str | None = Header(default=None),
+    session: AsyncSession = Depends(get_session),
+) -> User | None:
+    """可选鉴权：带了合法 token 就返回用户，否则安静地返回 None。
+
+    公开列表接口（帖子流 / 评论 / 活动）需要它来算"当前请求者是否点过赞"，
+    但又不能因为没登录就 401 —— 未登录时 ``liked`` 一律 False。
+    被 ban 的账号同样按未登录处理。
+    """
+    if not authorization or not authorization.lower().startswith("bearer "):
+        return None
+    token = authorization.split(" ", 1)[1].strip()
+    payload = decode_access_token(token)
+    if not payload or not payload.get("uid"):
+        return None
+    user = await session.scalar(select(User).where(User.id == payload["uid"]))
+    if user is None or user.is_banned:
+        return None
+    return user

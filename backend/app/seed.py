@@ -12,7 +12,16 @@ from datetime import datetime, timedelta, timezone
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from .models import Course, Professor, Review
+from .models import (
+    ClubEvent,
+    Course,
+    GlobalNotification,
+    Post,
+    PostComment,
+    Professor,
+    Review,
+    User,
+)
 
 _COURSES = [
     {"code": "MATH101", "title": "Linear Algebra", "department": "Mathematics", "credits": 5},
@@ -167,6 +176,276 @@ async def seed_if_empty(session: AsyncSession) -> bool:
         # Professor roll-up from the seed reviews.
         professor.rating_easy = round(sum(easy_scores) / len(easy_scores), 2) if easy_scores else 0.0
         professor.rating_quality = round(sum(quality_scores) / len(quality_scores), 2) if quality_scores else 0.0
+
+    await session.commit()
+    return True
+
+
+# =====================================================================
+# Campus Hub 示例数据（校园墙 / 社团活动 / 全局通知）
+# =====================================================================
+
+#: 演示学生账号（不会被登录流程误用：用户名形态合法但不属于真实学号）
+_DEMO_STUDENTS: list[dict] = [
+    {"username": "demo.dana@student.kaznu.kz", "display": "dana_k", "dept": "Computer Science Student"},
+    {"username": "demo.yerlan@student.kaznu.kz", "display": "yerlan_t", "dept": "Applied Math Student"},
+    {"username": "demo.madina@student.kaznu.kz", "display": "madina_s", "dept": "Physics Student"},
+]
+
+#: 帖子演示数据。``media`` 用 picsum 的**确定性**种子图（https，稳定），
+#: 前端对加载失败的图片做降级隐藏，所以离线时也不会出现破图。
+_DEMO_POSTS: list[dict] = [
+    {
+        "category": "course_review",
+        "content": (
+            "CS201 Data Structures (Seitkali) — 前两周一定要跟上 lab，期中之后难度陡增。"
+            "板书会把每个结构画出来，期末还会给一份题型清单。想拿 A 就老老实实做 lab 3 之后的每一次练习。"
+        ),
+        "is_anonymous": True,
+        "likes": 42,
+        "hours_ago": 3,
+        "media": [],
+        "comments": [
+            ("完全同意，lab 3 之后一定要自己手写一遍", True),
+            ("题型清单会发在 Telegram 班群里吗？", True),
+            ("他 office hour 也很好问，别害羞", False, 1),
+        ],
+    },
+    {
+        "category": "lost_found",
+        "content": (
+            "在 4 号楼 305 教室丢了一个深蓝色保温杯（杯身有白色贴纸），大概是周三下午 3 点那节课。"
+            "如果有同学看到麻烦 comment 一下，谢谢 🙏"
+        ),
+        "is_anonymous": True,
+        "likes": 8,
+        "hours_ago": 6,
+        "media": ["https://picsum.photos/seed/kaznu-bottle/800/520"],
+        "comments": [("刚在 305 讲台抽屉里看到一个，去问问助教", True)],
+    },
+    {
+        "category": "hackathon",
+        "content": (
+            "准备组队参加 10 月的 KazNU Hackathon（赛道：智慧校园）。"
+            "目前 2 人（后端 + iOS)，还缺 1 个会 Figma/前端的同学。有作品集更好，没有也行，关键是能一起熬夜 😄"
+        ),
+        "is_anonymous": False,
+        "author_index": 0,
+        "likes": 27,
+        "hours_ago": 9,
+        "media": [],
+        "comments": [
+            ("前端在这！做过两个 React 项目，私信聊", True),
+            ("什么时候截止报名？", True),
+        ],
+    },
+    {
+        "category": "housing",
+        "content": (
+            "Кто-нибудь сдаёт комнату рядом с кампусом на зимний семестр? "
+            "Ищу недалеко от Тимирязева, желательно с мебелью. Готов заселиться с 1 декабря."
+        ),
+        "is_anonymous": False,
+        "author_index": 2,
+        "likes": 15,
+        "hours_ago": 26,
+        "media": [],
+        "comments": [("Напиши в 4-й блок общежития, там часто освобождается", True)],
+    },
+    {
+        "category": "club",
+        "content": (
+            "机器人社团招新啦 🤖 每周三 18:00 在 FIT 楼实验室，零基础也能来玩。"
+            "做 RoboCup 备赛 + 寒假有个校级比赛，报名截止本周五。"
+        ),
+        "is_anonymous": False,
+        "author_index": 1,
+        "likes": 33,
+        "hours_ago": 30,
+        "media": [
+            "https://picsum.photos/seed/kaznu-robot/800/520",
+            "https://picsum.photos/seed/kaznu-robot-2/800/520",
+        ],
+        "comments": [
+            ("零基础真的可以吗？我只会一点点 Python", True),
+            ("可以！第一节课就是点灯 😄", False, 1),
+        ],
+    },
+    {
+        "category": "general",
+        "content": "图书馆 4 楼自习室今天人特别少，安静得能听见空调声。要赶 paper 的同学可以来占位 📚",
+        "is_anonymous": True,
+        "likes": 19,
+        "hours_ago": 52,
+        "media": [],
+        "comments": [],
+    },
+]
+
+#: 社团 / 讲座活动演示数据。
+#: ``approved=False`` 的那条专门用来演示后台审核流程（未审核 → 公开列表看不到）。
+#: 外链均为占位地址，仅用于演示 RSVP 跳转按钮。
+_DEMO_EVENTS: list[dict] = [
+    {
+        "club_name": "KazNU Robotics Club",
+        "title": "RoboCup 校内选拔赛说明会",
+        "description": "介绍今年 RoboCup 赛道规则、组队方式与备赛日程。零基础同学可先来旁听，现场有机器人演示。",
+        "poster": "https://picsum.photos/seed/kaznu-event-robocup/900/560",
+        "days_ahead": 2,
+        "hour": 18,
+        "location": "FIT Building · Lab 401",
+        "register_link": "https://kaznu.kz",
+        "approved": True,
+    },
+    {
+        "club_name": "Al-Farabi Debate Society",
+        "title": "英语辩论公开课：如何构建论证",
+        "description": "由校辩论队教练主讲，适合准备参加国际赛事或想提升口语与逻辑的同学。现场分组练习。",
+        "poster": "https://picsum.photos/seed/kaznu-event-debate/900/560",
+        "days_ahead": 5,
+        "hour": 16,
+        "location": "Main Building · Auditorium 2",
+        "register_link": "https://forms.gle/kaznu-debate-rsvp",
+        "approved": True,
+    },
+    {
+        "club_name": "KazNU Tech Society",
+        "title": "KazNU Hackathon 2026 报名启动",
+        "description": "48 小时线下黑客松，赛道包含智慧校园、教育科技与开放数据。提供餐食与导师，奖金池 1,000,000 ₸。",
+        "poster": "https://picsum.photos/seed/kaznu-event-hackathon/900/560",
+        "days_ahead": 9,
+        "hour": 10,
+        "location": "Innovation Hub · Floor 3",
+        "register_link": "https://1losion.me",
+        "approved": True,
+    },
+    {
+        "club_name": "KazNU Music Club",
+        "title": "秋季校园音乐会（待审核）",
+        "description": "社团乐队与合唱团联合演出，曲目包含哈萨克民谣与流行改编。该条为**待审核**示例：在 /admin 通过后才会出现在 App 里。",
+        "poster": "https://picsum.photos/seed/kaznu-event-music/900/560",
+        "days_ahead": 14,
+        "hour": 19,
+        "location": "Palace of Students",
+        "register_link": None,
+        "approved": False,
+    },
+]
+
+#: 全局紧急通知演示数据（1 条 danger + 1 条 warning 生效，1 条 info 已停用）。
+_DEMO_NOTIFICATIONS: list[dict] = [
+    {
+        "title": "Exam week starts Monday",
+        "message": "Midterm exam week runs Sep 21–26. Library opening hours are extended to 24/7 from Sunday.",
+        "level": "danger",
+        "active": True,
+        "hours_ago": 3,
+    },
+    {
+        "title": "Плановое отключение воды",
+        "message": "16 сентября с 09:00 до 15:00 в главном корпусе и блоке 4 отключат воду. Запасите воду заранее.",
+        "level": "warning",
+        "active": True,
+        "hours_ago": 8,
+    },
+    {
+        "title": "Nauryz holiday notice",
+        "message": "Campus offices will be closed Mar 21–23 for Nauryz. Classes resume Mar 24.",
+        "level": "info",
+        "active": False,
+        "hours_ago": 220,
+    },
+]
+
+
+async def seed_campus_if_empty(session: AsyncSession, author: User) -> bool:
+    """插入 Campus Hub 演示数据；``posts`` 表非空时直接跳过（幂等）。
+
+    ``author`` 是内置超管账号。匿名帖 / 匿名评论在库里**仍需**一个 ``user_id``
+    （外键必须指向真实行），只是 API 永远不会把它发出去 —— 返回体里只有
+    ``is_anonymous=True`` 和院系标签。
+    """
+    existing = await session.scalar(select(func.count(Post.id)))
+    if existing:
+        return False
+
+    now = datetime.now(timezone.utc)
+
+    # 演示学生账号：已存在则复用，保证函数可安全重复调用
+    students: list[User] = []
+    for spec in _DEMO_STUDENTS:
+        user = await session.scalar(select(User).where(User.univer_username == spec["username"]))
+        if user is None:
+            user = User(
+                univer_username=spec["username"],
+                univer_email=spec["username"],
+                global_display_name=spec["display"],
+                department_tag=spec["dept"],
+            )
+            session.add(user)
+            await session.flush()
+        students.append(user)
+
+    def pick(index: int | None) -> User:
+        """``index`` 指向 ``_DEMO_STUDENTS``；``None`` = 用超管账号。"""
+        if index is None or not students:
+            return author
+        return students[index % len(students)]
+
+    for spec in _DEMO_POSTS:
+        created = now - timedelta(hours=spec["hours_ago"])
+        post = Post(
+            user_id=pick(spec.get("author_index")).id,
+            is_anonymous=spec["is_anonymous"],
+            category=spec["category"],
+            content=spec["content"],
+            media_urls=spec["media"] or None,
+            likes_count=spec["likes"],
+            created_at=created,
+        )
+        session.add(post)
+        await session.flush()
+
+        for idx, entry in enumerate(spec["comments"]):
+            content, is_anonymous = entry[0], entry[1]
+            commenter_index = entry[2] if len(entry) > 2 else None
+            session.add(
+                PostComment(
+                    post_id=post.id,
+                    user_id=pick(commenter_index).id,
+                    is_anonymous=is_anonymous,
+                    content=content,
+                    created_at=created + timedelta(minutes=25 * (idx + 1)),
+                )
+            )
+
+    for spec in _DEMO_EVENTS:
+        event_time = (now + timedelta(days=spec["days_ahead"])).replace(
+            hour=spec["hour"], minute=0, second=0, microsecond=0
+        )
+        session.add(
+            ClubEvent(
+                club_name=spec["club_name"],
+                title=spec["title"],
+                description=spec["description"],
+                poster_url=spec["poster"],
+                event_time=event_time,
+                location=spec["location"],
+                register_link=spec["register_link"],
+                is_approved=spec["approved"],
+            )
+        )
+
+    for spec in _DEMO_NOTIFICATIONS:
+        session.add(
+            GlobalNotification(
+                title=spec["title"],
+                message=spec["message"],
+                level=spec["level"],
+                is_active=spec["active"],
+                created_at=now - timedelta(hours=spec["hours_ago"]),
+            )
+        )
 
     await session.commit()
     return True

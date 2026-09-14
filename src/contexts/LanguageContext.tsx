@@ -31,7 +31,15 @@ type ExtraTranslationKey =
   | "fullName" | "birthDate" | "iin" | "citizenship" | "faculty" | "specialty" | "groupName" | "address" | "phone" | "email"
   | "signIn" | "usernameLabel" | "passwordLabel" | "loginHint" | "logout"
   | "rememberMe" | "autoLoginNote" | "reverifyHint" | "themeLight" | "themeDark" | "themeAuto"
-  | "loginError";
+  | "loginError"
+  // ---- Campus Hub（校园娱乐与交流社区板块）----
+  | "campus" | "campusWall" | "campusEvents"
+  | "catAll" | "catCourseReview" | "catLostFound" | "catHousing" | "catHackathon" | "catClub" | "catGeneral"
+  | "anonymous" | "writePost" | "postPlaceholder" | "mediaLinks" | "mediaLinksHint" | "postAnonymously" | "publish"
+  | "comments" | "noComments" | "addComment" | "send"
+  | "organizer" | "where" | "when" | "rsvp"
+  | "noPosts" | "noPostsHint" | "noEvents" | "noEventsHint"
+  | "offlineDemo" | "notSynced" | "postPublished" | "commentPosted" | "campusLoadFailed";
 export type AllTranslationKey = TranslationKey | ExtendedTranslationKey | NewsTranslationKey | ExtraTranslationKey;
 
 interface LanguageContextType {
@@ -71,6 +79,15 @@ const TRANSLATIONS: Record<Language, Record<string, string>> = {
 
 const ADDITIONAL_TRANSLATIONS: Record<Language, Record<ExtraTranslationKey, string>> = {
   EN: {
+    // ---- Campus Hub ----
+    campus: "Campus", campusWall: "Wall", campusEvents: "Clubs & Events",
+    catAll: "All", catCourseReview: "Course review", catLostFound: "Lost & found", catHousing: "Housing", catHackathon: "Hackathon", catClub: "Clubs", catGeneral: "General",
+    writePost: "New post", postPlaceholder: "Share something with campus…", mediaLinks: "Image / video links", mediaLinksHint: "One https:// link per line (max 6)", postAnonymously: "Post anonymously", publish: "Publish",
+    anonymous: "Anonymous",
+    comments: "Comments", noComments: "No comments yet", addComment: "Write a comment…", send: "Send",
+    organizer: "Organizer", where: "Location", when: "Time", rsvp: "RSVP / Register",
+    noPosts: "Nothing on the wall yet", noPostsHint: "Be the first to post!", noEvents: "No upcoming events", noEventsHint: "Club events show up here once approved.",
+    offlineDemo: "Offline demo data", notSynced: "Not synced", postPublished: "Posted to the campus wall", commentPosted: "Comment added", campusLoadFailed: "Couldn't reach the server",
     noMoreToday: "No more classes today 🎉", degreePlan: "Graduation Plan", targetStandard: "Target",
     justGraduate: "Just Graduate", magna: "Magna Cum Laude", summa: "Summa Cum Laude",
     futureAvg: "avg GPA needed in remaining semesters", ectsLeft: "ECTS left", degreeProgress: "Degree progress",
@@ -101,6 +118,15 @@ const ADDITIONAL_TRANSLATIONS: Record<Language, Record<ExtraTranslationKey, stri
     serviceStudentAnketa: "Студент анкетасы", fullName: "Толық аты-жөні", birthDate: "Туған күні", iin: "ЖСН", citizenship: "Азаматтығы", faculty: "Факультет", specialty: "Мамандық", groupName: "Топ", address: "Мекенжайы", phone: "Телефон", email: "Email",
     signIn: "Кіру", usernameLabel: "Логин / студент ID", passwordLabel: "Құпиясөз", loginHint: "Демо: кез келген логин · құпиясөз 123456", logout: "Шығу",
     rememberMe: "Есте сақтау және автоматты кіру", autoLoginNote: "Келесі 15 күнде құпиясөз қажет емес", reverifyHint: "Өшірсеңіз, келесі жолы құпиясөзді қайта енгізесіз", themeLight: "Ашық", themeDark: "Қараңғы", themeAuto: "Авто", loginError: "Құпиясөз қате — қайта көріңіз",
+    // ---- Campus Hub ----
+    campus: "Кампус", campusWall: "Ағым", campusEvents: "Клубтар мен іс-шаралар",
+    catAll: "Барлығы", catCourseReview: "Пән пікірі", catLostFound: "Жоғалған зат", catHousing: "Тұрғын үй", catHackathon: "Хакатон", catClub: "Клубтар", catGeneral: "Жалпы",
+    writePost: "Жаңа жазба", postPlaceholder: "Кампуспен бөлісіңіз…", mediaLinks: "Сурет / видео сілтемелері", mediaLinksHint: "Әр жолға бір https:// сілтемесі (ең көбі 6)", postAnonymously: "Анонимді жариялау", publish: "Жариялау",
+    anonymous: "Аноним",
+    comments: "Пікірлер", noComments: "Пікір жоқ", addComment: "Пікір жазыңыз…", send: "Жіберу",
+    organizer: "Ұйымдастырушы", where: "Орын", when: "Уақыты", rsvp: "Тіркелу",
+    noPosts: "Ағымда әзірге ештеңе жоқ", noPostsHint: "Бірінші болып жазыңыз!", noEvents: "Алдағы іс-шара жоқ", noEventsHint: "Клуб іс-шаралары мақұлданған соң көрінеді.",
+    offlineDemo: "Офлайн демо деректер", notSynced: "Синхрондалмаған", postPublished: "Ағымға жарияланды", commentPosted: "Пікір қосылды", campusLoadFailed: "Серверге қосылу мүмкін болмады",
   },
   RU: {
     noMoreToday: "На сегодня занятий больше нет 🎉", degreePlan: "План до диплома", targetStandard: "Цель",
@@ -117,6 +143,15 @@ const ADDITIONAL_TRANSLATIONS: Record<Language, Record<ExtraTranslationKey, stri
     serviceStudentAnketa: "Анкета студента", fullName: "ФИО", birthDate: "Дата рождения", iin: "ИИН", citizenship: "Гражданство", faculty: "Факультет", specialty: "Специальность", groupName: "Группа", address: "Адрес", phone: "Телефон", email: "Email",
     signIn: "Войти", usernameLabel: "Логин / ID студента", passwordLabel: "Пароль", loginHint: "Демо: любой логин · пароль 123456", logout: "Выйти",
     rememberMe: "Запомнить меня и входить автоматически", autoLoginNote: "Без пароля в течение следующих 15 дней", reverifyHint: "Если выключено, пароль придётся ввести снова в следующий раз", themeLight: "Светлая", themeDark: "Тёмная", themeAuto: "Авто", loginError: "Неверный пароль — попробуйте ещё раз",
+    // ---- Campus Hub ----
+    campus: "Кампус", campusWall: "Лента", campusEvents: "Клубы и события",
+    catAll: "Все", catCourseReview: "Отзыв о курсе", catLostFound: "Потеряшки", catHousing: "Жильё", catHackathon: "Хакатон", catClub: "Клубы", catGeneral: "Общее",
+    writePost: "Новый пост", postPlaceholder: "Поделитесь чем-нибудь с кампусом…", mediaLinks: "Ссылки на фото / видео", mediaLinksHint: "По одной https:// ссылке в строке (макс. 6)", postAnonymously: "Опубликовать анонимно", publish: "Опубликовать",
+    anonymous: "Анонимно",
+    comments: "Комментарии", noComments: "Комментариев пока нет", addComment: "Написать комментарий…", send: "Отправить",
+    organizer: "Организатор", where: "Место", when: "Время", rsvp: "Записаться",
+    noPosts: "На стене пока ничего нет", noPostsHint: "Будьте первым!", noEvents: "Нет предстоящих событий", noEventsHint: "События клубов появятся после одобрения.",
+    offlineDemo: "Офлайн демо-данные", notSynced: "Не синхронизировано", postPublished: "Опубликовано на стене", commentPosted: "Комментарий добавлен", campusLoadFailed: "Не удалось связаться с сервером",
   },
 };
 

@@ -90,7 +90,8 @@ Default: any **Univer-shaped** student id / `@student.kaznu.kz` account logs in 
 | 路径 | 内容 |
 |---|---|
 | `/api/v1/*` | 评价系统 API：`auth` / `me` / `professors` / `courses` / `reviews` / `admin` / `super-admin` / `reports` |
-| `/admin` | **SQLAdmin Web 管理后台**：Reviews 查看·编辑·删除、Reports 处理、Professors/Courses 维护；超管另有 Users 封禁、Admin Applications 审批 |
+| `/api/v1/posts`、`/club-events`、`/notifications/latest` | **Campus Hub 校园社区 API**：校园墙帖子 / 评论 / 点赞、社团活动、全局紧急通知（见下文专节） |
+| `/admin` | **SQLAdmin Web 管理后台**：Reviews 查看·编辑·删除、Reports 处理、Professors/Courses 维护；**Campus Hub 内容审核**（Posts / Post Comments / Club Events / Global Notifications）；超管另有 Users 封禁、Admin Applications 审批 |
 | `/docs` | Swagger UI（包含上面全部路由） |
 | `/healthz` | 健康检查：`db_ready` + `admin` 路径（部署后先看它自证） |
 | `/api/news`、`/api/schedule`、`/api/gpa` | 旧版兼容接口（1.3 App 仍在用） |
@@ -106,6 +107,43 @@ uvicorn main:app --host 0.0.0.0 --port 8000      # 入口
 - **未配置时自动退回本地 SQLite 文件 `kaznu_helper.db`**（零依赖即可跑通评价 + 管理后台）；
 - 数据库连不上**不会阻塞启动**：`/docs`、`/admin` 登录页仍可访问，`/healthz` 会显示 `db_ready: false`，
   并在日志里打印当前 `DATABASE_URL` 便于排查。
+
+### Campus Hub（校园娱乐与交流社区）
+
+App 底部导航第 3 个 Tab（原 Materials 的位置）；**Materials 改为从首页「NEXT DEADLINE」卡片进入**。
+
+**数据模型**（`backend/app/models.py`；启动时 `create_all` 自动建表，无需迁移）
+
+| 模型 | 表 | 说明 |
+|---|---|---|
+| `Post` | `posts` | 校园墙帖子：`category` / `content` / `media_urls`(JSON) / `is_anonymous` / `likes_count` / `is_hidden` |
+| `PostComment` | `post_comments` | 评论（同样支持匿名） |
+| `PostLike` | `post_likes` | **点赞去重记录**（`post_id` + `liker_hash` 唯一约束） |
+| `ClubEvent` | `club_events` | 社团活动通告：`is_approved` 审核开关 |
+| `GlobalNotification` | `global_notifications` | 全校紧急通知：`level` = info/warning/danger，`is_active` 上下线开关 |
+
+> 为什么多了一张 `PostLike`：需求里的 `POST /posts/{id}/like` 是**点赞 / 取消赞开关**，
+> 要能正确"再点一次就取消"就必须记住"谁赞过"。沿用评价体系的匿名做法只存 `liker_hash`
+> （HMAC of Univer 账号），不含任何可反查身份的字段；`Post.likes_count` 作为冗余计数供列表快速读取。
+
+**接口**（读公开 / 写需登录；列表统一返回分页信封 `{items,total,limit,offset,has_more}`）
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| GET | `/api/v1/posts?category=&limit=&offset=` | 信息流（按分类分页；被下架的帖子不出现） |
+| POST | `/api/v1/posts` | 发帖（需登录，限流 6/min；`media_urls` 只收 http(s)、最多 6 条） |
+| POST | `/api/v1/posts/{id}/like` | 点赞 / 取消赞（同一账号再点一次即取消） |
+| GET | `/api/v1/posts/{id}/comments` | 评论列表（按时间正序 = 楼层顺序） |
+| POST | `/api/v1/posts/{id}/comments` | 发表评论（需登录，限流 12/min） |
+| GET | `/api/v1/club-events?club_name=&include_past=` | 活动列表（只返回已审核，默认隐藏已结束的） |
+| GET | `/api/v1/notifications/latest` | 当前生效的紧急通知；没有则返回 `null` |
+
+**隐私不变量**：匿名帖 / 匿名评论的响应里 `author.name` 恒为 `null`，只保留粗粒度的
+`department_tag`（与评价体系一致）。`check_campus_api.py` 有对应断言，改动不会静默退化。
+> 注意：`/admin` 是**员工界面**，为了追责会显示帖子作者显示名 —— 这是刻意的，与公开 API 是两个不同表面。
+
+**内容治理**：违规内容走 `is_hidden` 软下架（从公开列表消失、其评论接口 404，后台可一键恢复）；
+活动必须 `is_approved=true` 才公开；紧急通知靠 `is_active` 上下线。以上都在 `/admin` 的 Campus Hub 分组里操作。
 
 ### 管理后台多语言（EN / RU / ZH）
 
@@ -189,9 +227,11 @@ location = /healthz      { proxy_pass http://127.0.0.1:8000; }
 
 ### 自检（本地也能跑，无需 Postgres）
 ```bash
-python backend/tests/check_admin_mount.py     # 断言：/docs、全部评价/管理端路由、/admin、/healthz、旧接口、种子数据、/app
-python backend/tests/check_admin_i18n.py      # 断言：管理后台多语言（语言包注册、切换器、cookie、EN/RU/ZH 页面文案）
-python backend/tests/smoke_test.py            # 原有业务冒烟（匿名性/一人一评/登录门禁）
+python backend/tests/check_admin_mount.py      # 断言：/docs、全部评价/管理端路由、/admin、/healthz、旧接口、种子数据、/app
+python backend/tests/check_admin_i18n.py       # 断言：管理后台多语言（语言包注册、切换器、cookie、EN/RU/ZH 页面文案）
+python backend/tests/check_campus_api.py       # 断言：Campus Hub 全部端点（匿名脱敏 / 分页 / 点赞开关 / 软下架 / 通知轮转 / 后台页面）
+python backend/tests/check_campus_contract.py  # 断言：前端 TS 接口 ↔ 后端 OpenAPI 字段逐一对齐（防前后端类型漂移）
+python backend/tests/smoke_test.py             # 原有业务冒烟（匿名性/一人一评/登录门禁）
 ```
 
 ### 线上验证

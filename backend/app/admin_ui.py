@@ -30,7 +30,11 @@ from .models import (
     ROLE_ADMIN,
     ROLE_SUPER_ADMIN,
     AdminApplication,
+    ClubEvent,
     Course,
+    GlobalNotification,
+    Post,
+    PostComment,
     Professor,
     Report,
     Review,
@@ -379,6 +383,308 @@ class ReportAdmin(ModelView, model=Report):
         return _allowed(request, STAFF_ROLES)
 
 
+# =====================================================================
+# Campus Hub —— 校园墙 / 社团活动 / 全局通知 审核面板
+# =====================================================================
+
+
+def _post_author_label(model: Post, _attr: str) -> str:
+    """帖子作者显示名。
+
+    ⚠️ 这是**员工后台**：为了追责与封禁，这里会显示作者显示名（匿名帖也显示）。
+    公开 API（/api/v1/posts）永远不会返回匿名作者身份 —— 两处是不同表面。
+    """
+    return model.author.global_display_name if model.author else "—"
+
+
+def _post_content_preview(model: Post, _attr: str) -> str:
+    text = " ".join((model.content or "").split())
+    if not text:
+        return "—"
+    return text if len(text) <= 60 else text[:60] + "…"
+
+
+def _comment_post_label(model: PostComment, _attr: str) -> str:
+    """评论所属帖子的摘要，方便判断上下文。"""
+    post = model.post
+    if post is None:
+        return "—"
+    text = " ".join((post.content or "").split())
+    return (text[:40] + "…") if len(text) > 40 else (text or "—")
+
+
+class PostAdmin(ModelView, model=Post):
+    """admin & super_admin：校园墙帖子审核（一键隐藏 / 恢复 / 删除）。"""
+
+    name = L("Post")
+    name_plural = L("Posts")
+    category = L("Campus Hub")
+    category_icon = "fa-solid fa-people-group"
+    icon = "fa-solid fa-comments"
+
+    # 帖子来自 App，后台不新建；但可以编辑（例如改分类）与删除
+    can_create = False
+    can_edit = True
+    can_delete = True
+
+    column_list = [
+        Post.id,
+        Post.category,
+        Post.content,
+        Post.author,
+        Post.is_anonymous,
+        Post.likes_count,
+        Post.is_hidden,
+        Post.created_at,
+    ]
+    column_labels = make_column_labels(
+        {
+            Post.id: "ID",
+            Post.category: "Category",
+            Post.content: "Post Content",
+            Post.author: "Author",
+            Post.is_anonymous: "Anonymous",
+            Post.likes_count: "Likes",
+            Post.is_hidden: "Hidden",
+            Post.created_at: "Created At",
+        }
+    )
+    column_formatters = {
+        Post.content: _post_content_preview,
+        Post.author: _post_author_label,
+    }
+    column_searchable_list = [Post.content]
+    column_default_sort = [("created_at", True)]
+    # FK / 统计列不进表单：编辑时保持原值；likes_count 由 App 维护，手改没意义
+    form_excluded_columns = [Post.id, Post.user_id, Post.likes_count]
+    page_size = 30
+
+    def is_accessible(self, request: Request) -> bool:
+        return _allowed(request, STAFF_ROLES)
+
+    @action(
+        name="hide",
+        label=L("🙈 Hide"),
+        confirmation_message=L("Hide the selected posts?"),
+        add_in_detail=True,
+    )
+    async def hide_posts(self, request: Request) -> RedirectResponse:
+        pks = [pk for pk in request.query_params.get("pks", "").split(",") if pk]
+        async with self.session_maker() as session:
+            for pk in pks:
+                post = await session.get(Post, pk)
+                if post is not None:
+                    post.is_hidden = True
+            await session.commit()
+        return _redirect(request, self.identity)
+
+    @action(
+        name="unhide",
+        label=L("👁 Unhide"),
+        confirmation_message=L("Unhide the selected posts?"),
+        add_in_detail=True,
+    )
+    async def unhide_posts(self, request: Request) -> RedirectResponse:
+        pks = [pk for pk in request.query_params.get("pks", "").split(",") if pk]
+        async with self.session_maker() as session:
+            for pk in pks:
+                post = await session.get(Post, pk)
+                if post is not None:
+                    post.is_hidden = False
+            await session.commit()
+        return _redirect(request, self.identity)
+
+
+class PostCommentAdmin(ModelView, model=PostComment):
+    """admin & super_admin：评论审核（删除违规评论）。"""
+
+    name = L("Post Comment")
+    name_plural = L("Post Comments")
+    category = L("Campus Hub")
+    icon = "fa-solid fa-comment-dots"
+
+    can_create = False
+    can_edit = False
+    can_delete = True
+
+    column_list = [
+        PostComment.id,
+        PostComment.post,
+        PostComment.content,
+        PostComment.author,
+        PostComment.is_anonymous,
+        PostComment.created_at,
+    ]
+    column_labels = make_column_labels(
+        {
+            PostComment.id: "ID",
+            PostComment.post: "Post",
+            PostComment.content: "Comment Content",
+            PostComment.author: "Author",
+            PostComment.is_anonymous: "Anonymous",
+            PostComment.created_at: "Created At",
+        }
+    )
+    column_formatters = {
+        PostComment.post: _comment_post_label,
+        PostComment.author: _post_author_label,
+    }
+    column_searchable_list = [PostComment.content]
+    column_default_sort = [("created_at", True)]
+    page_size = 30
+
+    def is_accessible(self, request: Request) -> bool:
+        return _allowed(request, STAFF_ROLES)
+
+
+class ClubEventAdmin(ModelView, model=ClubEvent):
+    """admin & super_admin：社团活动审核（通过 / 下架）。"""
+
+    name = L("Club Event")
+    name_plural = L("Club Events")
+    category = L("Campus Hub")
+    icon = "fa-solid fa-calendar-star"
+
+    can_create = True
+    can_edit = True
+    can_delete = True
+
+    column_list = [
+        ClubEvent.id,
+        ClubEvent.club_name,
+        ClubEvent.title,
+        ClubEvent.event_time,
+        ClubEvent.location,
+        ClubEvent.is_approved,
+        ClubEvent.register_link,
+    ]
+    column_labels = make_column_labels(
+        {
+            ClubEvent.id: "ID",
+            ClubEvent.club_name: "Club Name",
+            ClubEvent.title: "Event Title",
+            ClubEvent.description: "Description",
+            ClubEvent.poster_url: "Poster URL",
+            ClubEvent.event_time: "Event Time",
+            ClubEvent.location: "Location",
+            ClubEvent.register_link: "Register Link",
+            ClubEvent.is_approved: "Approved",
+        }
+    )
+    column_searchable_list = [ClubEvent.title, ClubEvent.club_name]
+    column_default_sort = [("event_time", True)]
+    form_excluded_columns = [ClubEvent.id]
+
+    def is_accessible(self, request: Request) -> bool:
+        return _allowed(request, STAFF_ROLES)
+
+    @action(
+        name="approve-event",
+        label=L("✅ Approve"),
+        confirmation_message=L("Approve the selected events?"),
+        add_in_detail=True,
+    )
+    async def approve_events(self, request: Request) -> RedirectResponse:
+        pks = [pk for pk in request.query_params.get("pks", "").split(",") if pk]
+        async with self.session_maker() as session:
+            for pk in pks:
+                event = await session.get(ClubEvent, pk)
+                if event is not None:
+                    event.is_approved = True
+            await session.commit()
+        return _redirect(request, self.identity)
+
+    @action(
+        name="unapprove-event",
+        label=L("⛔ Unapprove"),
+        confirmation_message=L("Unapprove the selected events?"),
+        add_in_detail=True,
+    )
+    async def unapprove_events(self, request: Request) -> RedirectResponse:
+        pks = [pk for pk in request.query_params.get("pks", "").split(",") if pk]
+        async with self.session_maker() as session:
+            for pk in pks:
+                event = await session.get(ClubEvent, pk)
+                if event is not None:
+                    event.is_approved = False
+            await session.commit()
+        return _redirect(request, self.identity)
+
+
+class GlobalNotificationAdmin(ModelView, model=GlobalNotification):
+    """admin & super_admin：全校级紧急通知（顶部 Push Banner 的内容源）。
+
+    管理员在这里新建一条并把 ``is_active`` 打开，App 顶部立刻出现高亮通知栏；
+    关闭 ``is_active`` 即下线（历史记录仍然保留在后台）。
+    """
+
+    name = L("Global Notification")
+    name_plural = L("Global Notifications")
+    category = L("Campus Hub")
+    icon = "fa-solid fa-tower-broadcast"
+
+    can_create = True
+    can_edit = True
+    can_delete = True
+
+    column_list = [
+        GlobalNotification.id,
+        GlobalNotification.title,
+        GlobalNotification.message,
+        GlobalNotification.level,
+        GlobalNotification.is_active,
+        GlobalNotification.created_at,
+    ]
+    column_labels = make_column_labels(
+        {
+            GlobalNotification.id: "ID",
+            GlobalNotification.title: "Notification Title",
+            GlobalNotification.message: "Message",
+            GlobalNotification.level: "Level",
+            GlobalNotification.is_active: "Active",
+            GlobalNotification.created_at: "Created At",
+        }
+    )
+    column_searchable_list = [GlobalNotification.title, GlobalNotification.message]
+    column_default_sort = [("created_at", True)]
+    form_excluded_columns = [GlobalNotification.id]
+
+    def is_accessible(self, request: Request) -> bool:
+        return _allowed(request, STAFF_ROLES)
+
+    @action(
+        name="activate-notification",
+        label=L("🔔 Activate"),
+        confirmation_message=L("Activate the selected notifications?"),
+        add_in_detail=True,
+    )
+    async def activate_notifications(self, request: Request) -> RedirectResponse:
+        pks = [pk for pk in request.query_params.get("pks", "").split(",") if pk]
+        async with self.session_maker() as session:
+            for pk in pks:
+                item = await session.get(GlobalNotification, pk)
+                if item is not None:
+                    item.is_active = True
+            await session.commit()
+        return _redirect(request, self.identity)
+
+    @action(
+        name="deactivate-notification",
+        label=L("🔕 Deactivate"),
+        confirmation_message=L("Deactivate the selected notifications?"),
+        add_in_detail=True,
+    )
+    async def deactivate_notifications(self, request: Request) -> RedirectResponse:
+        pks = [pk for pk in request.query_params.get("pks", "").split(",") if pk]
+        async with self.session_maker() as session:
+            for pk in pks:
+                item = await session.get(GlobalNotification, pk)
+                if item is not None:
+                    item.is_active = False
+            await session.commit()
+        return _redirect(request, self.identity)
+
+
 def setup_admin_ui(app) -> Admin:
     """挂载 SQLAdmin 管理后台到 /admin（含 EN / RU / ZH 语言切换器）。"""
     secret = settings.admin_session_secret or settings.anon_hash_secret
@@ -416,9 +722,15 @@ def setup_admin_ui(app) -> Admin:
     admin.add_model_view(CourseAdmin)
     admin.add_model_view(ReviewAdmin)
     admin.add_model_view(ReportAdmin)
+    # Campus Hub：校园墙帖子 / 评论 / 社团活动 / 全局紧急通知
+    admin.add_model_view(PostAdmin)
+    admin.add_model_view(PostCommentAdmin)
+    admin.add_model_view(ClubEventAdmin)
+    admin.add_model_view(GlobalNotificationAdmin)
     print(
         "[kaznu] SQLAdmin 管理后台已挂载: /admin"
-        " （Users / Admin Applications / Professors / Courses / Reviews / Reports）"
+        " （Users / Admin Applications / Professors / Courses / Reviews / Reports"
+        " / Posts / Post Comments / Club Events / Global Notifications）"
     )
     print(
         "[kaznu] 管理后台语言: "

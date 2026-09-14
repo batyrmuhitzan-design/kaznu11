@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import re
 from datetime import datetime
+from typing import Generic, TypeVar
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -186,4 +187,171 @@ class UserBanOut(BaseModel):
 class ReportIn(BaseModel):
     review_id: str = Field(min_length=8, max_length=40)
     reason: str | None = Field(default=None, max_length=1000)
+
+
+# =====================================================================
+# Campus Hub —— 校园墙 / 社团活动 / 全局通知
+# =====================================================================
+
+T = TypeVar("T")
+
+#: 一条帖子最多挂 6 个媒体外链
+MAX_MEDIA_ITEMS = 6
+#: 只接受 http(s) 外链 —— 挡掉 javascript: / data: 之类的注入面
+_HTTP_URL_RE = re.compile(r"^https?://\S+$", re.IGNORECASE)
+
+
+def _clean_media_urls(urls: list[str]) -> list[str]:
+    """校验并规整媒体外链列表（去空、限长、限数量、强制 http(s)）。"""
+    cleaned: list[str] = []
+    for raw in urls:
+        url = (raw or "").strip()
+        if not url:
+            continue
+        if not _HTTP_URL_RE.match(url):
+            raise ValueError("media_urls 只接受 http(s):// 开头的外链")
+        if len(url) > 500:
+            raise ValueError("media_urls 单条链接长度上限 500")
+        cleaned.append(url)
+    if len(cleaned) > MAX_MEDIA_ITEMS:
+        raise ValueError(f"media_urls 最多 {MAX_MEDIA_ITEMS} 条")
+    return cleaned
+
+
+class Page(BaseModel, Generic[T]):
+    """统一的分页信封。
+
+    所有**列表型**新接口都返回这一个形状，前端只需要一套解析逻辑：
+
+        { "items": [...], "total": 42, "limit": 20, "offset": 0, "has_more": true }
+
+    注：1.3 时代的老接口（``/api/news``、``/api/v1/reviews`` 等）保持返回裸数组不变，
+    以免已发布的客户端解析失败。
+    """
+
+    items: list[T]
+    total: int
+    limit: int
+    offset: int
+    has_more: bool
+
+
+class PostAuthorOut(BaseModel):
+    """帖子 / 评论的作者信息。
+
+    匿名时 ``name`` 必须为 ``None`` —— 后端不会把匿名作者的显示名发出去，
+    只给校友看的 ``department_tag``（与评价体系一致）。
+    """
+
+    is_anonymous: bool
+    name: str | None = None
+    department_tag: str | None = None
+
+
+class PostIn(BaseModel):
+    content: str = Field(min_length=1, max_length=2000)
+    category: str = "general"
+    is_anonymous: bool = True
+    media_urls: list[str] = Field(default_factory=list)
+
+    @field_validator("content")
+    @classmethod
+    def strip_content(cls, v: str) -> str:
+        v = v.strip()
+        if not v:
+            raise ValueError("content 不能为空")
+        return v
+
+    @field_validator("category")
+    @classmethod
+    def check_category(cls, v: str) -> str:
+        from .models import POST_CATEGORIES
+
+        v = (v or "general").strip().lower()
+        if v not in POST_CATEGORIES:
+            raise ValueError(f"category 必须是 {list(POST_CATEGORIES)} 之一")
+        return v
+
+    @field_validator("media_urls")
+    @classmethod
+    def check_media_urls(cls, v: list[str]) -> list[str]:
+        return _clean_media_urls(v)
+
+
+class PostOut(BaseModel):
+    id: str
+    category: str
+    content: str
+    media_urls: list[str] = []
+    is_anonymous: bool
+    author: PostAuthorOut
+    likes_count: int
+    comment_count: int = 0
+    #: 当前请求者是否已点赞（未登录恒为 False）
+    liked: bool = False
+    created_at: datetime
+
+
+class PostCreated(BaseModel):
+    message: str
+    post: PostOut
+
+
+class LikeOut(BaseModel):
+    id: str
+    likes_count: int
+    liked: bool
+    message: str
+
+
+class CommentIn(BaseModel):
+    content: str = Field(min_length=1, max_length=800)
+    is_anonymous: bool = True
+
+    @field_validator("content")
+    @classmethod
+    def strip_content(cls, v: str) -> str:
+        v = v.strip()
+        if not v:
+            raise ValueError("content 不能为空")
+        return v
+
+
+class CommentOut(BaseModel):
+    id: str
+    post_id: str
+    content: str
+    is_anonymous: bool
+    author: PostAuthorOut
+    created_at: datetime
+
+
+class CommentCreated(BaseModel):
+    message: str
+    comment: CommentOut
+
+
+class ClubEventOut(BaseModel):
+    id: str
+    club_name: str
+    title: str
+    description: str | None = None
+    poster_url: str | None = None
+    event_time: datetime
+    location: str | None = None
+    register_link: str | None = None
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class GlobalNotificationOut(BaseModel):
+    id: str
+    title: str
+    message: str
+    #: info | warning | danger
+    level: str
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
 

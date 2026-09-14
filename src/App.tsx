@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import Dashboard from "./views/Dashboard";
 import Grades from "./views/Grades";
 import Materials from "./views/Materials";
+import Campus from "./views/Campus";
 import Schedule from "./views/Schedule";
 import Services from "./views/Services";
 import Profile from "./views/Profile";
@@ -25,7 +26,9 @@ import { attachGlobalLiveActivityWatcher, enableClassReminderNotificationActions
 const TABS = [
   { id: "dashboard", label: "Home", icon: "house.fill" },
   { id: "news", label: "News", icon: "newspaper.fill" },
-  { id: "materials", label: "Materials", icon: "book.closed.fill" },
+  // 第 3 个 Tab 由 Materials 换成 Campus Hub（校园娱乐与交流社区）；
+  // Materials 改为从首页「NEXT DEADLINE」卡片进入（见 Dashboard 的 DDL 卡片）。
+  { id: "campus", label: "Campus", icon: "sparkles" },
   { id: "schedule", label: "Schedule", icon: "calendar" },
   { id: "services", label: "Services", icon: "square.grid.2x2.fill" },
 ];
@@ -62,6 +65,14 @@ function TabIcon({ icon, active }: { icon: string; active: boolean }) {
         <path d="M4 3h15a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2zm0 2v14h15V5H4zm2.5 2.5h9v1.5h-9V7.5zm0 3.5h9v1.5h-9V11zm0 3.5h5v1.5h-5v-1.5z" />
       </svg>
     ),
+    // Campus Hub：社区/公告语义的 sparkles 图标（大星 + 两颗小星）
+    "sparkles": (
+      <svg viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6">
+        <path d="M12 2.2l1.7 4.4 4.4 1.7-4.4 1.7L12 14.4l-1.7-4.4L5.9 8.3l4.4-1.7L12 2.2z" />
+        <path d="M18.6 13.4l.95 2.45 2.45.95-2.45.95-.95 2.45-.95-2.45-2.45-.95 2.45-.95.95-2.45z" />
+        <path d="M5.6 14.6l.75 1.95 1.95.75-1.95.75-.75 1.95-.75-1.95-1.95-.75 1.95-.75.75-1.95z" />
+      </svg>
+    ),
   };
   return icons[icon] || null;
 }
@@ -72,7 +83,7 @@ export default function App() {
   const [selectedNews, setSelectedNews] = useState<NewsItem | null>(null);
   const { resolvedTheme } = useTheme();
   const t = useI18n();
-  const tabLabels = { dashboard: t("home"), news: t("news"), materials: t("materials"), schedule: t("schedule"), services: t("services") };
+  const tabLabels = { dashboard: t("home"), news: t("news"), campus: t("campus"), schedule: t("schedule"), services: t("services") };
 
   // Prof Reviews 路由：从 Home Quick Access / Services 卡片 / 课表深链进入。
   const [rmpDeepLink, setRmpDeepLink] = useState<RmpDeepLink | null>(null);
@@ -184,8 +195,10 @@ export default function App() {
             <Grades onBack={() => setActiveTab("dashboard")} />
           </SwipeBack>
         )}
-        {activeTab === "materials" && <Materials />}
+        {/* Materials 已从底部 Tab 移除，改由首页 NEXT DEADLINE 卡片进入 */}
+        {activeTab === "materials" && <Materials onBack={() => setActiveTab("dashboard")} />}
         {activeTab === "schedule" && <Schedule onOpenReviews={openReviews} />}
+        {activeTab === "campus" && <Campus />}
         {activeTab === "services" && <Services onOpenReviews={openReviews} />}
         {activeTab === "prof-reviews" && <ProfReviews onBack={() => setActiveTab(reviewsReturnRef.current)} deepLink={rmpDeepLink} />}
         {activeTab === "profile" && (
