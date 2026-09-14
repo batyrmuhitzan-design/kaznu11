@@ -23,8 +23,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
 from ..database import get_session
-from ..deps import get_current_user, get_optional_user, limiter
+from ..deps import get_current_user, get_optional_user, limiter, require_staff
 from ..models import (
+    OFFICIAL_BADGE_DEFAULT,
     POST_CATEGORIES,
     ClubEvent,
     GlobalNotification,
@@ -33,6 +34,9 @@ from ..models import (
     PostLike,
     User,
 )
+from ..push import all_push_targets, dispatch_alert, notify_user
+from ..push_payload import build_alert_payload, snippet, text as push_text
+from ..realtime import manager
 from ..schemas import (
     ClubEventOut,
     CommentCreated,
@@ -51,6 +55,7 @@ from ..security import anonymous_hash
 router = APIRouter(tags=["campus"])
 
 _POST_MSG = "Posted to the campus wall."
+_OFFICIAL_MSG = "Official announcement published."
 _COMMENT_MSG = "Comment added."
 _LIKE_ADDED = "Liked."
 _LIKE_REMOVED = "Like removed."
@@ -85,6 +90,8 @@ def _to_post_out(post: Post, *, comment_count: int = 0, liked: bool = False) -> 
         likes_count=post.likes_count or 0,
         comment_count=comment_count,
         liked=liked,
+        is_official=bool(post.is_official),
+        official_badge=post.official_badge,
         created_at=post.created_at,
     )
 
@@ -149,7 +156,9 @@ async def list_posts(
             select(Post)
             .options(joinedload(Post.author))
             .where(*clause)
-            .order_by(Post.created_at.desc())
+            # News 融合：官方公告**置顶**在 Feed 顶部（同组内仍按时间倒序）。
+            # 用布尔排序而不是单独接口，客户端只需渲染一个列表 —— 官方帖带徽章区分即可。
+            .order_by(Post.is_official.desc(), Post.created_at.desc())
             .limit(limit)
             .offset(offset)
         )
@@ -224,6 +233,36 @@ async def toggle_post_like(
         liked, message = True, _LIKE_ADDED
 
     await session.commit()
+
+    # 互动通知：点赞成功（不是取消赞）且不是自己赞自己 → 通知作者。
+    # ⚠️ 这里**不能读 post.author** —— 本查询没有 joinedload，异步懒加载会抛
+    #    MissingGreenlet（greenlet_spawn has not been called）。只读已加载的列。
+    if liked and post.user_id != current.id:
+        await notify_user(
+            session,
+            user_id=post.user_id,
+            kind="like",
+            title=push_text("EN", "like_title"),
+            body=push_text(
+                "EN",
+                "like_body" if not post.is_anonymous else "like_body_anon",
+                actor=current.global_display_name,
+            ),
+            # 帖子是匿名的话，连"谁赞的"都不该出现在通知里（匿名约定）
+            actor_name=None if post.is_anonymous else current.global_display_name,
+            route="post",
+            route_id=post.id,
+            # 幂等：同一人对同一帖反复点赞/取消赞只留一条通知
+            dedupe_key=f"like:{post.id}",
+            text_for=lambda locale: (
+                push_text(locale, "like_title"),
+                push_text(
+                    locale,
+                    "like_body" if not post.is_anonymous else "like_body_anon",
+                    actor=current.global_display_name,
+                ),
+            ),
+        )
     return LikeOut(id=post.id, likes_count=post.likes_count, liked=liked, message=message)
 
 
@@ -294,7 +333,92 @@ async def create_post_comment(
         .options(joinedload(PostComment.author))
         .where(PostComment.id == comment.id)
     )
+
+    # 互动通知：评论 → 通知帖子作者（自己的帖子自己评论不通知）
+    if post.user_id != current.id:
+        await notify_user(
+            session,
+            user_id=post.user_id,
+            kind="comment",
+            title=push_text("EN", "comment_title"),
+            body=push_text(
+                "EN",
+                "comment_body_anon" if payload.is_anonymous else "comment_body",
+                actor=current.global_display_name,
+                snippet=snippet(payload.content),
+            ),
+            # 评论者选择匿名 → 通知里也不能暴露是谁
+            actor_name=None if payload.is_anonymous else current.global_display_name,
+            route="post",
+            route_id=post.id,
+            # 每条评论一条通知（按评论 id 去重，重放同一次请求不会重复打扰）
+            dedupe_key=f"comment:{comment.id}",
+            text_for=lambda locale: (
+                push_text(locale, "comment_title"),
+                push_text(
+                    locale,
+                    "comment_body_anon" if payload.is_anonymous else "comment_body",
+                    actor=current.global_display_name,
+                    snippet=snippet(payload.content),
+                ),
+            ),
+        )
     return CommentCreated(message=_COMMENT_MSG, comment=_to_comment_out(comment))
+
+
+@router.post("/posts/official", response_model=PostCreated, status_code=201)
+@limiter.limit("10/minute")
+async def create_official_post(
+    request: Request,
+    payload: PostIn,
+    current: User = Depends(get_current_user),
+    _staff: User = Depends(require_staff),
+    session: AsyncSession = Depends(get_session),
+) -> PostCreated:
+    """发布**官方公告帖**（staff）—— News 板块融入社区 Feed 的入口。
+
+    * 官方帖在 Feed 里**置顶**并带 ``kaznu.official`` 徽章（``is_official`` 排序靠前）；
+    * 强制 ``is_anonymous=False``：官方公告必须可溯源，不允许匿名；
+    * 创建后在线用户走 WebSocket（``type=official`` → App 直接刷新 Feed），
+      离线设备走 APNs 系统横幅（``route=post``，点进去就是这条帖子）。
+    """
+    post = Post(
+        user_id=current.id,
+        is_anonymous=False,
+        category=payload.category if payload.category in POST_CATEGORIES else "general",
+        content=payload.content,
+        media_urls=payload.media_urls or None,
+        is_official=True,
+        official_badge=OFFICIAL_BADGE_DEFAULT,
+    )
+    session.add(post)
+    await session.commit()
+    await session.refresh(post)
+    post = await session.scalar(
+        select(Post).options(joinedload(Post.author)).where(Post.id == post.id)
+    )
+
+    preview = snippet(post.content, 120)
+    await manager.broadcast(
+        {"type": "official", "post_id": post.id, "title": snippet(post.content, 60)}
+    )
+
+    targets = await all_push_targets(session)
+    if targets:
+        await dispatch_alert(
+            session,
+            targets=targets,
+            # 逐设备构造：官方公告也要按用户手机的语言显示
+            payload_for=lambda target: build_alert_payload(
+                title=push_text(target.locale, "official_title"),
+                body=preview,
+                route="post",
+                route_id=post.id,
+                kind="official",
+                thread_id="kaznu.social.official",
+            ),
+        )
+    return PostCreated(message=_OFFICIAL_MSG, post=_to_post_out(post))
 
 
 @router.get("/club-events", response_model=Page[ClubEventOut])

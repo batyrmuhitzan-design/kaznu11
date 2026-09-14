@@ -94,6 +94,33 @@ class Settings:
     #: 调度循环间隔（秒）
     live_activity_tick_seconds: int = int(os.getenv("LIVE_ACTIVITY_TICK_SECONDS", "60"))
 
+    # ---------- 图片上传 / 存储（发帖与私信的本地相册上传） ----------
+    #: 上传目录（未配云存储时使用），通过 /media 静态挂载对外提供
+    upload_dir: str = os.getenv("UPLOAD_DIR", "./media")
+    #: 单张图片大小上限（字节），默认 8 MB
+    upload_max_bytes: int = int(os.getenv("UPLOAD_MAX_BYTES", str(8 * 1024 * 1024)))
+    #: 上传总开关（出问题时可以一键停掉，客户端会回退到"仅文字"发帖）
+    uploads_enabled: bool = os.getenv("UPLOADS_ENABLED", "true").lower() in {"1", "true", "yes"}
+    #: 对外站点根地址 —— 拼图片**绝对 URL** 用（iOS 端直接拿这个 URL 渲染，不用再拼域名）
+    public_base_url: str = os.getenv("PUBLIC_BASE_URL", "https://1losion.me").rstrip("/")
+    #: local（默认，零凭据可用）| s3（Supabase Storage / Azure Blob S3 网关 / R2 / MinIO）
+    storage_backend: str = os.getenv("STORAGE_BACKEND", "local").lower()
+    s3_endpoint_url: str = os.getenv("S3_ENDPOINT_URL", "")
+    s3_bucket: str = os.getenv("S3_BUCKET", "")
+    s3_region: str = os.getenv("S3_REGION", "auto")
+    s3_access_key_id: str = os.getenv("S3_ACCESS_KEY_ID", "")
+    s3_secret_access_key: str = os.getenv("S3_SECRET_ACCESS_KEY", "")
+    #: 云存储的公开读地址（如 https://<proj>.supabase.co/storage/v1/object/public/<bucket>）
+    s3_public_base: str = os.getenv("S3_PUBLIC_BASE", "").rstrip("/")
+
+    # ---------- 通知推送（全校广播 / 互动通知 / 私信离线推送） ----------
+    #: 关掉后所有普通通知只入库 + 走 WebSocket，不发 APNs（调试用）
+    notifications_push_enabled: bool = os.getenv(
+        "NOTIFICATIONS_PUSH_ENABLED", "true"
+    ).lower() in {"1", "true", "yes"}
+    #: 全校广播时的 APNs 并发批次大小（避免一次性打开上千条 HTTP/2 流）
+    broadcast_push_batch: int = int(os.getenv("BROADCAST_PUSH_BATCH", "120"))
+
 
 @lru_cache
 def get_settings() -> Settings:

@@ -179,6 +179,54 @@ App 底部导航第 3 个 Tab（原 Materials 的位置）；**Materials 改为�
 **优雅降级**：未配置 APNs 凭据时后端照常运行，调度与 `test-push` 返回
 `apns-not-configured` 并说明原因；App 端本地触发链路不受影响。
 
+### 私信 Chat（WebSocket）/ 通知中心 / 图片上传
+
+Campus 社区补全：**一对一私信 + 通知中心 + 全校广播 + 本地相册上传 + News 融入 Feed**。
+
+**数据模型**（启动时 `create_all` 自动建表；`posts` 新增两列由 `_ensure_post_official_columns` 兼容迁移）
+
+| 模型 | 表 | 说明 |
+|---|---|---|
+| `Conversation` | conversations | 一对一会话；参与者按 (a,b) 规范化排序 + 唯一约束 → 天然防重复会话 |
+| `Message` | messages | 私信；`client_id` 唯一约束 = 离线队列幂等键；`read_at` 做已读回执 |
+| `DeviceToken` | device_tokens | 通知用推送 token（**与 Live Activity 注册表分开**，关掉灵动岛也能收通知） |
+| `UserNotification` | user_notifications | 定向通知（点赞/评论/私信/官方）；`(user_id, dedupe_key)` 唯一 → 反复点赞只留一条 |
+| `NotificationReadCursor` | notification_read_cursors | 广播已读游标（一个时间戳，避免广播写 N 行） |
+
+**端点**
+
+| 方法 | 路径 | 用途 |
+|---|---|---|
+| GET/POST | `/chat/conversations` | 会话列表（含未读数）/ 开会话（幂等） |
+| GET/POST | `/chat/conversations/{id}/messages` | 历史（倒序分页）/ 发送（REST 降级通道） |
+| POST | `/chat/read` | 标记已读 + 回执给对方 |
+| GET | `/chat/unread-count` | 私信未读数（角标兜底） |
+| WS | `/api/v1/ws/chat?token=…` | **实时通道**：send / read / typing / ping ↔ ready / message / read / typing / pong / error |
+| GET | `/notifications` | 通知中心（定向通知 + 广播 + 未读总数） |
+| POST | `/notifications/read`、`/{id}/read` | 全部已读 / 单条已读 |
+| POST | `/notifications/devices`、DELETE `/{device_id}` | 推送设备登记 / 注销 |
+| POST | `/notifications/broadcast` | **全校广播**（staff）：入库 + WebSocket + APNs 扇出 |
+| GET | `/notifications/push-status` | 推送自检（staff）：凭据 / alert topic / 设备数 |
+| POST | `/uploads/image` | 图片上传（1-6 张，multipart）→ 绝对 URL |
+| GET | `/uploads/status`、DELETE `/uploads/image` | 存储自检 / 删除（staff） |
+| POST | `/posts/official` | 官方公告帖（staff）→ 置顶 + `kaznu.official` 徽章 + 系统横幅 |
+
+**几条关键设计**
+
+1. **三条通路各司其职**：入库（通知中心/已读）→ WebSocket（在前台秒到、不耗推送配额）→ APNs（**只有离线才发**，避免"前台已看到横幅又弹系统通知"的双重打扰）。
+2. **WS 与 REST 共用 `persist_message()`**：WS 断了前端自动降级走 REST，幂等键（`client_id`）与推送行为完全一致，不会分叉。
+3. **WS 帧必须 `model_dump(mode="json")`**：REST 由 FastAPI 序列化，WS 是自己 `json.dumps` —— 直接塞 Pydantic 对象会抛 `TypeError`，异常发生在 WS 处理器里 → 连接被关、消息发不出（已踩并加测试覆盖）。
+4. **通知文案按设备语言渲染**：`notify_user(text_for=…)` 逐设备构造 payload（一台英文机一台俄文机都对）。
+5. **广播不写 N 行**：`GlobalNotification` + 读游标时间戳，一次广播只写一行。
+6. **上传按文件头校验**（不信 content-type），文件名随机 uuid（**不带用户信息**，符合社区匿名约定）；未配云存储时落本地磁盘 + `/media` 静态挂载，零凭据可用。
+7. **WebSocket 鉴权走 query string**：浏览器 WS 不能自定义 Header；token 无效/封禁在握手阶段以 403 拒绝。
+
+**环境变量**：`UPLOAD_DIR` / `UPLOAD_MAX_BYTES` / `UPLOADS_ENABLED` / `PUBLIC_BASE_URL` /
+`STORAGE_BACKEND=local|s3`（S3 兼容：Supabase Storage / Azure Blob 网关 / R2）+ `S3_*` /
+`NOTIFICATIONS_PUSH_ENABLED` / `BROADCAST_PUSH_BATCH`。
+
+**自检**：`python backend/tests/check_social_api.py` —— 48 项，包含**真起 uvicorn 子进程 + 真 WebSocket 客户端**的端到端断言（收发消息、多端回显、幂等重发、typing、已读回执、鉴权拒绝、异常事件不崩连接）。
+
 ### 管理后台多语言（EN / RU / ZH）
 
 `/admin` 导航栏与登录页都有语言切换器（🌐 下拉），支持 **EN / RU / ZH** 三种语言：

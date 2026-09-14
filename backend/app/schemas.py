@@ -289,6 +289,10 @@ class PostOut(BaseModel):
     comment_count: int = 0
     #: 当前请求者是否已点赞（未登录恒为 False）
     liked: bool = False
+    #: News 板块融合：官方公告帖（Feed 置顶 + 徽章）
+    is_official: bool = False
+    #: 徽章 key（kaznu.official）；前端按 key 取本地化文案，服务器不写死文案
+    official_badge: str | None = None
     created_at: datetime
 
 
@@ -479,4 +483,192 @@ class SchedulerRunOut(BaseModel):
     failed: int
     skipped: str | None = None
     details: list[dict] = []
+
+
+
+# =====================================================================
+# 私信 Chat / 通知中心 / 图片上传
+# =====================================================================
+
+
+class ChatPeerOut(BaseModel):
+    """私信对方（**实名**信息）。
+
+    与校园墙的匿名约定**刻意不同**：私信是一对一沟通，对方必须知道自己在跟谁说话，
+    所以这里始终返回全局显示名 + 院系标签（不提供匿名私信）。
+    """
+
+    id: str
+    display_name: str
+    department_tag: str | None = None
+
+
+class ConversationOut(BaseModel):
+    """会话列表项（含冗余的"最后一条消息"与未读数，避免前端再查两次）。"""
+
+    id: str
+    peer: ChatPeerOut
+    last_message_preview: str = ""
+    last_message_at: datetime | None = None
+    last_sender_id: str | None = None
+    #: 当前用户在这个会话里的未读数
+    unread_count: int = 0
+    created_at: datetime | None = None
+
+
+class ConversationCreated(BaseModel):
+    message: str
+    conversation: ConversationOut
+
+
+class StartConversationIn(BaseModel):
+    """开启会话：既支持 peer_id（从用户列表点进来），也支持 peer_username（从帖子作者点进来）。"""
+
+    peer_id: str | None = Field(default=None, max_length=36)
+    peer_username: str | None = Field(default=None, max_length=120)
+
+
+class MessageOut(BaseModel):
+    id: str
+    conversation_id: str
+    sender_id: str
+    body: str = ""
+    media_urls: list[str] = []
+    #: 客户端幂等键（离线队列重发时用来对齐本地气泡）
+    client_id: str | None = None
+    read_at: datetime | None = None
+    is_deleted: bool = False
+    created_at: datetime | None = None
+    #: 是不是"我发的"（前端据此决定气泡左右与颜色）
+    is_mine: bool = False
+
+
+class MessageIn(BaseModel):
+    body: str = Field(default="", max_length=2000)
+    media_urls: list[str] = Field(default_factory=list)
+    #: 客户端生成的 uuid —— 离线重发时保证幂等（不会出现两个气泡）
+    client_id: str | None = Field(default=None, max_length=64)
+
+
+class MessageCreated(BaseModel):
+    message: str
+    sent: MessageOut
+
+
+class MarkReadIn(BaseModel):
+    conversation_id: str
+
+
+class UnreadCountOut(BaseModel):
+    """角标数据：私信未读 + 通知未读（二者相加 = App 图标角标）。"""
+
+    messages: int = 0
+    notifications: int = 0
+    total: int = 0
+
+
+# ---------------------------------------------------------------- 通知中心
+
+
+class NotificationOut(BaseModel):
+    id: str
+    #: like | comment | message | official | system
+    kind: str
+    title: str
+    body: str = ""
+    #: 点击跳转：post / chat / news / campus / none
+    route: str = "none"
+    route_id: str | None = None
+    actor_name: str | None = None
+    is_read: bool = False
+    created_at: datetime | None = None
+
+
+class BroadcastOut(BaseModel):
+    """全校广播项（来自 GlobalNotification；已读用游标时间戳算，不落 N 行）。"""
+
+    id: str
+    title: str
+    message: str
+    level: str = "info"
+    is_read: bool = False
+    created_at: datetime | None = None
+
+
+class NotificationCenterOut(BaseModel):
+    """通知中心：定向通知（分页）+ 全校广播（不分页，量本来就不大）+ 未读总数。"""
+
+    items: list[NotificationOut] = []
+    broadcasts: list[BroadcastOut] = []
+    total: int = 0
+    limit: int = 20
+    offset: int = 0
+    has_more: bool = False
+    unread_count: int = 0
+
+
+class ReadResultOut(BaseModel):
+    message: str
+    marked: int = 0
+
+
+class DeviceTokenIn(BaseModel):
+    """App 上报推送设备（普通通知用，与 Live Activity 注册分开）。"""
+
+    device_id: str = Field(min_length=4, max_length=64)
+    token: str = Field(min_length=8, max_length=200)
+    platform: str = Field(default="ios", pattern="^(ios|android)$")
+    environment: str = Field(default="sandbox", pattern="^(sandbox|production)$")
+    locale: str = Field(default="EN", pattern="^(EN|KZ|RU)$")
+    alerts_enabled: bool = True
+
+
+class DeviceTokenOut(BaseModel):
+    id: str
+    device_id: str
+    platform: str
+    environment: str
+    locale: str
+    alerts_enabled: bool
+    created_at: datetime | None = None
+
+
+class BroadcastIn(BaseModel):
+    """管理员全校广播（App 内顶部 Banner + 系统横幅 + 通知中心）。"""
+
+    title: str = Field(min_length=1, max_length=200)
+    message: str = Field(min_length=1, max_length=2000)
+    level: str = Field(default="info", pattern="^(info|warning|danger)$")
+
+
+class BroadcastResultOut(BaseModel):
+    id: str
+    ws: int = 0
+    targets: int = 0
+    push: dict = {}
+
+
+# ---------------------------------------------------------------- 图片上传
+
+
+class UploadedImageOut(BaseModel):
+    """上传成功返回的图片描述。``url`` 是绝对地址，客户端可直接渲染。"""
+
+    url: str
+    key: str
+    size: int
+    content_type: str
+
+
+class UploadStatusOut(BaseModel):
+    """上传服务自检（staff）。"""
+
+    backend: str
+    configured_backend: str
+    uploads_enabled: bool
+    upload_dir: str | None = None
+    dir_writable: bool = False
+    public_base_url: str
+    max_bytes: int
+    allowed_types: list[str] = []
 

@@ -194,6 +194,10 @@ class Post(Base):
     likes_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     # 管理员在 /admin 里下架（软删除），软删除后不出现在公开列表
     is_hidden: Mapped[bool] = mapped_column(Boolean, default=False, index=True, nullable=False)
+    #: **News 板块融合**：官方公告帖 —— 置顶在 Feed 顶部、带官方徽章，只有 staff 能创建
+    is_official: Mapped[bool] = mapped_column(Boolean, default=False, index=True, nullable=False)
+    #: 徽章 key（默认 kaznu.official）；存 key 不存文案，前端按语言取本地化字符串
+    official_badge: Mapped[str | None] = mapped_column(String(40), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, index=True)
 
     author: Mapped[User] = relationship()
@@ -432,4 +436,191 @@ class LiveActivityPushLog(Base):
     pushed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
 
+
+
+# =====================================================================
+# 私信 Chat / 通知中心 / 推送设备（Campus 社区功能补全）
+# =====================================================================
+
+#: 私信正文长度上限（与前端 maxLength 一致）
+MESSAGE_MAX_LEN = 2000
+#: 一条消息最多附带的图片数（与发帖 media_urls 上限一致）
+MESSAGE_MAX_MEDIA = 6
+
+#: 通知类型
+#:   like / comment —— 别人的互动（点赞、评论）
+#:   message        —— 收到私信
+#:   official       —— 官方公告（News 融合后的置顶帖）
+#:   broadcast      —— 全校广播（由 GlobalNotification 承载，不落 UserNotification）
+#:   system         —— 其他系统消息
+NOTIFICATION_KINDS = ("like", "comment", "message", "official", "broadcast", "system")
+
+#: 官方帖默认徽章 key（前台按 key 取本地化文案，服务器不写死文案）
+OFFICIAL_BADGE_DEFAULT = "kaznu.official"
+
+#: 通知点击后的跳转目标（前端路由用）
+NOTIFICATION_ROUTES = ("post", "chat", "news", "campus", "none")
+
+
+class DeviceToken(Base):
+    """一台设备的推送 token（每个用户 + 设备一条）。
+
+    与 ``LiveActivityRegistration`` 的分工**必须分清**，否则会互相覆盖：
+
+    * ``live_activity_registrations`` 是 **Live Activity 专用**：除了 device_token
+      还存 push-to-start token、时区、课前提醒开关（灵动岛场景）；
+    * ``device_tokens`` 是 **通知专用**：全校广播 / 点赞评论 / 私信。
+      用户可以关掉灵动岛提醒但继续收通知，所以两者不能合成一张表。
+
+    发推送时把两处的 token 合并去重（见 ``push.push_targets``）。
+    """
+
+    __tablename__ = "device_tokens"
+    __table_args__ = (
+        UniqueConstraint("user_id", "device_id", name="uq_device_token_user_device"),
+        Index("ix_device_token_token", "token"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    user_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    #: 客户端自生成的安装标识（卸载重装会变）—— 同一用户多台设备去重
+    device_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    token: Mapped[str] = mapped_column(String(200), nullable=False)
+    #: ios | android
+    platform: Mapped[str] = mapped_column(String(16), default="ios", nullable=False)
+    #: sandbox | production（开发构建必须 sandbox，否则 APNs 返回 BadDeviceToken）
+    environment: Mapped[str] = mapped_column(String(16), default="sandbox", nullable=False)
+    #: App 语言 —— 推送文案由**服务器**生成，所以必须记住用户语言
+    locale: Mapped[str] = mapped_column(String(8), default="EN", nullable=False)
+    #: 通知总开关（App 设置里的"接收推送"）
+    alerts_enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    last_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
+class Conversation(Base):
+    """一对一私信会话。
+
+    **参与者用 a/b 两个字段 + 规范化排序**（小的 user_id 放 a），
+    这样 ``UniqueConstraint(user_a_id, user_b_id)`` 就能天然防止"同一对用户建出两条会话"，
+    不需要额外 join 表 —— 需求只要求一对一私信，不需要群聊。
+    """
+
+    __tablename__ = "conversations"
+    __table_args__ = (
+        UniqueConstraint("user_a_id", "user_b_id", name="uq_conversation_pair"),
+        Index("ix_conversation_last_message", "last_message_at"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    user_a_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    user_b_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    #: 列表页直接读这两个冗余字段，避免为每条会话再查一次消息表
+    last_message_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, index=True)
+    last_message_preview: Mapped[str] = mapped_column(String(140), default="", nullable=False)
+    last_sender_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+    user_a: Mapped[User] = relationship(foreign_keys=[user_a_id])
+    user_b: Mapped[User] = relationship(foreign_keys=[user_b_id])
+
+    @staticmethod
+    def ordered(user_one: str, user_two: str) -> tuple[str, str]:
+        """规范化参与者顺序（保证同一对用户只有一种 (a, b) 组合）。"""
+        return (user_one, user_two) if user_one <= user_two else (user_two, user_one)
+
+    def peer_of(self, user_id: str) -> str:
+        """取"对方"的 user_id。"""
+        return self.user_b_id if self.user_a_id == user_id else self.user_a_id
+
+
+class Message(Base):
+    """私信消息（支持图片附件）。
+
+    ``client_id`` 是**离线队列的幂等键**：客户端断网时把消息排队，恢复后重发可能重复投递，
+    靠 ``UniqueConstraint(conversation_id, client_id)`` 保证同一条只落库一次
+    （客户端生成 uuid，服务端回显同一条，不产生重复气泡）。
+    """
+
+    __tablename__ = "messages"
+    __table_args__ = (
+        Index("ix_message_conversation_created", "conversation_id", "created_at"),
+        UniqueConstraint("conversation_id", "client_id", name="uq_message_client_id"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    conversation_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("conversations.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    sender_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    body: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    media_urls: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    #: 客户端幂等键（uuid；同一条重发只落库一次）
+    client_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    #: 对方读到的时间（null = 未读）
+    read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    #: 软删除（撤回 / 管理员下架都不物理删行，保留审计轨迹）
+    is_deleted: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, index=True)
+
+    sender: Mapped[User] = relationship()
+
+
+class UserNotification(Base):
+    """定向通知（点赞 / 评论 / 私信 / 官方公告）。
+
+    **全校广播不写这张表** —— 广播由 ``GlobalNotification`` 承载，否则一次广播要写 N 行
+    （N = 用户数）。通知中心把两者合并返回，广播的已读状态用
+    ``NotificationReadCursor.broadcasts_read_at`` 一个时间戳表达。
+    """
+
+    __tablename__ = "user_notifications"
+    __table_args__ = (
+        Index("ix_user_notification_user_created", "user_id", "created_at"),
+        Index("ix_user_notification_user_unread", "user_id", "is_read"),
+        # 幂等：同一个人对同一条帖子反复点赞/取消赞，只留一条通知
+        UniqueConstraint("user_id", "dedupe_key", name="uq_user_notification_dedupe"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    user_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    #: like | comment | message | official | system
+    kind: Mapped[str] = mapped_column(String(16), default="system", index=True, nullable=False)
+    title: Mapped[str] = mapped_column(String(200), default="", nullable=False)
+    body: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    #: 点击后跳哪里：post / chat / news / campus / none
+    route: Mapped[str] = mapped_column(String(16), default="none", nullable=False)
+    #: 跳转目标 id（帖子 id / 会话 id / 新闻 id）
+    route_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    #: 触发者显示名；**匿名互动时留空** —— 与社区匿名约定一致，不因通知泄露身份
+    actor_name: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    is_read: Mapped[bool] = mapped_column(Boolean, default=False, index=True, nullable=False)
+    #: 去重键（如 like:{post_id}），配合 UniqueConstraint 实现幂等
+    dedupe_key: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, index=True)
+
+
+class NotificationReadCursor(Base):
+    """每个用户的"广播读到哪儿了"游标（配合 GlobalNotification 使用）。
+
+    只需一行/人，就能表达"全校广播的已读状态"，避免每次广播写 N 行 UserNotification。
+    """
+
+    __tablename__ = "notification_read_cursors"
+
+    user_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    )
+    broadcasts_read_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, onupdate=_now)
 

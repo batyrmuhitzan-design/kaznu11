@@ -18,7 +18,18 @@ from .config import settings
 from .database import SessionLocal, init_db
 from .deps import limiter
 from .routers import admin as admin_routes
-from .routers import auth, campus, courses, live_activity, me, professors, reports as report_routes
+from .routers import (
+    auth,
+    campus,
+    chat,
+    courses,
+    live_activity,
+    me,
+    notifications,
+    professors,
+    reports as report_routes,
+    uploads,
+)
 from .routers import reviews, super_admin
 from .seed import seed_campus_if_empty, seed_if_empty
 
@@ -122,6 +133,15 @@ def _make_app() -> FastAPI:
     app.include_router(campus.router, prefix="/api/v1")
     # Live Activity 远程推送：注册 token / 服务器侧课表 / 课前调度
     app.include_router(live_activity.router, prefix="/api/v1")
+    # 私信 Chat：REST（历史/发送/已读）+ WebSocket（/api/v1/ws/chat）
+    app.include_router(chat.router, prefix="/api/v1")
+    # 通知中心 + 全校广播 + 推送设备注册
+    app.include_router(notifications.router, prefix="/api/v1")
+    # 图片上传（本地相册 → FormData → 存储 → URL）
+    app.include_router(uploads.router, prefix="/api/v1")
+
+    # 上传的图片：本地存储后端下通过 /media 静态提供（云存储后端则由其公网域名直接提供）
+    _mount_media(app)
 
     # Legacy endpoints the 1.3 frontend already consumes (/api/schedule etc).
     app.include_router(_legacy_router())
@@ -156,6 +176,28 @@ def _make_app() -> FastAPI:
         }
 
     return app
+
+
+def _mount_media(app: FastAPI) -> None:
+    """把上传目录挂到 ``/media``（本地存储后端用）。
+
+    * 目录不存在就先创建 —— 首次部署时 ``upload_dir`` 还没生成，
+      不创建会让 ``StaticFiles`` 直接抛错、整个 App 起不来；
+    * ``STORAGE_BACKEND=s3`` 时不用这个挂载（图片 URL 由存储服务自己的域名提供）；
+    * 刻意用 ``check_dir=False``：万一目录之后被清理，也只是图片 404，
+      不会拖垮整个服务。
+    """
+    try:
+        from fastapi.staticfiles import StaticFiles
+
+        from .storage import LocalStorage
+
+        root = LocalStorage().root
+        root.mkdir(parents=True, exist_ok=True)
+        app.mount("/media", StaticFiles(directory=str(root), check_dir=False), name="media")
+        print(f"[kaznu] 图片存储已挂载: /media → {root}")
+    except Exception as exc:  # pragma: no cover - 挂载失败不应阻断启动
+        print(f"[warn] /media 挂载失败（上传的图片将无法直接访问）: {exc}")
 
 
 def _legacy_router():

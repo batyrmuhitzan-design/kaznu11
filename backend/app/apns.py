@@ -24,6 +24,11 @@ from .config import settings
 APNS_HOST_SANDBOX = "https://api.sandbox.push.apple.com"
 APNS_HOST_PRODUCTION = "https://api.push.apple.com"
 
+#: APNs 明确表示"该 device token 已失效"的两个 reason —— 收到就应把本地记录标记失效，
+#: 否则每次广播都会重复打到一个永远失败的 token 上（既慢又浪费配额）。
+APNS_REASON_UNREGISTERED = "Unregistered"
+APNS_REASON_BAD_TOKEN = "BadDeviceToken"
+
 #: JWT 刷新间隔（APNs 上限 1 小时）
 _JWT_TTL_SECONDS = 40 * 60
 
@@ -32,6 +37,11 @@ def live_activity_topic(bundle_id: str | None = None) -> str:
     """Live Activity 的 APNs topic。"""
     bundle = (bundle_id or settings.apns_bundle_id or "com.kaznu.helper").strip()
     return f"{bundle}.push-type.liveactivity"
+
+
+def alert_topic(bundle_id: str | None = None) -> str:
+    """普通通知（系统横幅）的 APNs topic —— **主 App 的 Bundle ID，没有后缀**。"""
+    return (bundle_id or settings.apns_bundle_id or "com.kaznu.helper").strip()
 
 
 @dataclass
@@ -201,6 +211,71 @@ class ApnsClient:
         """
         if not settings.live_activity_push_enabled:
             return ApnsResult(False, None, "push-disabled", "LIVE_ACTIVITY_PUSH_ENABLED=false")
+        return await self._push(
+            token=token,
+            payload=payload,
+            topic=live_activity_topic(),
+            push_type="liveactivity",
+            event=event,
+            environment=environment,
+            priority=priority,
+            collapse_id=collapse_id,
+            expiration=expiration,
+        )
+
+    async def send_alert(
+        self,
+        *,
+        token: str,
+        payload: dict[str, Any],
+        environment: str | None = None,
+        priority: int = 10,
+        collapse_id: str | None = None,
+        expiration: int = 0,
+    ) -> ApnsResult:
+        """发送一条**普通通知**（系统横幅：全校广播 / 点赞评论 / 私信）。
+
+        与 Live Activity 的唯一实质差别是 topic 与 push-type：
+
+            apns-topic      = 主 App 的 Bundle ID（``settings.apns_bundle_id``）
+            apns-push-type  = alert
+
+        ⚠️ 用错 topic（比如发通知却用了 ``…push-type.liveactivity``）会被 APNs
+        直接拒绝（``TopicDisallowed``），而且**锁屏上什么都不会出现**，
+        排查时很容易误以为是 payload 写错了。
+
+        ``payload`` 由 ``push_payload.build_alert_payload`` 构造（契约唯一来源）。
+        """
+        if not settings.notifications_push_enabled:
+            return ApnsResult(False, None, "push-disabled", "NOTIFICATIONS_PUSH_ENABLED=false")
+        return await self._push(
+            token=token,
+            payload=payload,
+            topic=settings.apns_bundle_id,
+            push_type="alert",
+            event="alert",
+            environment=environment,
+            priority=priority,
+            collapse_id=collapse_id,
+            expiration=expiration,
+        )
+
+    # ------------------------------------------------------- 共用发送实现
+
+    async def _push(
+        self,
+        *,
+        token: str,
+        payload: dict[str, Any],
+        topic: str,
+        push_type: str,
+        event: str,
+        environment: str | None = None,
+        priority: int = 10,
+        collapse_id: str | None = None,
+        expiration: int = 0,
+    ) -> ApnsResult:
+        """Live Activity 与普通通知共用的 HTTP/2 发送路径。"""
         if not self.configured:
             return ApnsResult(False, None, "apns-not-configured", "缺少 APNs 凭据，未发送")
 
@@ -217,8 +292,8 @@ class ApnsClient:
 
         headers = {
             "authorization": f"bearer {jwt_token}",
-            "apns-topic": live_activity_topic(),
-            "apns-push-type": "liveactivity",
+            "apns-topic": topic,
+            "apns-push-type": push_type,
             "apns-priority": str(priority),
             "apns-expiration": str(expiration),
             "content-type": "application/json",

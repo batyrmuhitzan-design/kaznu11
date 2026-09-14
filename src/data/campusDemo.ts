@@ -36,6 +36,10 @@ export interface CampusPost {
   likes_count: number;
   comment_count: number;
   liked: boolean;
+  /** News 融合：官方公告帖（Feed 置顶 + 官方徽章），只有 staff 能创建 */
+  is_official?: boolean;
+  /** 徽章 key（kaznu.official）；前端按 key 取本地化文案 */
+  official_badge?: string | null;
   created_at: string;
   /** true = 本地离线创建（未同步到服务器），UI 会标注"未同步" */
   local_only?: boolean;

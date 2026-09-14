@@ -43,6 +43,12 @@ reportlab>=4.1
 httpx>=0.27        # backend/tests/smoke_test.py 使用
 aiosqlite>=0.20    # 无 PostgreSQL 时的本地冒烟测试（DATABASE_URL=sqlite+aiosqlite）
 
+# ---------- 私信 Chat / 通知 / 图片上传 ----------
+# FastAPI 的 WebSocket 运行时实现（uvicorn[standard] 也会带上，但显式声明更可靠）
+websockets>=12
+# FormData 图片上传：FastAPI 解析 multipart 必需（缺了会在启动时直接报错）
+python-multipart>=0.0.9
+
 # ---------- 可选：Live Activity 远程推送（APNs）----------
 # 默认**不装**：代码对它们是惰性导入，缺失时 apns.py 会优雅降级（configured=false）。
 # 只有真的要用服务器推送 Live Activity 时才需要装（并配 APNS_* 环境变量）：
