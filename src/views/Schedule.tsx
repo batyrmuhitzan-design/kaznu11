@@ -300,7 +300,7 @@ export default function Schedule({ onOpenReviews }: { onOpenReviews?: (professor
   return (
     <div className="h-full flex flex-col overflow-hidden transition-colors duration-300" style={{ background: theme.bg }}>
       {/* Header */}
-      <div className="px-4 pt-2 pb-3 shrink-0">
+      <div className="screen-pin px-4 pb-3 shrink-0">
         <div className="flex items-center justify-between mb-4">
           <h1 className={`text-2xl font-bold ${theme.headerText}`} style={{ letterSpacing: "-0.5px" }}>
             {t("schedule")}

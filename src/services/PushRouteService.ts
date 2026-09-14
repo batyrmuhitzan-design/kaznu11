@@ -98,7 +98,8 @@ export function applyPushRoute(route: string, routeId: string | null): PushTarge
     case "post":
       return { tab: "campus", id: routeId };
     case "news":
-      return { tab: "news", id: routeId };
+      // News 已并入 Campus 的「新闻」分段，所以新闻类通知落到 Hub 页
+      return { tab: "campus", id: null };
     case "campus":
       return { tab: "campus", id: null };
     default:

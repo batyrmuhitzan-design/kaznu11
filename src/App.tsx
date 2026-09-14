@@ -8,7 +8,6 @@ import Services from "./views/Services";
 import Profile from "./views/Profile";
 import ProfReviews, { type RmpDeepLink } from "./views/ProfReviews";
 import { useI18n } from "./contexts/LanguageContext";
-import News, { NewsDetail, type NewsItem } from "./views/News";
 import NotificationCenter from "./views/NotificationCenter";
 import ChatList, { ChatDetail } from "./views/Chat";
 import {
@@ -21,6 +20,7 @@ import {
   fetchNotificationUnread,
   handleRealtimeNotificationEvent,
   notifyRealtimeChange,
+  startNotificationWatcher,
   subscribeBanner,
   type InAppBanner,
 } from "./services/NotificationService";
@@ -43,9 +43,8 @@ import { attachLiveActivityPushSync } from "./services/LiveActivityPushService";
 
 const TABS = [
   { id: "dashboard", label: "Home", icon: "house.fill" },
-  { id: "news", label: "News", icon: "newspaper.fill" },
-  // 第 3 个 Tab 由 Materials 换成 Campus Hub（校园娱乐与交流社区）；
-  // Materials 改为从首页「NEXT DEADLINE」卡片进入（见 Dashboard 的 DDL 卡片）。
+  // News 已并入 Campus Hub 的「新闻」分段（不再占一个底部 Tab）；
+  // Campus 是校园社区 + 活动 + 新闻的统一入口。
   { id: "campus", label: "Campus", icon: "sparkles" },
   { id: "schedule", label: "Schedule", icon: "calendar" },
   { id: "services", label: "Services", icon: "square.grid.2x2.fill" },
@@ -98,7 +97,6 @@ function TabIcon({ icon, active }: { icon: string; active: boolean }) {
 export default function App() {
   const [activeTab, setActiveTab] = useState("dashboard");
   const [authed, setAuthed] = useState(() => isSessionValid());
-  const [selectedNews, setSelectedNews] = useState<NewsItem | null>(null);
   /** 私信：正在打开的会话（null = 显示会话列表）。进入详情前的 Tab 由 chatsReturnRef 记住 */
   const [openConversation, setOpenConversation] = useState<Conversation | null>(null);
   const chatsReturnRef = useRef("dashboard");
@@ -108,7 +106,7 @@ export default function App() {
   const [campusFocusPostId, setCampusFocusPostId] = useState<string | null>(null);
   const { resolvedTheme } = useTheme();
   const t = useI18n();
-  const tabLabels = { dashboard: t("home"), news: t("news"), campus: t("campus"), schedule: t("schedule"), services: t("services") };
+  const tabLabels = { dashboard: t("home"), campus: t("campus"), schedule: t("schedule"), services: t("services") };
 
   // Prof Reviews 路由：从 Home Quick Access / Services 卡片 / 课表深链进入。
   const [rmpDeepLink, setRmpDeepLink] = useState<RmpDeepLink | null>(null);
@@ -205,6 +203,13 @@ export default function App() {
     const timer = window.setTimeout(() => setBanner(null), 6000);
     return () => window.clearTimeout(timer);
   }, [banner]);
+
+  // 前台通知看护：45s 轮询"最新广播 + 未读数" —— 兜底"管理端直接往数据库插通知"
+  // 这种没有 WebSocket 帧的情况（不走这里就只能重启 App 才看得到）
+  useEffect(() => {
+    if (!authed) return;
+    return startNotificationWatcher();
+  }, [authed]);
 
   // 用会话 id 打开私信：推送点击只带 id，对端信息要从会话列表里取
   const openConversationById = useCallback(async (conversationId: string) => {
@@ -339,6 +344,12 @@ export default function App() {
           <Campus
             focusPostId={campusFocusPostId}
             onFocusHandled={() => setCampusFocusPostId(null)}
+            onOpenChat={() => {
+              // Hub 页顶部的私信入口
+              chatsReturnRef.current = "campus";
+              setOpenConversation(null);
+              setActiveTab("chat");
+            }}
             onOpenConversation={(conversation) => {
               // 从帖子点「私信」→ 记住来路是 Campus，返回时回到校园墙
               chatsReturnRef.current = "campus";
@@ -354,12 +365,7 @@ export default function App() {
             <Profile onBack={() => setActiveTab("dashboard")} />
           </SwipeBack>
         )}
-        {activeTab === "news" && <News onOpenDetail={(item) => { setSelectedNews(item); setActiveTab("news-detail"); }} />}
-        {activeTab === "news-detail" && selectedNews && (
-          <SwipeBack onBack={() => setActiveTab("news")}>
-            <NewsDetail item={selectedNews} onBack={() => setActiveTab("news")} />
-          </SwipeBack>
-        )}
+        {/* News 已并入 Campus 的「新闻」分段：不再有独立 Tab，也没有独立详情路由 */}
       </div>
 
       {/* Tab Bar */}

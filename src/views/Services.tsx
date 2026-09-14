@@ -258,7 +258,7 @@ export default function Services({ onOpenReviews }: { onOpenReviews?: () => void
 
   return (
     <div className="app-surface h-full flex flex-col overflow-hidden">
-      <div className="flex items-center justify-between gap-2 px-4 py-2 w-full overflow-hidden">
+      <div className="flex items-center justify-between gap-2 px-4 w-full overflow-hidden screen-pin">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white shrink-0 truncate" style={{ letterSpacing: "-0.5px" }}>{t("campusHub")}</h1>
         <div className="flex items-center gap-2 shrink-0">
           <span className="px-2.5 py-1 text-xs font-medium bg-gray-100 dark:bg-zinc-800 text-gray-700 dark:text-gray-300 rounded-full flex items-center gap-1 border border-gray-200 dark:border-zinc-700 whitespace-nowrap">

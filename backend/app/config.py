@@ -44,6 +44,8 @@ class Settings:
     # The demo gate still enforces the *Univer account shape* (student id / @student.kaznu.kz).
     demo_password: str = os.getenv("DEMO_PASSWORD", "123456")
     demo_all_password: bool = os.getenv("DEMO_ALL_PASSWORD", "true").lower() in {"1", "true", "yes"}
+    #: 新用户首次登录时，由"校园助手"演示账号主动发一条欢迎私信（演示构建默认开；生产关掉）
+    demo_welcome_dm: bool = os.getenv("DEMO_WELCOME_DM", "true").lower() in {"1", "true", "yes"}
 
     # Pepper for the per-account anonymous hash (never persisted raw).
     anon_hash_secret: str = os.getenv("ANON_HASH_SECRET", "kaznu-helper-dev-pepper-change-me")

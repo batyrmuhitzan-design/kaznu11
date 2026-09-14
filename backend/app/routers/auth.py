@@ -93,6 +93,12 @@ async def login(
     Enforced here already: username must look like a real Univer account, not an arbitrary alias.
     """
     user, is_new = await _get_or_create_user(session, payload.username, payload.password)
+    if is_new:
+        # 首次登录：让"校园助手"演示账号真发一条欢迎私信（未读数 / 会话列表 / 图文气泡立刻可测）。
+        # 失败也不影响登录 —— send_welcome_dm 内部已经把异常吞掉了。
+        from ..welcome import send_welcome_dm
+
+        await send_welcome_dm(session, user)
     token = create_access_token(user.id)
     return LoginOut(
         access_token=token,

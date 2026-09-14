@@ -15,6 +15,7 @@
  */
 import { useEffect, useState } from "react";
 import type { NotificationLevel } from "../data/campusDemo";
+import { postSystemBannerNow } from "../native/notifications";
 import { API_BASE_URL, blockInsecureRequest } from "../utils/config";
 import { rmpEnsureToken } from "./ProfReviewsService";
 
@@ -197,6 +198,52 @@ export function getBanner(): InAppBanner | null {
 function setBanner(next: InAppBanner | null): void {
   banner = next;
   bannerListeners.forEach((cb) => cb(next));
+  if (!next || hasSeenBanner(next.id)) return;
+  rememberBanner(next.id);
+  // 同一事件走两条通路：应用内浮层（上）+ 真实 iOS 系统横幅（下，走本地通知）
+  void postSystemBannerNow({
+    id: bannerNotificationId(next.id),
+    threadId: next.origin === "broadcast" ? "kaznu.broadcast" : "kaznu.notify",
+    title: next.title,
+    body: next.message,
+  });
+}
+
+/** 已弹过横幅的 id（持久化：否则重启 App 会把同一条广播再弹一遍） */
+const SEEN_BANNER_KEY = "kaznu:seenBannerIds";
+
+function seenBannerIds(): string[] {
+  try {
+    const raw = localStorage.getItem(SEEN_BANNER_KEY);
+    const list = raw ? (JSON.parse(raw) as string[]) : [];
+    return Array.isArray(list) ? list : [];
+  } catch {
+    return [];
+  }
+}
+
+function hasSeenBanner(id: string): boolean {
+  return seenBannerIds().includes(id);
+}
+
+function rememberBanner(id: string): void {
+  try {
+    localStorage.setItem(SEEN_BANNER_KEY, JSON.stringify([...seenBannerIds(), id].slice(-50)));
+  } catch {
+    /* 存储不可用时最多"重启后再弹一次"，不影响功能 */
+  }
+}
+
+/**
+ * 横幅对应的**数字通知 id**（iOS 本地通知要 int）。
+ *
+ * 用 80_000 段：避开课前提醒（<10_000）与即时横幅（60_000 / 70_000，见 native/notifications.ts），
+ * 三者互不覆盖 —— 否则广播会把"上课提醒"顶掉。
+ */
+function bannerNotificationId(seed: string): number {
+  let hash = 0;
+  for (let i = 0; i < seed.length; i += 1) hash = (hash * 31 + seed.charCodeAt(i)) >>> 0;
+  return 80_000 + (hash % 9_900);
 }
 
 /** 关闭当前 Banner（用户手动 × 掉，或超时自动收起）。 */
@@ -269,4 +316,77 @@ export function handleRealtimeNotificationEvent(event: {
     return true;
   }
   return false;
+}
+
+// =====================================================================
+// 前台通知看护（管理端直插数据库时的兜底）
+// =====================================================================
+
+/** 前台轮询间隔（45s：够及时，又不至于费电/费流量） */
+const FOREGROUND_POLL_MS = 45_000;
+
+interface LatestBroadcast {
+  id: string;
+  title: string;
+  message: string;
+  level: NotificationLevel;
+  created_at: string | null;
+}
+
+/**
+ * 前台通知看护：登录后挂载，返回卸载函数。
+ *
+ * **为什么必须有它** —— 管理端发全校通知有两条路径：
+ *  1) 调 `POST /notifications/broadcast`（App 内广播面板 / API）：会**同时**推 WebSocket 帧，
+ *     在线用户秒到（见 `backend/app/push.py → broadcast_notification`）；
+ *  2) 直接在 SQLAdmin 后台往 `global_notifications` 表插一行：**不产生任何实时帧**，
+ *     只能靠轮询发现，否则用户得重启 App 才看得到（"我在管理端发了通知但 App 没反应"就是这个原因）。
+ *
+ * 每 45s + 每次回前台：拉一次"最新广播"与未读数 → 没弹过就弹（应用内 Banner + 真实系统横幅）。
+ *
+ * ⚠️ **App 被系统杀掉时收不到**：iOS 不允许常驻进程，唯一途径是 APNs 远程推送，
+ * 服务器需配 `.p8` 凭据（客户端 token 上报已在 `PushRegistrationService` 就绪，配好即生效）。
+ */
+export function startNotificationWatcher(): () => void {
+  let timer: number | undefined;
+  let stopped = false;
+
+  const tick = async () => {
+    if (stopped || document.visibilityState !== "visible") return;
+    const res = await apiFetchAuthed("/notifications/latest", {}, 5000);
+    if (res && res.ok) {
+      let latest: LatestBroadcast | null = null;
+      try {
+        latest = (await res.json()) as LatestBroadcast | null;
+      } catch {
+        latest = null;
+      }
+      if (latest?.id && !hasSeenBanner(latest.id)) {
+        // 统一走 setBanner：应用内浮层 + 系统横幅 + 去重都在那里完成
+        setBanner({
+          id: latest.id,
+          title: latest.title,
+          message: latest.message,
+          level: latest.level ?? "info",
+          origin: "broadcast",
+        });
+        bumpRevision();
+      }
+    }
+    void fetchNotificationUnread();
+  };
+
+  const onVisible = () => {
+    if (document.visibilityState === "visible") void tick();
+  };
+
+  void tick();
+  timer = window.setInterval(() => void tick(), FOREGROUND_POLL_MS);
+  document.addEventListener("visibilitychange", onVisible);
+
+  return () => {
+    stopped = true;
+    if (timer !== undefined) window.clearInterval(timer);
+    document.removeEventListener("visibilitychange", onVisible);
+  };
 }

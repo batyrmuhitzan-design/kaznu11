@@ -324,7 +324,7 @@ const QUICK = [
   { key: "univer", icon: "🔔", label: "univer", target: "services", color: "#F59E0B", bg: "rgba(245,158,11,0.13)" },
   { key: "dorm", icon: "🏠", label: "dorm", target: "dorm", color: "#007AFF", bg: "rgba(0,122,255,0.15)" },
   { key: "grades", icon: "🎓", label: "grades", target: "grades", color: "#30D158", bg: "rgba(48,209,88,0.13)" },
-  { key: "news", icon: "📰", label: "news", target: "news", color: "#FF453A", bg: "rgba(255,69,58,0.12)" },
+  { key: "news", icon: "📰", label: "news", target: "campus", color: "#FF453A", bg: "rgba(255,69,58,0.12)" },
   { key: "profile", icon: "👤", label: "profile", target: "profile", color: "#00C7BE", bg: "rgba(0,199,190,0.13)" },
 ];
 

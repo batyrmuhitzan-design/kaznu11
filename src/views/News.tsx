@@ -54,7 +54,14 @@ export function NewsDetail({ item, onBack }: { item: NewsItem; onBack: () => voi
   );
 }
 
-export default function News({ onOpenDetail }: { onOpenDetail: (item: NewsItem) => void }) {
+/**
+ * 新闻列表 —— 内嵌在 Campus Hub 的「新闻」分段里。
+ *
+ * 所以它**刻意不含自己的顶部栏**：标题与分段控件由 Campus 统一负责，
+ * 否则会出现"双层标题 + 两个滚动容器"的错乱。
+ * 需要独立页面（例如从推送直接进新闻）时，用 App 的路由把它塞进 Campus 分段即可。
+ */
+export function NewsList({ onOpenDetail }: { onOpenDetail: (item: NewsItem) => void }) {
   const t = useI18n();
   const [items, setItems] = useState<NewsItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -103,19 +110,14 @@ export default function News({ onOpenDetail }: { onOpenDetail: (item: NewsItem) 
   }, []);
 
   return (
-    <div className="app-surface h-full flex flex-col overflow-hidden">
-      <div className="screen-pin px-4 pt-1">
-        <h1 className="text-2xl font-bold text-white">{t("news")}</h1>
-      </div>
-      <div className="flex-1 min-h-0 overflow-y-auto px-4 pt-3 pb-28 animate-slide-up">
-        <div className="space-y-2.5">
-          {loading ? <div className="glass squircle-md p-5 theme-muted text-sm">{t("loadingNews")}</div> : items.map((item) => (
-            <button key={item.id} type="button" onClick={() => onOpenDetail(item)} className="haptic-action news-card glass w-full text-left flex items-center gap-3.5 px-4 py-4">
-              <div className="min-w-0 flex-1"><h2 className="text-[15px] font-semibold text-white truncate">{item.title}</h2><p className="theme-muted text-xs mt-1">{formatDate(item.published_at)}</p></div>
-              <span className="theme-muted shrink-0"><Arrow /></span>
-            </button>
-          ))}
-        </div>
+    <div className="flex-1 min-h-0 overflow-y-auto px-4 pt-1 pb-28 animate-slide-up">
+      <div className="space-y-2.5">
+        {loading ? <div className="glass squircle-md p-5 theme-muted text-sm">{t("loadingNews")}</div> : items.map((item) => (
+          <button key={item.id} type="button" onClick={() => onOpenDetail(item)} className="haptic-action news-card glass w-full text-left flex items-center gap-3.5 px-4 py-4">
+            <div className="min-w-0 flex-1"><h2 className="text-[15px] font-semibold text-white truncate">{item.title}</h2><p className="theme-muted text-xs mt-1">{formatDate(item.published_at)}</p></div>
+            <span className="theme-muted shrink-0"><Arrow /></span>
+          </button>
+        ))}
       </div>
     </div>
   );

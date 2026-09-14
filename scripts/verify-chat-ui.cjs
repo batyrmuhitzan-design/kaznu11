@@ -171,6 +171,42 @@ if (/class PostAuthorOut[\s\S]{0,500}?id: str \| None = None/.test(schemas)) {
 if (/id=user\.id if user else None/.test(campusRouter)) ok("后端: 实名帖填作者 id、匿名帖置 None");
 else bad("后端: 作者 id 未按匿名规则填充");
 
+// ------------------------------------------------------------------ 9b) News 并入 Hub / 顶部栏固定 / 系统横幅兜底
+const news = read("src/views/News.tsx");
+const schedule = read("src/views/Schedule.tsx");
+const services = read("src/views/Services.tsx");
+
+if (!/\{ id: "news"/.test(app)) ok("App: 底部 News Tab 已移除（News 并入 Hub）");
+else bad("App: 底部仍有 News Tab —— 用户会看到重复入口");
+
+if (!/activeTab === "news"/.test(app) && !/selectedNews/.test(app)) ok("App: 旧的 news/news-detail 路由已删除");
+else bad("App: 仍残留独立 news 路由");
+
+if (/NewsList/.test(campus) && /openNews/.test(campus)) ok("Campus: 「新闻」分段内嵌 NewsList + 详情子屏");
+else bad("Campus: 未内嵌新闻");
+
+if (/"wall", "events", "news"/.test(campus)) ok("Campus: 分段控件为 校园墙 / 活动 / 新闻");
+else bad("Campus: 分段控件缺少新闻");
+
+if (/export function NewsList/.test(news) && !/export default function News\(/.test(news)) {
+  ok("News: 列表已抽成 NewsList（自身无顶部栏，避免双层标题）");
+} else bad("News: NewsList 抽取不正确");
+
+if (/onOpenChat/.test(campus) && /useChatUnread/.test(campus)) ok("Campus: Hub 顶部有私信入口 + 实时红点");
+else bad("Campus: Hub 顶部缺少私信入口");
+
+if (/screen-pin/.test(schedule) && /screen-pin/.test(services)) {
+  ok("Schedule / Services: 顶部栏已固定（screen-pin：sticky + 实底 + 分隔线）");
+} else bad("Schedule / Services: 顶部栏未固定（滚动会被带走）");
+
+if (/postSystemBannerNow/.test(notifService)) {
+  ok("通知: Banner 同时弹真实 iOS 系统横幅（本地通知，不需要 APNs 凭据）");
+} else bad("通知: 只弹应用内浮层，没有系统横幅");
+
+if (/startNotificationWatcher/.test(notifService) && /startNotificationWatcher/.test(app)) {
+  ok("通知: 前台轮询看护已挂载（兜底管理端直接插库、没有 WS 帧的情况）");
+} else bad("通知: 缺少前台轮询兜底（管理端插库后 App 不会自己发现）");
+
 // ------------------------------------------------------------------ 10) 行为测试
 /**
  * 直接加载真实模块跑（Node ≥22.6 可直跑 TS）。
@@ -244,7 +280,7 @@ export async function resolve(specifier, context, nextResolve) {
     ["chat + 会话 id", "chat", "conv-9", "chat", "conv-9"],
     ["chat 无 id（只开列表）", "chat", null, "chat", null],
     ["post → 校园墙 + 帖子 id", "post", "p-1", "campus", "p-1"],
-    ["news → 新闻页", "news", "n-1", "news", "n-1"],
+    ["news → Hub 的新闻分段", "news", "n-1", "campus", null],
     ["campus → 校园墙", "campus", null, "campus", null],
   ];
   for (const [label, routeName, routeId, tab, id] of cases) {

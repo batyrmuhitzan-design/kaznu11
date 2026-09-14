@@ -35,6 +35,8 @@ import {
 } from "../services/CampusService";
 import { startConversation, type Conversation } from "../services/ChatService";
 import { MAX_UPLOAD_FILES, uploadImages } from "../services/UploadService";
+import { NewsList, NewsDetail, type NewsItem } from "./News";
+import { useChatUnread } from "./Chat";
 import { hapticTap, motorHaptic } from "../utils/haptics";
 import { useKeyboardOpen } from "../utils/keyboard";
 
@@ -149,18 +151,24 @@ export default function CampusView({
   focusPostId = null,
   onFocusHandled,
   onOpenConversation,
+  onOpenChat,
 }: {
   /** 从通知 / 推送点进来的帖子 id（App 传入），Feed 加载完成后自动打开该帖 */
   focusPostId?: string | null;
   onFocusHandled?: () => void;
   /** 点「私信」后把会话交给 App 打开（Campus 自己不持有私信路由） */
   onOpenConversation?: (conversation: Conversation) => void;
+  /** 顶部私信入口（红点走实时未读，和会话列表同源） */
+  onOpenChat?: () => void;
 }) {
   const t = useI18n();
   const toast = useToast();
+  const unreadMessages = useChatUnread();
 
-  const [mode, setMode] = useState<"wall" | "events">("wall");
+  const [mode, setMode] = useState<"wall" | "events" | "news">("wall");
   const [category, setCategory] = useState<CategoryFilter>("all");
+  /** 从「新闻」分段点进去的新闻详情（子屏，与帖子详情同层） */
+  const [openNews, setOpenNews] = useState<NewsItem | null>(null);
   const [posts, setPosts] = useState<CampusPost[]>([]);
   const [events, setEvents] = useState<ClubEventItem[]>([]);
   const [notification, setNotification] = useState<CampusNotificationItem | null>(null);
@@ -289,6 +297,15 @@ export default function CampusView({
     );
   }
 
+  // 新闻详情（News 已并入 Campus 的「新闻」分段，所以它也是 Campus 的子屏）
+  if (openNews) {
+    return (
+      <div className="app-surface h-full flex flex-col overflow-hidden">
+        <NewsDetail item={openNews} onBack={() => setOpenNews(null)} />
+      </div>
+    );
+  }
+
   if (composerOpen) {
     return (
       <div className="app-surface h-full flex flex-col overflow-hidden">
@@ -305,20 +322,41 @@ export default function CampusView({
           <h1 className="text-xl font-bold text-white flex items-center gap-1.5" style={{ letterSpacing: "-0.4px" }}>
             <span>🎓</span> {t("campus")}
           </h1>
-          <span
-            className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded-full"
-            style={{
-              background: source === "live" ? "rgba(48,209,88,0.14)" : "rgba(255,159,10,0.14)",
-              color: source === "live" ? "#30D158" : "#FF9F0A",
-            }}
-          >
-            {source === "live" ? t("live") : t("offlineDemo")}
-          </span>
+          <div className="flex items-center gap-2">
+            <span
+              className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded-full"
+              style={{
+                background: source === "live" ? "rgba(48,209,88,0.14)" : "rgba(255,159,10,0.14)",
+                color: source === "live" ? "#30D158" : "#FF9F0A",
+              }}
+            >
+              {source === "live" ? t("live") : t("offlineDemo")}
+            </span>
+            {/* 私信入口就在 Hub 页：红点来自 WebSocket 实时未读（与会话列表同源） */}
+            <button
+              type="button"
+              aria-label={t("messages")}
+              title={t("messages")}
+              onClick={() => onOpenChat?.()}
+              data-haptic="light"
+              className="haptic-action icon-button relative"
+            >
+              <div className="w-8 h-8 flex items-center justify-center" style={{ color: "rgba(235,235,245,0.6)" }}>
+                <svg viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6" aria-hidden="true">
+                  <path d="M12 3C6.99 3 3 6.36 3 10.5c0 2.16 1.05 4.1 2.73 5.44-.16 1.05-.66 2.06-1.5 2.9a.6.6 0 0 0 .5 1.02c1.9-.14 3.4-.8 4.44-1.44.9.22 1.86.34 2.83.34 5.01 0 9-3.36 9-7.5S17.01 3 12 3Z" />
+                </svg>
+              </div>
+              {unreadMessages > 0 && (
+                <span className="badge-dot">{unreadMessages > 99 ? "99+" : unreadMessages}</span>
+              )}
+            </button>
+          </div>
         </div>
 
         <div className="seg-compact mt-2" role="tablist" aria-label={t("campus")}>
-          {(["wall", "events"] as const).map((m) => {
+          {(["wall", "events", "news"] as const).map((m) => {
             const active = mode === m;
+            const label = m === "wall" ? t("campusWall") : m === "events" ? t("campusEvents") : t("news");
             return (
               <button
                 key={m}
@@ -331,7 +369,7 @@ export default function CampusView({
                 }}
                 className="haptic-action"
               >
-                {m === "wall" ? t("campusWall") : t("campusEvents")}
+                {label}
               </button>
             );
           })}
@@ -372,7 +410,7 @@ export default function CampusView({
             )}
           </div>
         </>
-      ) : (
+      ) : mode === "events" ? (
         <div className="flex-1 min-h-0 overflow-y-auto px-4 pt-1 pb-28 space-y-3 animate-slide-up">
           {events.length === 0 ? (
             <EmptyState icon="🎪" title={t("noEvents")} hint={t("noEventsHint")} />
@@ -380,6 +418,9 @@ export default function CampusView({
             events.map((e) => <EventCard key={e.id} event={e} onOpen={() => setOpenEvent(e)} />)
           )}
         </div>
+      ) : (
+        /* 新闻分段：News 已并入 Campus。NewsList 自身不带顶部栏，标题与分段由本页统一渲染 */
+        <NewsList onOpenDetail={(item) => setOpenNews(item)} />
       )}
 
       {/* 新建动态：右下角悬浮圆钮（FAB）。
