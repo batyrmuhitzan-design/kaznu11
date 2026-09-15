@@ -389,18 +389,24 @@ function GpaCard({ onNavigate }: { onNavigate: (tab: string) => void }) {
   }, []);
 
   return (
-    <button type="button" onClick={() => onNavigate("grades")} className="haptic-action interactive-card flex-1 glass squircle-lg p-4 card-shadow inner-glow-blue text-left">
-      <div className="flex items-center justify-between">
-        <p className="text-xs font-medium" style={{ color: "var(--tx-4)" }}>{t("cumulativeGpa")}</p>
-        <div className="px-1.5 py-0.5 rounded-full text-xs font-semibold" style={{ background: "rgba(16,185,129,0.15)", color: "#10B981", fontSize: 10 }}>▲ {t("top")} 5%</div>
+    // min-w-0 是必须的：作为 grid/flex 子项时，默认 min-width:auto 会让
+    // 卡片"撑到内容的最小宽度"，进而在小屏上把整行顶出屏幕（首页横向溢出的根因之一）。
+    <button
+      type="button"
+      onClick={() => onNavigate("grades")}
+      className="haptic-action interactive-card w-full h-full min-w-0 flex flex-col glass squircle-lg p-4 card-shadow inner-glow-blue text-left"
+    >
+      <div className="flex items-center justify-between gap-1.5 min-w-0">
+        <p className="text-xs font-medium truncate min-w-0" style={{ color: "var(--tx-4)" }}>{t("cumulativeGpa")}</p>
+        <div className="shrink-0 whitespace-nowrap px-1.5 py-0.5 rounded-full text-xs font-semibold" style={{ background: "rgba(16,185,129,0.15)", color: "var(--success)", fontSize: 10 }}>▲ {t("top")} 5%</div>
       </div>
       {data ? (
         <>
-          <div className="mt-1">
+          <div className="mt-1 min-w-0">
             <AnimatedNumber value={data.gpa} decimals={2} duration={1400} className="gpa-grow text-3xl font-bold text-white" style={{ fontFamily: "JetBrains Mono", letterSpacing: "-1px" }} />
           </div>
           <GpaScale value={data.gpa} />
-          <p className="text-xs mt-1.5" style={{ color: "var(--tx-6)", fontFamily: "JetBrains Mono" }}>
+          <p className="text-xs mt-1.5 truncate min-w-0" style={{ color: "var(--tx-6)", fontFamily: "JetBrains Mono" }}>
             ↑ <AnimatedNumber value={data.change} decimals={2} duration={1400} /> {t("thisSemester")}
           </p>
         </>
@@ -640,7 +646,7 @@ export default function Dashboard({ onOpenProfile, onNavigate, onOpenReviews, on
           </div>
         </div>
         </div>
-        <div className="flex-1 min-h-0 overflow-y-auto px-4 pt-3 pb-28 space-y-3 animate-slide-up">
+        <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-4 pt-3 pb-28 space-y-3 animate-slide-up min-w-0">
 
         {/* Main Course Card (2x2) */}
         <div className="glass squircle-lg px-5 pt-5 pb-6 relative overflow-hidden card-shadow" style={{ minHeight: 160 }}>
@@ -695,8 +701,15 @@ export default function Dashboard({ onOpenProfile, onNavigate, onOpenReviews, on
           </div>
         </div>
 
-        {/* Row: GPA Card + DDL Card */}
-        <div className="flex gap-3">
+        {/* Row: GPA Card + Latest Materials Card
+            ⚠️ 布局修正（首页卡片对齐 / 溢出）：
+            用 grid + items-stretch 而不是 flex ——
+            * `grid-cols-2` 保证左右**严格 1:1**（flex-1 会受各自内容宽度影响）；
+            * `items-stretch`（grid 默认）让两卡**等高**，不会被内容撑成不同高度；
+            * 两个子卡片都必须带 `min-w-0`，否则 grid/flex 子项的默认
+              `min-width: auto` 会让卡片"撑到内容最小宽度"，小屏上把整行顶出屏幕
+              → 这正是首页能左右滑动的根因。 */}
+        <div className="grid grid-cols-2 gap-3 items-stretch w-full min-w-0">
           <GpaCard onNavigate={onNavigate} />
 
           {/* 最新课程资料卡片
@@ -709,14 +722,14 @@ export default function Dashboard({ onOpenProfile, onNavigate, onOpenReviews, on
           <button
             type="button"
             onClick={() => onNavigate("materials")}
-            className="haptic-action interactive-card flex-1 glass squircle-lg p-4 card-shadow text-left"
+            className="haptic-action interactive-card w-full h-full min-w-0 flex flex-col glass squircle-lg p-4 card-shadow text-left"
           >
-            <div className="flex items-center justify-between mb-1">
-              <p className="text-xs font-medium" style={{ color: "var(--tx-4)" }}>
+            <div className="flex items-center justify-between gap-1.5 mb-1 min-w-0">
+              <p className="text-xs font-medium truncate min-w-0" style={{ color: "var(--tx-4)" }}>
                 {t("latestMaterials")}
               </p>
               {materialSummary?.latest && (
-                <span className="text-xs" style={{ color: "var(--tx-5)", fontFamily: "JetBrains Mono" }}>
+                <span className="shrink-0 whitespace-nowrap text-xs" style={{ color: "var(--tx-5)", fontFamily: "JetBrains Mono" }}>
                   {materialAge(materialSummary.latest.created_at)}
                 </span>
               )}
@@ -728,15 +741,15 @@ export default function Dashboard({ onOpenProfile, onNavigate, onOpenReviews, on
               </p>
             ) : materialSummary?.latest ? (
               <>
-                <p className="text-sm font-bold text-white leading-tight" style={{ overflowWrap: "anywhere" }}>
+                <p className="text-sm font-bold text-white leading-tight min-w-0" style={{ overflowWrap: "anywhere" }}>
                   {materialSummary.latest.file_name}
                 </p>
                 <p className="text-xs mt-0.5 truncate" style={{ color: "var(--tx-4)" }}>
                   {materialSummary.latest.course_code} · {materialSummary.latest.course_title}
                 </p>
-                <div className="flex items-center gap-1.5 mt-2">
+                <div className="flex flex-wrap items-center gap-1.5 mt-2 min-w-0">
                   <span
-                    className="text-[9px] font-bold px-1.5 py-0.5 rounded-full"
+                    className="text-[9px] font-bold px-1.5 py-0.5 rounded-full shrink-0"
                     style={{
                       background: "var(--accent-soft-bg)",
                       color: "var(--accent-soft-text)",
@@ -746,12 +759,12 @@ export default function Dashboard({ onOpenProfile, onNavigate, onOpenReviews, on
                     {materialSummary.latest.file_format}
                   </span>
                   {materialSummary.latest.size_label && (
-                    <span className="text-[9px]" style={{ color: "var(--tx-6)", fontFamily: "JetBrains Mono" }}>
+                    <span className="text-[9px] shrink-0" style={{ color: "var(--tx-6)", fontFamily: "JetBrains Mono" }}>
                       {materialSummary.latest.size_label}
                     </span>
                   )}
                 </div>
-                <p className="text-xs mt-1.5" style={{ color: "var(--tx-6)" }}>
+                <p className="text-xs mt-1.5 min-w-0" style={{ color: "var(--tx-6)", overflowWrap: "anywhere" }}>
                   {materialSummary.total > 1
                     ? trf(
                         {
@@ -769,7 +782,7 @@ export default function Dashboard({ onOpenProfile, onNavigate, onOpenReviews, on
                 <p className="text-sm font-bold text-white leading-tight" style={{ opacity: 0.7 }}>
                   {t("noNewMaterials")}
                 </p>
-                <p className="text-xs mt-1" style={{ color: "var(--tx-6)" }}>
+                <p className="text-xs mt-1 min-w-0" style={{ color: "var(--tx-6)", overflowWrap: "anywhere" }}>
                   {t("noNewMaterialsHint")}
                 </p>
               </>
@@ -847,7 +860,7 @@ export default function Dashboard({ onOpenProfile, onNavigate, onOpenReviews, on
                     <p
                       className="text-xs font-semibold"
                       style={{
-                        color: live ? "#10B981" : done ? "var(--tx-7)" : "rgba(235,235,245,0.6)",
+                        color: live ? "var(--success)" : done ? "var(--tx-7)" : "var(--tx-4)",
                         fontFamily: "JetBrains Mono",
                       }}
                     >

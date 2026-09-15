@@ -325,17 +325,32 @@ export default function LoginScreen({ onSuccess }: { onSuccess: () => void }) {
             <p className="text-[11px] mt-1.5 pl-[30px] leading-relaxed" style={{ color: "#FF453A", opacity: 0.92 }}>{t("reverifyHint")}</p>
           )}
 
-          {/* 法律条款强制同意 */}
-          <button
-            type="button"
+          {/* 法律条款强制同意
+              ⚠️ 结构说明（这里踩过一个真 bug）：
+              外层**不能**用 <button> —— HTML 规范禁止 button 嵌套 button，
+              WebKit 会把内层「Terms & Privacy Policy」的点击冒泡吞给外层，
+              表现为"点条款没反应"或"点条款=顺手勾了同意"。
+              所以外层改为 div[role=checkbox]（保留键盘可达性），
+              内层链接才是唯一的真按钮，并显式 stopPropagation + preventDefault。 */}
+          <div
             role="checkbox"
             aria-checked={agreed}
+            aria-labelledby="login-terms-label"
+            tabIndex={0}
             onClick={() => {
               const next = !agreed;
               setAgreed(next);
               if (next) persistTermsAccepted();
             }}
-            className="haptic-action mt-5 w-full flex items-start gap-2.5 text-left"
+            onKeyDown={(event) => {
+              if (event.key === " " || event.key === "Enter") {
+                event.preventDefault();
+                const next = !agreed;
+                setAgreed(next);
+                if (next) persistTermsAccepted();
+              }
+            }}
+            className="haptic-action mt-5 w-full flex items-start gap-2.5 text-left cursor-pointer select-none"
           >
             <span
               className="mt-0.5 w-[22px] h-[22px] rounded-md flex items-center justify-center shrink-0 transition-colors"
@@ -350,22 +365,29 @@ export default function LoginScreen({ onSuccess }: { onSuccess: () => void }) {
                 </svg>
               )}
             </span>
-            <span className="flex-1 text-xs font-medium leading-relaxed" style={{ color: "var(--app-text)" }}>
+            <span id="login-terms-label" className="flex-1 min-w-0 text-xs font-medium leading-relaxed" style={{ color: "var(--app-text)" }}>
               {language === "KZ"
-                ? "Пайдалану шарттары мен құпиялылық саясатымен келісемін"
+                ? "Пайдалану шарттары мен құпиялылық саясатымен келісемін:"
                 : language === "RU"
-                  ? "Я согласен(на) с Условиями использования и Политикой конфиденциальности"
-                  : "I agree to the Terms of Service and Privacy Policy"}{" "}
+                  ? "Я согласен(на) с Условиями использования и Политикой конфиденциальности:"
+                  : "I agree to the Terms of Service and Privacy Policy:"}{" "}
+              {/* relative z-10：确保不会被相邻/下方提示文字盖住点击区 */}
               <button
                 type="button"
-                onClick={() => setShowLegal(true)}
-                className="inline text-[13px] font-bold underline decoration-1 underline-offset-2"
-                style={{ color: "var(--accent-soft-text)" }}
+                onClick={(event) => {
+                  // 阻止冒泡 → 打开条款弹窗时**不会**顺带切换同意状态
+                  event.stopPropagation();
+                  event.preventDefault();
+                  motorHaptic();
+                  setShowLegal(true);
+                }}
+                className="haptic-action relative z-10 inline-flex items-center text-[13px] font-bold underline decoration-1 underline-offset-2"
+                style={{ color: "var(--accent-soft-text)", padding: "2px 1px" }}
               >
-                {language === "KZ" ? "Terms & Privacy Policy" : language === "RU" ? "Terms & Privacy Policy" : "Terms & Privacy Policy"}
+                Terms &amp; Privacy Policy
               </button>
             </span>
-          </button>
+          </div>
           {!agreed && (
             <p className="text-[11px] mt-1.5 pl-[32px] leading-relaxed" style={{ color: "#FF9F0A", opacity: 0.9 }}>
               {language === "KZ"

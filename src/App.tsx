@@ -291,7 +291,13 @@ export default function App() {
   return (
     <div
       className="app-root relative w-full h-full flex flex-col overflow-hidden"
-      style={{ fontFamily: "Inter, system-ui, sans-serif", maxWidth: 430, margin: "0 auto" }}
+      style={{
+        fontFamily: "Inter, system-ui, sans-serif",
+        // min(430px, 100%)：桌面预览仍保持 430px 的"手机列"，但在窄屏/iPhone SE 上
+        // 严格不超过视口宽度 —— 配合 CSS 的 overflow-x:hidden 彻底堵住横向拖动。
+        maxWidth: "min(430px, 100%)",
+        margin: "0 auto",
+      }}
     >
       {/* 首次启动 / 会话过期：先登录一次 */}
       {!authed && <LoginScreen onSuccess={() => setAuthed(true)} />}

@@ -306,6 +306,27 @@ button:focus-visible { outline: 2px solid rgba(0,122,255,0.8); outline-offset: 2
   padding-top: calc(env(safe-area-inset-top, 0px) + 12px);
 }
 
+/* ===== 横向溢出防线（首页"左右能拖动"的修复）=====
+   1) 根容器：绝不允许超出视口宽度，也绝不自己产生横向滚动；
+   2) 页面壳 .app-surface：同样限宽 + 锁 X 轴；
+   3) 内层纵向滚动容器：必须显式 overflow-x-hidden ——
+      因为 CSS 规范规定「一轴 auto、另一轴 visible」时 visible 会被**计算为 auto**，
+      于是本来只想纵向滚的容器会顺带获得横向滚动能力（就是那个能左右滑的 bug）。
+   子卡片另外还要带 min-w-0：grid/flex 子项默认 min-width:auto
+   会被内容撑到最小宽度，光靠 overflow 隐藏只是"藏起来"而不是"排得下"。 */
+.app-root,
+.app-surface {
+  /* min(100%, 100vw)：两种口径都限住；带滚动条的桌面浏览器下 100vw 可能比 100% 略大，
+     取 min 可避免"为了防溢出反而多出 15px 溢出" */
+  max-width: min(100%, 100vw);
+  width: 100%;
+  overflow-x: hidden;
+}
+.app-surface > .overflow-y-auto,
+.app-surface .scroll-y-lock-x {
+  overflow-x: hidden;
+}
+
 /* 全局按钮：点击反馈只保留组件自带的 active:scale 缩放，去掉了“扫光/划光”高光动画。
    按压观感与底部导航键一致：干净、无光效划过。 */
 button { position: relative; }

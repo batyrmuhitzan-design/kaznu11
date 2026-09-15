@@ -258,6 +258,91 @@ for (const key of clubKeys) {
 if (missingKeys.length === 0) ok(`i18n: ${clubKeys.length} 个新词条 EN/KZ/RU 三语齐全`);
 else bad(`i18n: 缺语言覆盖 → ${missingKeys.join(", ")}`);
 
+// ------------------------------------------------------------------ 11b) 登录页条款链接（button 嵌套 bug）
+const login = read("src/views/LoginScreen.tsx");
+// 标记必须足够独特："法律条款强制同意" 在文件里出现两次（state 注释 + JSX 注释），
+// 用短词会取到 state 注释之后的整段代码，导致断言永远失败。
+const termsBlock = login.split("{/* 法律条款强制同意")[1]?.split("Please agree to the terms")[0] ?? "";
+
+if (!termsBlock) {
+  bad("LoginScreen: 找不到条款同意区块（选择器失效，请更新守卫）");
+} else {
+  // 外层若仍是 <button role="checkbox"> → 内部再放 <button> 就是非法嵌套，
+  // WebKit 会把内层点击冒泡吞给外层（"点条款没反应"的根因）
+  if (/<button[^>]*role="checkbox"/.test(termsBlock)) {
+    bad("LoginScreen: 条款外层仍是 <button role=checkbox> —— 会和内层链接形成非法 button 嵌套");
+  } else if (/role="checkbox"/.test(termsBlock)) {
+    ok("LoginScreen: 条款外层改为 div[role=checkbox]（不再与内层链接嵌套 button）");
+  } else {
+    bad("LoginScreen: 条款外层缺少 role=checkbox");
+  }
+
+  if (/event\.stopPropagation\(\)/.test(termsBlock) && /setShowLegal\(true\)/.test(termsBlock)) {
+    ok("LoginScreen: 条款链接 stopPropagation + 打开 LegalModal（不会顺带勾选同意）");
+  } else {
+    bad("LoginScreen: 条款链接缺少 stopPropagation / 未绑定打开弹窗");
+  }
+
+  if (/relative z-10/.test(termsBlock)) ok("LoginScreen: 条款链接有独立 z-10（不被下方提示文字压住）");
+  else bad("LoginScreen: 条款链接没有独立 z-index");
+
+  if (/tabIndex=\{0\}/.test(termsBlock) && /onKeyDown/.test(termsBlock)) {
+    ok("LoginScreen: 改用 div 后仍保留键盘可达性（tabIndex + Space/Enter）");
+  } else bad("LoginScreen: div[role=checkbox] 缺少键盘支持（可访问性回退）");
+}
+
+// ------------------------------------------------------------------ 11c) 首页横向溢出 + 卡片对齐
+const dashboardScroller = /flex-1 min-h-0 overflow-y-auto overflow-x-hidden/;
+if (dashboardScroller.test(dashboard)) ok("Dashboard: 纵向滚动容器显式 overflow-x-hidden（堵住横向拖动）");
+else bad("Dashboard: 滚动容器缺 overflow-x-hidden（overflow-y:auto 会让 X 轴也变 auto）");
+
+if (/grid grid-cols-2 gap-3 items-stretch w-full min-w-0/.test(dashboard)) {
+  ok("Dashboard: GPA / 资料卡父容器用 grid-cols-2 + items-stretch（严格 1:1 且等高）");
+} else bad("Dashboard: GPA / 资料卡父容器不是 grid-cols-2 items-stretch");
+
+const flexCardsCount = (dashboard.match(/interactive-card (flex-1|w-full h-full min-w-0)/g) ?? []).length;
+if (/interactive-card w-full h-full min-w-0 flex flex-col/.test(dashboard)) {
+  ok("Dashboard: 两张卡片都带 w-full h-full min-w-0（可在窄屏收缩，不再撑破行）");
+} else bad(`Dashboard: 卡片缺少 w-full/h-full/min-w-0（命中 ${flexCardsCount} 处）`);
+
+if (/min-w-0/.test(dashboard) && !/width:\s*3\d\d/.test(dashboard) && !/w-\[3\d\dpx\]/.test(dashboard)) {
+  ok("Dashboard: 无固定像素宽度（没有 380px 这类硬编码）");
+} else bad("Dashboard: 仍存在固定像素宽度或缺少 min-w-0");
+
+if (/max-width: min\(100%, 100vw\)[\s\S]{0,120}overflow-x: hidden/.test(css)) {
+  ok("css: .app-root / .app-surface 限宽 + 锁 X 轴（含 100vw 上限）");
+} else bad("css: 根容器缺少 max-width/overflow-x 防线");
+
+if (/"min\(430px, 100%\)"/.test(app)) ok("App: 根节点 maxWidth = min(430px, 100%)（窄屏不超过视口）");
+else bad("App: 根节点仍是固定 maxWidth 430");
+
+// ------------------------------------------------------------------ 11d) 全仓库：button 嵌套（WebKit 会吞掉内层点击）
+const nestedButtonHits = [];
+for (const rel of allSources) {
+  const raw = read(rel);
+  // 去注释：注释里可能出现 `<button>` 字样（说明"禁止嵌套"），会被朴素标签栈误判
+  const text = raw
+    .replace(/\{\/\*[\s\S]*?\*\/\}/g, "")
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/^\s*\/\/.*$/gm, "");
+  const re = /<\/?button\b/g;
+  const stack = [];
+  let m;
+  while ((m = re.exec(text)) !== null) {
+    if (m[0].startsWith("</")) {
+      stack.pop();
+      continue;
+    }
+    if (stack.length > 0) nestedButtonHits.push(`${rel}:${text.slice(0, m.index).split("\n").length}`);
+    stack.push(1);
+  }
+}
+if (nestedButtonHits.length === 0) {
+  ok(`前端: ${allSources.length} 个文件均无 button 嵌套（内层点击不会被吞）`);
+} else {
+  bad(`前端: 存在 button 嵌套 → ${nestedButtonHits.join(", ")}`);
+}
+
 // ------------------------------------------------------------------ 12) 行为测试（真跑代码）
 (async () => {
   globalThis.window = globalThis;

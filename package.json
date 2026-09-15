@@ -10,6 +10,7 @@
     "format": "oxfmt",
     "verify:social": "node scripts/verify-chat-ui.cjs",
     "verify:theme": "node --import ./scripts/lib/register-ts.mjs scripts/verify-theme-system.cjs",
+    "verify:guard": "node scripts/lib/guard-self-test.cjs",
     "postinstall": "node scripts/patch-capacitor-system-sound.cjs"
   },
   "dependencies": {
