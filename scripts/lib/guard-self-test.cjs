@@ -51,5 +51,27 @@ console.log(`  ${a === false ? "[ok]" : "[!!]"} 真实 css 不含该 hack → ${
 console.log(`  ${b === true ? "[ok]" : "[!!]"} 注入的坏 css 能被识别 → ${b}（期望 true）`);
 if (a !== false || b !== true) failed += 1;
 
+// PDF 相关断言的选择器也要能分辨好坏（修复前 = origin+绝对路径 + Share url:）
+const legalPdf = fs.readFileSync(path.join(root, "src/native/legalPdf.ts"), "utf8");
+const buggyPdf = `
+function assetUrl() { return \`\${window.location.origin}/KazNU_Helper_Legal_Notice_3Lang.pdf\`; }
+export async function openLegalPdf(): Promise<void> {
+  await Share.share({ url: entry.uri });
+}`;
+const pdfChecks = [
+  ["baseURI 解析（修复前）", /new URL\(PDF_FILE_NAME,\s*document\.baseURI\)/.test(buggyPdf), false],
+  ["Share files:[…]（修复前）", /files:\s*\[saved\.uri\]/.test(buggyPdf), false],
+  ["旧 url: entry.uri 残留（修复前）", /url:\s*entry\.uri/.test(buggyPdf), true],
+  ["baseURI 解析（修复后）", /new URL\(PDF_FILE_NAME,\s*document\.baseURI\)/.test(legalPdf), true],
+  ["Share files:[…]（修复后）", /files:\s*\[saved\.uri\]/.test(legalPdf), true],
+  ["旧 url: entry.uri 已移除（修复后）", /url:\s*entry\.uri/.test(legalPdf), false],
+  ["返回成功状态（修复后）", /Promise<boolean>/.test(legalPdf), true],
+];
+for (const [label, actual, expected] of pdfChecks) {
+  const pass = actual === expected;
+  if (!pass) failed += 1;
+  console.log(`  ${pass ? "[ok]" : "[!!]"} ${label} → ${actual}（期望 ${expected}）`);
+}
+
 console.log(failed ? `\n负向自检失败 ${failed} 项` : "\n负向自检通过");
 process.exit(failed ? 1 : 0);

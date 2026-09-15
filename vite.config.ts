@@ -11,7 +11,12 @@ export default defineConfig(({ mode }) => {
   const emitSourcemaps = mode === 'development'
 
   return {
-    base: process.env.FIGMA_PUBLIC_URL ? `${process.env.FIGMA_PUBLIC_URL}/` : '/',
+    // 相对基路径（'./'）而不是 '/'：
+    //   * iOS（Capacitor）文档基址 capacitor://localhost/ → ./assets/... 正常；
+    //   * 网站预览挂在子路径 https://1losion.me/app/ 下 —— 用 '/' 会生成
+    //     /assets/index-*.js 的**根绝对路径**，实测 404（页面白屏）；
+    //   * 相对路径在根部署、子路径部署、Capacitor 三种环境下都成立。
+    base: process.env.FIGMA_PUBLIC_URL ? `${process.env.FIGMA_PUBLIC_URL}/` : './',
     build: {
       sourcemap: emitSourcemaps ? 'inline' : false,
       minify: !emitSourcemaps,

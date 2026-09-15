@@ -28,6 +28,15 @@ function toLegalLang(code: string | null | undefined): LegalLang {
 /** 持久化 key：用户是否已同意条款与隐私政策 */
 export const TERMS_ACCEPTED_KEY = "hasAcceptedTerms";
 
+/**
+ * 持久化 key：用户是否**打开过**完整法律文档（PDF / 全文）。
+ *
+ * 为什么需要它：勾选"我同意"必须建立在"真的看到过条款"之上，否则同意没有意义。
+ * 登录页用这个标志做闸门 —— 没看过就不给打勾。
+ * 用 localStorage（而不是只存内存）是因为重载/重进 App 不该让用户白看一次。
+ */
+export const LEGAL_VIEWED_KEY = "kaznu:viewedLegalDoc";
+
 export function hasAcceptedTerms(): boolean {
   try {
     return window.localStorage.getItem(TERMS_ACCEPTED_KEY) === "true";
@@ -44,14 +53,48 @@ export function persistTermsAccepted(): void {
   }
 }
 
+/** 是否已看过法律文档（PDF 或应用内全文） */
+export function hasViewedLegalDoc(): boolean {
+  try {
+    return window.localStorage.getItem(LEGAL_VIEWED_KEY) === "true";
+  } catch {
+    return false;
+  }
+}
+
+export function persistLegalViewed(): void {
+  try {
+    window.localStorage.setItem(LEGAL_VIEWED_KEY, "true");
+  } catch {
+    /* ignore */
+  }
+}
+
+/**
+ * 打开法律文档并标记"已看过"。
+ *
+ * 唯一入口 —— 登录页的「打开条款 PDF」按钮、条款弹窗里的「Open Full PDF」、
+ * 个人页的 PDF 入口都走它，避免三处各写一遍"打开 + 打标"而漏掉打标。
+ *
+ * @returns 是否成功唤起（成功才打标，避免"点了一下但没打开"也算看过）
+ */
+export async function openLegalDocAndMark(): Promise<boolean> {
+  const opened = await openLegalPdf();
+  if (opened) persistLegalViewed();
+  return opened;
+}
+
 export default function LegalModal({
   open: openProp,
   onClose,
   initialLanguage,
+  onLegalViewed,
 }: {
   open: boolean;
   onClose: () => void;
   initialLanguage?: LegalLang;
+  /** 用户在弹窗里打开了 PDF 时回调（登录页据此解锁"我同意"勾选框） */
+  onLegalViewed?: () => void;
 }) {
   const [lang, setLang] = useState<LegalLang>(() =>
     typeof window === "undefined" ? "en" : toLegalLang(window.localStorage.getItem("language")),
@@ -156,7 +199,11 @@ export default function LegalModal({
         <div className="lms-divider shrink-0 px-4 pt-3 flex gap-2.5" style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 14px)" }}>
           <button
             type="button"
-            onClick={() => { void openLegalPdf(); }}
+            onClick={() => {
+              void openLegalDocAndMark().then((opened) => {
+                if (opened) onLegalViewed?.();
+              });
+            }}
             className="haptic-action lms-btn-ghost flex-1 py-3 rounded-xl text-sm font-bold"
           >
             📄 {lang === "kk" ? "Толық PDF-ті ашу" : lang === "ru" ? "Открыть PDF" : "Open Full PDF"}

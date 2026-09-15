@@ -343,6 +343,46 @@ if (nestedButtonHits.length === 0) {
   bad(`前端: 存在 button 嵌套 → ${nestedButtonHits.join(", ")}`);
 }
 
+// ------------------------------------------------------------------ 11e) 条款 PDF 打不开 + 必须先看过才能勾选
+const legalPdf = read("src/native/legalPdf.ts");
+const viteConfig = read("vite.config.ts");
+
+if (/new URL\(PDF_FILE_NAME,\s*document\.baseURI\)/.test(legalPdf)) {
+  ok("legalPdf: PDF 地址按 document.baseURI 解析（子路径 /app/ 与 capacitor:// 都成立）");
+} else {
+  bad("legalPdf: PDF 地址写死了 origin + 绝对路径 → 子路径部署下 404");
+}
+
+if (/files:\s*\[saved\.uri\]/.test(legalPdf) && !/url:\s*entry\.uri/.test(legalPdf)) {
+  ok("legalPdf: 原生端用 Share files:[fileUri]（用 url: file:// 会被 iOS 静默忽略）");
+} else {
+  bad("legalPdf: Share 用法不对（本地文件必须走 files:[…]）");
+}
+
+if (/return true;/.test(legalPdf) && /Promise<boolean>/.test(legalPdf)) {
+  ok("legalPdf: 返回是否唤起成功（调用方据此判定\"算不算看过\"）");
+} else bad("legalPdf: openLegalPdf 未返回成功状态");
+
+if (/base:\s*process\.env\.FIGMA_PUBLIC_URL\s*\?\s*`\$\{process\.env\.FIGMA_PUBLIC_URL\}\/`\s*:\s*'\.\/'/.test(viteConfig)) {
+  ok("vite: base = './' 相对路径（子路径部署 /app/ 下资源不再 404）");
+} else bad("vite: base 仍是 '/'，子路径部署会 404");
+
+if (/export function hasViewedLegalDoc/.test(legalModal) && /export async function openLegalDocAndMark/.test(legalModal)) {
+  ok("LegalModal: 提供 hasViewedLegalDoc / openLegalDocAndMark（打开即打标）");
+} else bad("LegalModal: 缺少\"已看过条款\"的状态与统一入口");
+
+if (/onLegalViewed\?\.\(\)/.test(legalModal) && /onLegalViewed=\{/.test(login)) {
+  ok("LegalModal ↔ LoginScreen: 弹窗里打开 PDF 会回调解锁勾选框");
+} else bad("LegalModal → LoginScreen: 缺少 onLegalViewed 回调接线");
+
+if (/const toggleAgreed = \(\) => \{[\s\S]{0,400}?!legalViewed[\s\S]{0,200}?return;/.test(login)) {
+  ok("LoginScreen: 未看过条款 → toggleAgreed 直接拒绝勾选（不是静默失败）");
+} else bad("LoginScreen: 勾选没有被\"必须先看过条款\"拦住");
+
+if (/openTermsPdf/.test(login) && /📄/.test(login)) {
+  ok("LoginScreen: 勾选框旁有显式「Open PDF」入口");
+} else bad("LoginScreen: 缺少入口 PDF 按钮");
+
 // ------------------------------------------------------------------ 12) 行为测试（真跑代码）
 (async () => {
   globalThis.window = globalThis;

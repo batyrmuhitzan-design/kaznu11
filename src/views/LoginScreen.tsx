@@ -4,7 +4,13 @@ import { useTheme } from "../contexts/ThemeContext";
 import { saveSession, readSavedAccount, readLastUsername } from "../utils/session";
 import { motorHaptic, errorHaptic } from "../utils/haptics";
 import kaznuLogo from "../assets/kaznu-logo.png";
-import LegalModal, { hasAcceptedTerms, persistTermsAccepted } from "../components/LegalModal";
+import LegalModal, {
+  hasAcceptedTerms,
+  hasViewedLegalDoc,
+  openLegalDocAndMark,
+  persistLegalViewed,
+  persistTermsAccepted,
+} from "../components/LegalModal";
 
 const LANGUAGES: Language[] = ["EN", "KZ", "RU"];
 
@@ -181,8 +187,38 @@ export default function LoginScreen({ onSuccess }: { onSuccess: () => void }) {
   // 法律条款强制同意（首次进入必须勾选）
   const [agreed, setAgreed] = useState(() => hasAcceptedTerms());
   const [showLegal, setShowLegal] = useState(false);
+  /**
+   * 是否已看过完整条款（PDF / 全文）。
+   * 闸门：没看过 → 不给勾"我同意"（用户要求："不点开看 pdf 就打不了勾勾"）。
+   * 已同意过条款的老用户（agreed 初值为 true）不受影响。
+   */
+  const [legalViewed, setLegalViewed] = useState(() => hasViewedLegalDoc());
+  /** 用户试图在"没看过条款"时打勾 → 高亮提示（而不是静默失败） */
+  const [termsBlocked, setTermsBlocked] = useState(false);
 
   const canSubmit = username.trim().length > 0 && password.length > 0 && agreed && !busy && !leaving;
+
+  /** 打开条款 PDF（成功即记为"已看过"，随后勾选框解锁） */
+  const openTermsPdf = async () => {
+    motorHaptic();
+    const opened = await openLegalDocAndMark();
+    if (opened) {
+      setLegalViewed(true);
+      setTermsBlocked(false);
+    }
+  };
+
+  /** 切换"我同意"：未看过条款时拒绝勾选并给出明确原因 */
+  const toggleAgreed = () => {
+    if (!agreed && !legalViewed) {
+      setTermsBlocked(true);
+      errorHaptic();
+      return;
+    }
+    const next = !agreed;
+    setAgreed(next);
+    if (next) persistTermsAccepted();
+  };
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
@@ -335,19 +371,14 @@ export default function LoginScreen({ onSuccess }: { onSuccess: () => void }) {
           <div
             role="checkbox"
             aria-checked={agreed}
+            aria-disabled={!agreed && !legalViewed}
             aria-labelledby="login-terms-label"
             tabIndex={0}
-            onClick={() => {
-              const next = !agreed;
-              setAgreed(next);
-              if (next) persistTermsAccepted();
-            }}
+            onClick={toggleAgreed}
             onKeyDown={(event) => {
               if (event.key === " " || event.key === "Enter") {
                 event.preventDefault();
-                const next = !agreed;
-                setAgreed(next);
-                if (next) persistTermsAccepted();
+                toggleAgreed();
               }
             }}
             className="haptic-action mt-5 w-full flex items-start gap-2.5 text-left cursor-pointer select-none"
@@ -357,6 +388,8 @@ export default function LoginScreen({ onSuccess }: { onSuccess: () => void }) {
               style={{
                 background: agreed ? "linear-gradient(135deg, #0033A0, #007AFF)" : "var(--field-bg)",
                 border: agreed ? "none" : "1px solid var(--field-border)",
+                // 未看过条款 → 勾选框呈"禁用"视觉（但仍可点，点击会给出原因，而不是静默失败）
+                opacity: !agreed && !legalViewed ? 0.45 : 1,
               }}
             >
               {agreed && (
@@ -366,35 +399,65 @@ export default function LoginScreen({ onSuccess }: { onSuccess: () => void }) {
               )}
             </span>
             <span id="login-terms-label" className="flex-1 min-w-0 text-xs font-medium leading-relaxed" style={{ color: "var(--app-text)" }}>
-              {language === "KZ"
-                ? "Пайдалану шарттары мен құпиялылық саясатымен келісемін:"
-                : language === "RU"
-                  ? "Я согласен(на) с Условиями использования и Политикой конфиденциальности:"
-                  : "I agree to the Terms of Service and Privacy Policy:"}{" "}
-              {/* relative z-10：确保不会被相邻/下方提示文字盖住点击区 */}
-              <button
-                type="button"
-                onClick={(event) => {
-                  // 阻止冒泡 → 打开条款弹窗时**不会**顺带切换同意状态
-                  event.stopPropagation();
-                  event.preventDefault();
-                  motorHaptic();
-                  setShowLegal(true);
-                }}
-                className="haptic-action relative z-10 inline-flex items-center text-[13px] font-bold underline decoration-1 underline-offset-2"
-                style={{ color: "var(--accent-soft-text)", padding: "2px 1px" }}
-              >
-                Terms &amp; Privacy Policy
-              </button>
+              <span className="block">
+                {language === "KZ"
+                  ? "Пайдалану шарттары мен құпиялылық саясатымен келісемін"
+                  : language === "RU"
+                    ? "Я согласен(на) с Условиями использования и Политикой конфиденциальности"
+                    : "I agree to the Terms of Service and Privacy Policy"}
+              </span>
+              {/* 两个入口：应用内全文（已排版）与完整 PDF。
+                  relative z-10 确保不会被相邻/下方提示文字盖住点击区。 */}
+              <span className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1">
+                <button
+                  type="button"
+                  onClick={(event) => {
+                    // 阻止冒泡 → 打开弹窗时**不会**顺带切换同意状态
+                    event.stopPropagation();
+                    event.preventDefault();
+                    motorHaptic();
+                    // 看过应用内全文同样算"看过条款"（法律上等价，且不强迫用户下载 PDF）
+                    persistLegalViewed();
+                    setLegalViewed(true);
+                    setTermsBlocked(false);
+                    setShowLegal(true);
+                  }}
+                  className="haptic-action relative z-10 inline-flex items-center text-[12px] font-bold underline decoration-1 underline-offset-2"
+                  style={{ color: "var(--accent-soft-text)", padding: "2px 1px" }}
+                >
+                  Terms &amp; Privacy Policy
+                </button>
+                <button
+                  type="button"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    event.preventDefault();
+                    void openTermsPdf();
+                  }}
+                  className="haptic-action relative z-10 inline-flex items-center gap-1 text-[12px] font-bold"
+                  style={{ color: "var(--accent-soft-text)", padding: "2px 1px" }}
+                >
+                  📄 {language === "KZ" ? "PDF ашу" : language === "RU" ? "Открыть PDF" : "Open PDF"}
+                </button>
+              </span>
             </span>
           </div>
           {!agreed && (
-            <p className="text-[11px] mt-1.5 pl-[32px] leading-relaxed" style={{ color: "#FF9F0A", opacity: 0.9 }}>
-              {language === "KZ"
-                ? "Жалғастыру үшін алдымен шарттармен келісіңіз"
-                : language === "RU"
-                  ? "Сначала согласитесь с условиями, чтобы продолжить"
-                  : "Please agree to the terms to continue"}
+            <p
+              className="text-[11px] mt-1.5 pl-[32px] leading-relaxed"
+              style={{ color: termsBlocked ? "var(--danger)" : "var(--warm-soft-text)", opacity: 0.95 }}
+            >
+              {!legalViewed
+                ? language === "KZ"
+                  ? "Тіркелу үшін алдымен шарттарды ашып оқыңыз (PDF немесе толық мәтін)"
+                  : language === "RU"
+                    ? "Сначала откройте и прочитайте условия (PDF или полный текст), затем отметьте согласие"
+                    : "Open the terms first (PDF or full text), then you can tick the box"
+                : language === "KZ"
+                  ? "Жалғастыру үшін келісімді белгілеңіз"
+                  : language === "RU"
+                    ? "Отметьте согласие, чтобы продолжить"
+                    : "Please tick the box to continue"}
             </p>
           )}
 
@@ -414,7 +477,15 @@ export default function LoginScreen({ onSuccess }: { onSuccess: () => void }) {
           <LoginToolbar />
         </div>
       </div>
-      <LegalModal open={showLegal} onClose={() => setShowLegal(false)} />
+      {/* 弹窗里打开 PDF 也要解锁勾选框 → 回传 onLegalViewed */}
+      <LegalModal
+        open={showLegal}
+        onClose={() => setShowLegal(false)}
+        onLegalViewed={() => {
+          setLegalViewed(true);
+          setTermsBlocked(false);
+        }}
+      />
     </div>
   );
 }
