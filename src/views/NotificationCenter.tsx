@@ -27,20 +27,21 @@ import {
 
 type TFn = ReturnType<typeof useI18n>;
 
-/** 通知 kind → 图标与配色（与后端 models 的注释一一对应） */
+/** 通知 kind → 图标与配色（与后端 models 的注释一一对应）
+ *  颜色全部走语义 token：浅色模式下 #409CFF / #FF9F0A 这类亮色在白底上会糊掉 */
 const KIND_STYLE: Record<string, { icon: string; color: string }> = {
-  like: { icon: "❤️", color: "#FF453A" },
-  comment: { icon: "💬", color: "#409CFF" },
-  message: { icon: "✉️", color: "#30D158" },
-  official: { icon: "📢", color: "#FF9F0A" },
-  system: { icon: "⚙️", color: "#8E8E93" },
+  like: { icon: "❤️", color: "var(--danger)" },
+  comment: { icon: "💬", color: "var(--accent-soft-text)" },
+  message: { icon: "✉️", color: "var(--success)" },
+  official: { icon: "📢", color: "var(--warm-soft-text)" },
+  system: { icon: "⚙️", color: "var(--tx-5)" },
 };
 
 /** 广播级别配色（与 Campus 顶部紧急通知栏同一套语义色） */
 const LEVEL_STYLE: Record<string, { bg: string; border: string; text: string; icon: string }> = {
-  info: { bg: "rgba(0,122,255,0.14)", border: "rgba(0,122,255,0.32)", text: "#409CFF", icon: "ℹ️" },
-  warning: { bg: "rgba(245,158,11,0.16)", border: "rgba(245,158,11,0.34)", text: "#FFB340", icon: "⚠️" },
-  danger: { bg: "rgba(239,68,68,0.16)", border: "rgba(239,68,68,0.36)", text: "#FF6B6B", icon: "🚨" },
+  info: { bg: "var(--accent-soft-bg)", border: "var(--accent-soft-border)", text: "var(--accent-soft-text)", icon: "ℹ️" },
+  warning: { bg: "var(--warm-soft-bg)", border: "var(--warm-soft-border)", text: "var(--warm-soft-text)", icon: "⚠️" },
+  danger: { bg: "rgba(239,68,68,0.16)", border: "rgba(239,68,68,0.36)", text: "var(--danger)", icon: "🚨" },
 };
 
 /** ISO → now / 12m / 3h / 2d / 日期 */
@@ -227,7 +228,7 @@ export default function NotificationCenter({
                 onClick={() => void openItem(item)}
                 className={`haptic-action notification-row w-full flex items-start gap-3.5 p-4 rounded-2xl text-left ${item.is_read ? "is-read" : ""}`}
               >
-                <div className="notification-icon" style={{ color: style.color, background: `${style.color}18` }}>
+                <div className="notification-icon" style={{ color: style.color, background: `color-mix(in srgb, ${style.color} 10%, transparent)` }}>
                   {style.icon}
                 </div>
                 <div className="flex-1 min-w-0">

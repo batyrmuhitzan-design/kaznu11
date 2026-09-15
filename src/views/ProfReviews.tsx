@@ -82,21 +82,21 @@ function extraToReview(e: ExtraReview, color: string): RmpReview {
 }
 
 function attendanceColor(att: string): string {
-  if (att === "mandatory") return "#FF9F0A";
-  if (att === "recommended") return "#409CFF";
-  return "#30D158";
+  if (att === "mandatory") return "var(--warm-soft-text)";
+  if (att === "recommended") return "var(--accent-soft-text)";
+  return "var(--success)";
 }
 
 function ratingColor(v: number): string {
-  if (v >= 4.3) return "#10B981";
-  if (v >= 3.5) return "#30D158";
-  if (v >= 2.8) return "#FF9F0A";
-  return "#FF453A";
+  if (v >= 4.3) return "var(--success)";
+  if (v >= 3.5) return "var(--success)";
+  if (v >= 2.8) return "var(--warm-soft-text)";
+  return "var(--danger)";
 }
 /** Small UI atoms used across the Prof Reviews screens. */
 function Stars({ value, color, size = 11 }: { value: number; color: string; size?: number }) {
   return (
-    <span style={{ color: "rgba(235,235,245,0.22)", fontSize: size, letterSpacing: 1, lineHeight: 1 }}>
+    <span style={{ color: "var(--tx-8)", fontSize: size, letterSpacing: 1, lineHeight: 1 }}>
       {[1, 2, 3, 4, 5].map((i) => (
         <span key={i} style={{ color: i <= Math.round(value) ? color : undefined }}>
           {STAR}
@@ -111,9 +111,11 @@ function TagChip({ text, accent }: { text: string; accent?: string }) {
     <span
       className="px-2 py-0.5 rounded-full text-[10px] font-semibold"
       style={{
-        background: accent ? `${accent}1c` : "rgba(255,255,255,0.07)",
-        color: accent ?? "rgba(235,235,245,0.72)",
-        border: `1px solid ${accent ? `${accent}2e` : "rgba(255,255,255,0.09)"}`,
+        // 强调色可能是 var(--token)：十六进制后缀拼接（`${accent}1c`）对 var() 无效，
+        // 所以改用 color-mix 现算透明度（iOS 16.4+ / 现代 WebKit 均支持）
+        background: accent ? `color-mix(in srgb, ${accent} 11%, transparent)` : "rgba(255,255,255,0.07)",
+        color: accent ?? "var(--tx-2)",
+        border: `1px solid ${accent ? `color-mix(in srgb, ${accent} 18%, transparent)` : "rgba(255,255,255,0.09)"}`,
       }}
     >
       {text}
@@ -140,20 +142,20 @@ function ReviewItem({ r, s, showProfessor }: { r: RmpReview; s: Record<string, s
         {showProfessor && prof ? (
           <span className="text-xs font-bold text-white truncate">{prof.name}</span>
         ) : (
-          <span className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: "rgba(235,235,245,0.4)" }}>
+          <span className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: "var(--tx-6)" }}>
             {r.courseCode ?? r.courseTitle ?? s.teachesCourses}
           </span>
         )}
         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold" style={{ background: "rgba(94,92,230,0.16)", color: "#8E8CE9" }}>
           <svg viewBox="0 0 16 16" fill="currentColor" className="w-2.5 h-2.5"><path d="M8 1.5l1.8 3.7 4.1.6-3 2.9.7 4.1L8 10.8l-3.6 2 .7-4.1-3-2.9 4.1-.6z" /></svg>
-          <Stars value={r.quality} color="#FFD60A" size={8} />
+          <Stars value={r.quality} color="var(--star)" size={8} />
         </span>
       </div>
 
       {r.comment ? (
         <p className="text-[13px] leading-relaxed text-white/90">{r.comment}</p>
       ) : (
-        <p className="text-[13px] italic" style={{ color: "rgba(235,235,245,0.35)" }}>—</p>
+        <p className="text-[13px] italic" style={{ color: "var(--tx-7)" }}>—</p>
       )}
 
       <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
@@ -165,14 +167,14 @@ function ReviewItem({ r, s, showProfessor }: { r: RmpReview; s: Record<string, s
       </div>
 
       <div className="mt-2 flex items-center justify-between gap-2">
-        <div className="flex items-center gap-1.5 text-[10px]" style={{ color: "rgba(235,235,245,0.5)" }}>
-          <span className="w-4 h-4 rounded-full inline-flex items-center justify-center text-[8px] font-bold" style={{ background: "rgba(255,255,255,0.1)", color: "rgba(235,235,245,0.75)" }}>
+        <div className="flex items-center gap-1.5 text-[10px]" style={{ color: "var(--tx-4)" }}>
+          <span className="w-4 h-4 rounded-full inline-flex items-center justify-center text-[8px] font-bold" style={{ background: "rgba(255,255,255,0.1)", color: "var(--tx-2)" }}>
             {initialsOf(r.dept)}
           </span>
           <span className="font-medium max-w-[150px] truncate">{r.dept}</span>
           <span className="opacity-70">· {ageLabel(s, r)}</span>
         </div>
-        <div className="flex items-center gap-1 text-[10px] font-semibold" style={{ color: "rgba(235,235,245,0.45)" }}>
+        <div className="flex items-center gap-1 text-[10px] font-semibold" style={{ color: "var(--tx-5)" }}>
           <span className="flex items-center gap-0.5">
             <svg viewBox="0 0 20 20" fill="none" className="w-3 h-3"><path d="M10 18s-6-4.1-6-9a3.6 3.6 0 016-2.6A3.6 3.6 0 0116 9c0 4.9-6 9-6 9z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" /></svg>
             {r.likes}
@@ -213,10 +215,10 @@ function ProfessorRow({ row, onOpen }: { row: SummaryRow; onOpen: (id: string) =
           <span className="text-sm font-bold shrink-0" style={{ color: qualityColor, fontFamily: "JetBrains Mono" }}>{row.quality.toFixed(1)}</span>
         </span>
         <span className="flex items-center justify-between gap-2 mt-0.5">
-          <span className="text-[11px] truncate" style={{ color: "rgba(235,235,245,0.45)" }}>{row.department}</span>
-          <span className="text-[10px] shrink-0 flex items-center gap-1" style={{ color: "rgba(235,235,245,0.4)" }}>
+          <span className="text-[11px] truncate" style={{ color: "var(--tx-5)" }}>{row.department}</span>
+          <span className="text-[10px] shrink-0 flex items-center gap-1" style={{ color: "var(--tx-6)" }}>
             <span className="inline-flex items-center gap-0.5 px-1.5 py-px rounded-full" style={{ background: "rgba(255,214,10,0.1)" }}>
-              <Stars value={row.easy} color="#FFD60A" size={8} />
+              <Stars value={row.easy} color="var(--star)" size={8} />
             </span>
             <svg viewBox="0 0 20 20" fill="currentColor" className="w-3 h-3 opacity-70"><path d="M6 4h8v1H6zM6 8h8v1H6zM6 12h5v1H6zM4 15h2v3l4-3h6a2 2 0 002-2V4a2 2 0 00-2-2H4a2 2 0 00-2 2v9a2 2 0 002 2z" /></svg>
           </span>
@@ -255,7 +257,7 @@ function CourseRow({ row, onOpen }: { row: CourseSummaryRow; onOpen: (code: stri
             <span className="text-sm font-bold shrink-0" style={{ color, fontFamily: "JetBrains Mono" }}>{row.quality.toFixed(1)}</span>
           )}
         </span>
-        <span className="text-[11px] mt-0.5 block truncate" style={{ color: "rgba(235,235,245,0.45)" }}>
+        <span className="text-[11px] mt-0.5 block truncate" style={{ color: "var(--tx-5)" }}>
           {row.code} · {row.department}
         </span>
       </span>
@@ -266,7 +268,7 @@ function CourseRow({ row, onOpen }: { row: CourseSummaryRow; onOpen: (code: stri
 function RatingPill({ label, value, color }: { label: string; value: number; color: string }) {
   return (
     <div className="flex-1 px-3 py-2.5 squircle-sm" style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.08)" }}>
-      <p className="text-[9px] font-bold uppercase tracking-wider" style={{ color: "rgba(235,235,245,0.45)" }}>{label}</p>
+      <p className="text-[9px] font-bold uppercase tracking-wider" style={{ color: "var(--tx-5)" }}>{label}</p>
       <p className="text-xl font-bold mt-0.5" style={{ color, fontFamily: "JetBrains Mono", lineHeight: 1.1 }}>{value.toFixed(1)}</p>
       <div className="mt-1"><Stars value={value} color={color} size={9} /></div>
     </div>
@@ -284,7 +286,7 @@ function BackChevron({ label, onBack }: { label: string; onBack: () => void }) {
 function StarPicker({ label, color, value, onChange }: { label: string; color: string; value: number; onChange: (v: number) => void }) {
   return (
     <div>
-      <p className="text-[10px] font-bold uppercase tracking-wider mb-1.5" style={{ color: "rgba(235,235,245,0.5)" }}>{label}</p>
+      <p className="text-[10px] font-bold uppercase tracking-wider mb-1.5" style={{ color: "var(--tx-4)" }}>{label}</p>
       <div className="flex items-center gap-1">
         {[1, 2, 3, 4, 5].map((i) => (
           <button
@@ -294,7 +296,7 @@ function StarPicker({ label, color, value, onChange }: { label: string; color: s
             className="haptic-action w-9 h-9 flex items-center justify-center rounded-lg text-xl"
             style={{
               background: i <= value ? `${color}26` : "rgba(255,255,255,0.06)",
-              color: i <= value ? color : "rgba(235,235,245,0.25)",
+              color: i <= value ? color : "var(--tx-8)",
               border: `1px solid ${i <= value ? `${color}55` : "rgba(255,255,255,0.08)"}`,
             }}
             aria-label={`${label} ${i}`}
@@ -312,7 +314,7 @@ function EmptyState({ title, hint }: { title: string; hint: string }) {
     <div className="py-12 flex flex-col items-center text-center px-8">
       <div className="w-14 h-14 rounded-2xl flex items-center justify-center text-2xl mb-3" style={{ background: "rgba(255,255,255,0.05)" }}>🔍</div>
       <p className="text-sm font-bold text-white">{title}</p>
-      <p className="text-xs mt-1.5" style={{ color: "rgba(235,235,245,0.45)" }}>{hint}</p>
+      <p className="text-xs mt-1.5" style={{ color: "var(--tx-5)" }}>{hint}</p>
     </div>
   );
 }
@@ -323,7 +325,7 @@ function InfoNote({ title, body, icon }: { title: string; body: string; icon: st
       <span className="text-lg leading-none mt-0.5">{icon}</span>
       <div>
         <p className="text-[11px] font-bold text-white">{title}</p>
-        <p className="text-[10px] mt-1 leading-relaxed" style={{ color: "rgba(235,235,245,0.5)" }}>{body}</p>
+        <p className="text-[10px] mt-1 leading-relaxed" style={{ color: "var(--tx-4)" }}>{body}</p>
       </div>
     </div>
   );
@@ -374,10 +376,10 @@ function CommunitySheet({
           <p className="text-base font-bold text-white">👤 {s.communityProfile}</p>
           <button type="button" onClick={onClose} className="theme-muted w-7 h-7 flex items-center justify-center rounded-full" style={{ background: "rgba(255,255,255,0.08)" }}>✕</button>
         </div>
-        <p className="text-[10px] mb-4 leading-relaxed" style={{ color: "rgba(235,235,245,0.5)" }}>{s.hiddenNameNote}</p>
+        <p className="text-[10px] mb-4 leading-relaxed" style={{ color: "var(--tx-4)" }}>{s.hiddenNameNote}</p>
 
         <label className="block mb-3">
-          <span className="text-[11px] font-semibold mb-1 block" style={{ color: "rgba(235,235,245,0.6)" }}>{s.displayName}</span>
+          <span className="text-[11px] font-semibold mb-1 block" style={{ color: "var(--tx-3)" }}>{s.displayName}</span>
           <input
             value={name}
             onChange={(e) => setName(e.target.value)}
@@ -389,7 +391,7 @@ function CommunitySheet({
         </label>
 
         <label className="block mb-3">
-          <span className="text-[11px] font-semibold mb-1 block" style={{ color: "rgba(235,235,245,0.6)" }}>{s.deptTag}</span>
+          <span className="text-[11px] font-semibold mb-1 block" style={{ color: "var(--tx-3)" }}>{s.deptTag}</span>
           <input
             value={dept}
             onChange={(e) => setDept(e.target.value)}
@@ -400,7 +402,7 @@ function CommunitySheet({
           />
         </label>
 
-        <p className="text-[10px] leading-relaxed mb-4 px-3 py-2 squircle-sm" style={{ background: "rgba(0,122,255,0.1)", color: "#409CFF" }}>
+        <p className="text-[10px] leading-relaxed mb-4 px-3 py-2 squircle-sm" style={{ background: "rgba(0,122,255,0.1)", color: "var(--accent-soft-text)" }}>
           {s.nameDefaultNote}
         </p>
 
@@ -468,7 +470,7 @@ function ComposerScreen({
           <span className="w-11 h-11 squircle-sm flex items-center justify-center text-sm font-bold text-white" style={{ background: `linear-gradient(135deg, ${prof.color}, ${prof.color}aa)` }}>{initialsOf(prof.name)}</span>
           <div className="min-w-0">
             <p className="text-sm font-bold text-white truncate">{prof.name}</p>
-            <p className="text-[11px] mt-0.5" style={{ color: "rgba(235,235,245,0.45)" }}>{s.rateThisProfessor}</p>
+            <p className="text-[11px] mt-0.5" style={{ color: "var(--tx-5)" }}>{s.rateThisProfessor}</p>
           </div>
         </div>
 
@@ -476,17 +478,17 @@ function ComposerScreen({
 
         <div className="glass squircle-lg p-4 space-y-4">
           <StarPicker label={s.quality} color="#8E8CE9" value={quality} onChange={setQuality} />
-          <StarPicker label={s.easiness} color="#FFD60A" value={easy} onChange={setEasy} />
+          <StarPicker label={s.easiness} color="var(--star)" value={easy} onChange={setEasy} />
         </div>
         {courseChips.length > 0 && (
           <div className="glass squircle-lg p-4">
-            <p className="text-[10px] font-bold uppercase tracking-wider mb-2" style={{ color: "rgba(235,235,245,0.5)" }}>{s.teachesCourses}</p>
+            <p className="text-[10px] font-bold uppercase tracking-wider mb-2" style={{ color: "var(--tx-4)" }}>{s.teachesCourses}</p>
             <div className="flex flex-wrap gap-1.5">
               <button
                 type="button"
                 onClick={() => setCourseCode("")}
                 className="px-2.5 py-1.5 rounded-full text-[11px] font-semibold"
-                style={{ background: courseCode === "" ? "rgba(0,122,255,0.22)" : "rgba(255,255,255,0.07)", color: courseCode === "" ? "#409CFF" : "rgba(235,235,245,0.7)" }}
+                style={{ background: courseCode === "" ? "rgba(0,122,255,0.22)" : "rgba(255,255,255,0.07)", color: courseCode === "" ? "var(--accent-soft-text)" : "var(--tx-2)" }}
               >
                 🌐 {s.teachesCourses}
               </button>
@@ -494,7 +496,7 @@ function ComposerScreen({
                 const active = courseCode === c.code;
                 return (
                   <button key={c.code} type="button" onClick={() => setCourseCode(c.code)} className="px-2.5 py-1.5 rounded-full text-[11px] font-semibold"
-                    style={{ background: active ? "rgba(0,122,255,0.22)" : "rgba(255,255,255,0.07)", color: active ? "#409CFF" : "rgba(235,235,245,0.7)", border: active ? "1px solid rgba(0,122,255,0.5)" : "1px solid transparent" }}
+                    style={{ background: active ? "rgba(0,122,255,0.22)" : "rgba(255,255,255,0.07)", color: active ? "var(--accent-soft-text)" : "var(--tx-2)", border: active ? "1px solid rgba(0,122,255,0.5)" : "1px solid transparent" }}
                   >{c.code}</button>
                 );
               })}
@@ -503,7 +505,7 @@ function ComposerScreen({
         )}
 
         <div className="glass squircle-lg p-4">
-          <p className="text-[10px] font-bold uppercase tracking-wider mb-2" style={{ color: "rgba(235,235,245,0.5)" }}>{s.attendance}</p>
+          <p className="text-[10px] font-bold uppercase tracking-wider mb-2" style={{ color: "var(--tx-4)" }}>{s.attendance}</p>
           <div className="flex rounded-full p-1" style={{ background: "var(--seg-track)" }}>
             {attendanceSeeds.map((seed) => {
               const active = attendance === seed;
@@ -511,23 +513,23 @@ function ComposerScreen({
               return (
                 <button key={seed} type="button" onClick={() => setAttendance(seed)}
                   className="haptic-action flex-1 py-2 rounded-full text-[11px] font-semibold transition-all"
-                  style={{ background: active ? c : "transparent", color: active ? "#fff" : "rgba(235,235,245,0.6)" }}
+                  style={{ background: active ? c : "transparent", color: active ? "#fff" : "var(--tx-3)" }}
                 >{attendanceLabels[seed]}</button>
               );
             })}
           </div>
         </div>
         <div className="glass squircle-lg p-4">
-          <p className="text-[10px] font-bold uppercase tracking-wider mb-2" style={{ color: "rgba(235,235,245,0.5)" }}>{s.comment}</p>
+          <p className="text-[10px] font-bold uppercase tracking-wider mb-2" style={{ color: "var(--tx-4)" }}>{s.comment}</p>
           <textarea value={comment} onChange={(e) => setComment(e.target.value.slice(0, 1200))} rows={4} placeholder={s.commentPlaceholder}
             className="w-full px-3 py-3 squircle-sm text-sm text-white outline-none resize-none leading-relaxed"
             style={{ background: "var(--field-bg)", border: "1px solid var(--field-border)" }}
           />
-          <p className="text-[9px] mt-1 text-right" style={{ color: "rgba(235,235,245,0.35)" }}>{comment.length}/1200</p>
+          <p className="text-[9px] mt-1 text-right" style={{ color: "var(--tx-7)" }}>{comment.length}/1200</p>
         </div>
 
         <div className="glass squircle-lg p-4">
-          <p className="text-[10px] font-bold uppercase tracking-wider mb-2" style={{ color: "rgba(235,235,245,0.5)" }}>{s.tags}</p>
+          <p className="text-[10px] font-bold uppercase tracking-wider mb-2" style={{ color: "var(--tx-4)" }}>{s.tags}</p>
           <div className="flex flex-wrap gap-1.5">
             {TAG_POOL.map((tag) => {
               const active = tags.includes(tag);
@@ -535,7 +537,7 @@ function ComposerScreen({
                 <button key={tag} type="button" onClick={() => toggleTag(tag)} className="px-2.5 py-1.5 rounded-full text-[11px] font-semibold"
                   style={{
                     background: active ? "rgba(94,92,230,0.24)" : "rgba(255,255,255,0.07)",
-                    color: active ? "#A6A4FF" : "rgba(235,235,245,0.7)",
+                    color: active ? "#A6A4FF" : "var(--tx-2)",
                     border: active ? "1px solid rgba(94,92,230,0.6)" : "1px solid transparent",
                   }}
                 >{active ? "✓ " : ""}#{tag}</button>
@@ -588,26 +590,26 @@ function ProfessorDetail({
             </span>
             <div className="min-w-0">
               <h1 className="text-xl font-bold text-white truncate" style={{ letterSpacing: "-0.4px" }}>{row.name}</h1>
-              <p className="text-xs mt-1" style={{ color: "rgba(235,235,245,0.55)" }}>{row.department}</p>
-              <p className="text-[10px] mt-1 font-medium" style={{ color: "rgba(235,235,245,0.4)" }}>
+              <p className="text-xs mt-1" style={{ color: "var(--tx-4)" }}>{row.department}</p>
+              <p className="text-[10px] mt-1 font-medium" style={{ color: "var(--tx-6)" }}>
                 {rmpCountLabel(s, row.count)} · {s.of} 5
               </p>
             </div>
           </div>
           <div className="relative flex gap-2 mt-4">
             <RatingPill label={s.quality} value={row.quality} color={qualityColor} />
-            <RatingPill label={s.easiness} value={row.easy} color="#FFD60A" />
+            <RatingPill label={s.easiness} value={row.easy} color="var(--star)" />
           </div>
         </div>
 
         {courseStats.length > 0 && (
           <div className="mt-3">
-            <p className="text-xs font-bold mb-2" style={{ color: "rgba(235,235,245,0.6)" }}>{s.teachesCourses}</p>
+            <p className="text-xs font-bold mb-2" style={{ color: "var(--tx-3)" }}>{s.teachesCourses}</p>
             <div className="flex flex-wrap gap-1.5">
               {courseStats.map((c) => (
                 <button key={c.code} type="button" onClick={() => onOpenCourse(c.code)}
                   className="haptic-action px-2.5 py-1.5 squircle-sm text-[11px] font-semibold inline-flex items-center gap-1.5"
-                  style={{ background: "rgba(0,122,255,0.14)", color: "#409CFF", border: "1px solid rgba(0,122,255,0.28)" }}
+                  style={{ background: "rgba(0,122,255,0.14)", color: "var(--accent-soft-text)", border: "1px solid rgba(0,122,255,0.28)" }}
                 >
                   {c.code}
                   <span className="opacity-80" style={{ color: ratingColor(c.quality), fontFamily: "JetBrains Mono" }}>{c.quality.toFixed(1)}</span>
@@ -631,7 +633,7 @@ function ProfessorDetail({
 
         <div className="flex items-center justify-between mt-5 mb-2">
           <p className="text-sm font-semibold text-white">{s.reviewsWord}</p>
-          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full" style={{ background: "rgba(255,255,255,0.07)", color: "rgba(235,235,245,0.55)" }}>
+          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full" style={{ background: "rgba(255,255,255,0.07)", color: "var(--tx-4)" }}>
             {reviews.length}
           </span>
         </div>
@@ -680,9 +682,9 @@ function CourseDetail({
         <div className="glass squircle-lg p-5 card-shadow" style={{ border: "1px solid rgba(0,122,255,0.18)" }}>
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0">
-              <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: "#409CFF" }}>{course.code}</p>
+              <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: "var(--accent-soft-text)" }}>{course.code}</p>
               <h1 className="text-xl font-bold text-white mt-1 truncate" style={{ letterSpacing: "-0.4px" }}>{course.title}</h1>
-              <p className="text-xs mt-1" style={{ color: "rgba(235,235,245,0.55)" }}>{course.department}</p>
+              <p className="text-xs mt-1" style={{ color: "var(--tx-4)" }}>{course.department}</p>
             </div>
             <span className="text-3xl shrink-0">📚</span>
           </div>
@@ -690,7 +692,7 @@ function CourseDetail({
 
         {profRows.length > 0 && (
           <>
-            <p className="text-xs font-bold mt-4 mb-2" style={{ color: "rgba(235,235,245,0.6)" }}>{s.professors}</p>
+            <p className="text-xs font-bold mt-4 mb-2" style={{ color: "var(--tx-3)" }}>{s.professors}</p>
             <div className="glass squircle-lg overflow-hidden">
               {profRows.map((row) => (
                 <ProfessorRow key={row.id} row={row} onOpen={onOpenProfessor} />
@@ -701,7 +703,7 @@ function CourseDetail({
 
         <div className="flex items-center justify-between mt-5 mb-2">
           <p className="text-sm font-semibold text-white">{s.reviewsWord}</p>
-          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full" style={{ background: "rgba(255,255,255,0.07)", color: "rgba(235,235,245,0.55)" }}>{reviews.length}</span>
+          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full" style={{ background: "rgba(255,255,255,0.07)", color: "var(--tx-4)" }}>{reviews.length}</span>
         </div>
         {reviews.length === 0 ? (
           <div className="glass squircle-lg overflow-hidden"><EmptyState title={s.noRatingsYet} hint={s.blurb} /></div>
@@ -759,7 +761,7 @@ function HomeContent({
             const active = mode === m;
             return (
               <button key={m} type="button" onClick={() => onMode(m)} className="haptic-action flex-1 py-2 rounded-full text-[11px] font-bold transition-all"
-                style={{ background: active ? "#007AFF" : "transparent", color: active ? "#fff" : "rgba(235,235,245,0.6)" }}>
+                style={{ background: active ? "#007AFF" : "transparent", color: active ? "#fff" : "var(--tx-3)" }}>
                 {m === "prof" ? `👨‍🏫 ${s.professors}` : `📚 ${s.courses}`}
               </button>
             );
@@ -771,7 +773,7 @@ function HomeContent({
 
       <div className="glass squircle-md overflow-hidden">
         <div className="px-4 pt-3 pb-1 flex items-center justify-between">
-          <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "rgba(235,235,245,0.45)" }}>
+          <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "var(--tx-5)" }}>
             {mode === "prof" ? `${s.professors} · ${profRows.length}` : `${s.courses} · ${courseRows.length}`}
           </p>
         </div>
@@ -934,7 +936,7 @@ function ProfReviewsView({ onBack, deepLink }: ProfReviewsProps) {
           <div className="flex items-center justify-between gap-2">
             <BackChevron label={t("back")} onBack={onBack} />
             <h1 className="text-xl font-bold text-white flex items-center gap-1.5" style={{ letterSpacing: "-0.4px" }}>
-              <span style={{ color: "#FFD60A" }}>⭐</span> {s.title}
+              <span style={{ color: "var(--star)" }}>⭐</span> {s.title}
             </h1>
             <span className="w-8" />
           </div>

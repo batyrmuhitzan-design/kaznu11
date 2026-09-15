@@ -29,6 +29,18 @@ type ChatTranslationKey =
   | "notifCenter" | "notifEmpty" | "notifEmptyHint" | "notifAllReadDone"
   | "notifLike" | "notifComment" | "notifMessage" | "notifOfficial" | "notifSystem"
   | "broadcastLabel" | "latestAnnouncement" | "fromOfficial";
+/** 课程资料卡片 + 社团申请 / 创建（本轮产品重构） */
+type ClubTranslationKey =
+  | "latestMaterials" | "noNewMaterials" | "noNewMaterialsHint" | "done"
+  | "clubs" | "myClubApplications" | "createClub" | "createClubHint"
+  | "clubAvatar" | "clubAvatarHint" | "clubName" | "clubNamePlaceholder"
+  | "clubCategory" | "clubDescription" | "clubDescriptionPlaceholder"
+  | "clubContact" | "clubContactNamePlaceholder" | "clubTelegramPlaceholder" | "clubContactHint"
+  | "clubSubmit" | "clubSubmitting" | "clubReviewHint"
+  | "clubStatusPending" | "clubStatusApproved" | "clubStatusRejected"
+  | "clubSubmittedTitle" | "clubSubmittedHint"
+  | "clubCatAcademic" | "clubCatSports" | "clubCatArts" | "clubCatTech" | "clubCatVolunteer" | "clubCatMedia"
+  | "clubApplyUnauth" | "clubApplyDuplicate" | "clubApplyInvalid" | "clubApplyFailed";
 type ExtraTranslationKey =
   | "noMoreToday" | "degreePlan" | "targetStandard" | "justGraduate" | "magna" | "summa"
   | "futureAvg" | "ectsLeft" | "degreeProgress" | "avgPerSem" | "reachable" | "needsPerfect"
@@ -51,7 +63,7 @@ type ExtraTranslationKey =
   | "organizer" | "where" | "when" | "rsvp"
   | "noPosts" | "noPostsHint" | "noEvents" | "noEventsHint"
   | "offlineDemo" | "notSynced" | "postPublished" | "commentPosted" | "campusLoadFailed";
-export type AllTranslationKey = TranslationKey | ExtendedTranslationKey | NewsTranslationKey | ExtraTranslationKey | ChatTranslationKey;
+export type AllTranslationKey = TranslationKey | ExtendedTranslationKey | NewsTranslationKey | ExtraTranslationKey | ChatTranslationKey | ClubTranslationKey;
 
 interface LanguageContextType {
   language: Language;
@@ -118,6 +130,31 @@ const ADDITIONAL_TRANSLATIONS: Record<Language, Record<string, string>> = {
     notifLike: "liked your post", notifComment: "commented on your post", notifMessage: "sent you a message",
     notifOfficial: "official announcement", notifSystem: "KazNU Helper",
     broadcastLabel: "Campus-wide", latestAnnouncement: "Latest announcement", fromOfficial: "KazNU Official",
+    // ---- 课程资料卡片 + 社团申请 / 创建（EN）----
+    latestMaterials: "LATEST MATERIALS", noNewMaterials: "No new materials",
+    noNewMaterialsHint: "Lecture slides appear here as soon as your teacher uploads them.",
+    done: "Done",
+    clubs: "Clubs & Societies", myClubApplications: "My applications",
+    createClub: "Create a club or society", createClubHint: "Submit for review — visible to everyone once approved.",
+    clubAvatar: "Club logo", clubAvatarHint: "Tap to pick from your photo library — uploaded when you submit.",
+    clubName: "Club name", clubNamePlaceholder: "e.g. ACM Code Club",
+    clubCategory: "Category",
+    clubDescription: "About & recruitment", clubDescriptionPlaceholder: "What does your club do? Who should join?",
+    clubContact: "Contact / person in charge",
+    clubContactNamePlaceholder: "Leave empty to use your student profile",
+    clubTelegramPlaceholder: "Telegram @handle",
+    clubContactHint: "Your phone number stays private — only admins and you can see it.",
+    clubSubmit: "Submit", clubSubmitting: "Submitting…",
+    clubReviewHint: "Applications are reviewed by the student affairs team — usually within 1–2 days.",
+    clubStatusPending: "Pending review", clubStatusApproved: "Approved", clubStatusRejected: "Rejected",
+    clubSubmittedTitle: "Application submitted",
+    clubSubmittedHint: "Our team will review it shortly. You can follow the status right here in Campus.",
+    clubCatAcademic: "Academic", clubCatSports: "Sports", clubCatArts: "Arts",
+    clubCatTech: "Tech", clubCatVolunteer: "Volunteer", clubCatMedia: "Media",
+    clubApplyUnauth: "Please sign in again to submit",
+    clubApplyDuplicate: "You already applied for a club with this name",
+    clubApplyInvalid: "Please check the form — name and description are required",
+    clubApplyFailed: "Couldn't submit right now — try again in a moment",
     noMoreToday: "No more classes today 🎉", degreePlan: "Graduation Plan", targetStandard: "Target",
     justGraduate: "Just Graduate", magna: "Magna Cum Laude", summa: "Summa Cum Laude",
     futureAvg: "avg GPA needed in remaining semesters", ectsLeft: "ECTS left", degreeProgress: "Degree progress",
@@ -176,6 +213,31 @@ const ADDITIONAL_TRANSLATIONS: Record<Language, Record<string, string>> = {
     notifLike: "жазбаңызды ұнатты", notifComment: "жазбаңызға пікір қалдырды", notifMessage: "сізге хабарлама жіберді",
     notifOfficial: "ресми хабарлама", notifSystem: "KazNU Helper",
     broadcastLabel: "Жалпы кампус", latestAnnouncement: "Соңғы хабарлама", fromOfficial: "KazNU ресми",
+    // ---- 课程资料卡片 + 社团申请 / 创建（KZ）----
+    latestMaterials: "СОҢҒЫ МАТЕРИАЛДАР", noNewMaterials: "Жаңа материал жоқ",
+    noNewMaterialsHint: "Оқытушы жүктеген бетте дәріс слайдтары осында шығады.",
+    done: "Дайын",
+    clubs: "Клубтар мен ұйымдар", myClubApplications: "Менің өтінімдерім",
+    createClub: "Клуб немесе ұйым құру", createClubHint: "Тексеруге жіберіңіз — мақұлданған соң бәріне көрінеді.",
+    clubAvatar: "Клуб логотипі", clubAvatarHint: "Фото галереясынан таңдаңыз — жібергенде жүктеледі.",
+    clubName: "Клуб атауы", clubNamePlaceholder: "мысалы: ACM Code Club",
+    clubCategory: "Санат",
+    clubDescription: "Клуб туралы және қабылдау", clubDescriptionPlaceholder: "Клуб не істейді? Кім қосылуы керек?",
+    clubContact: "Байланыс / жауапты адам",
+    clubContactNamePlaceholder: "Бос қалдырсаңыз — студент профиліңіз қолданылады",
+    clubTelegramPlaceholder: "Telegram @handle",
+    clubContactHint: "Телефон нөміріңіз жасырын — тек әкімшілер мен өзіңіз көресіз.",
+    clubSubmit: "Жіберу", clubSubmitting: "Жіберілуде…",
+    clubReviewHint: "Өтінімдерді студенттік істер тобы қарайды — әдетте 1–2 күн ішінде.",
+    clubStatusPending: "Тексеруде", clubStatusApproved: "Мақұлданды", clubStatusRejected: "Қабылданбады",
+    clubSubmittedTitle: "Өтінім жіберілді",
+    clubSubmittedHint: "Команда жақын арада қарайды. Күйін осы жерден бақылай аласыз.",
+    clubCatAcademic: "Академиялық", clubCatSports: "Спорт", clubCatArts: "Өнер",
+    clubCatTech: "Технология", clubCatVolunteer: "Волонтёрлік", clubCatMedia: "Медиа",
+    clubApplyUnauth: "Жіберу үшін қайта кіріңіз",
+    clubApplyDuplicate: "Осы атаумен өтінім қабылданған",
+    clubApplyInvalid: "Форманы тексеріңіз — атау мен сипаттама қажет",
+    clubApplyFailed: "Қазір жіберілмеді — сәл кейінірек қайталаңыз",
   },
   RU: {
     noMoreToday: "На сегодня занятий больше нет 🎉", degreePlan: "План до диплома", targetStandard: "Цель",
@@ -220,6 +282,31 @@ const ADDITIONAL_TRANSLATIONS: Record<Language, Record<string, string>> = {
     notifLike: "лайкнул(а) вашу запись", notifComment: "прокомментировал(а) вашу запись", notifMessage: "отправил(а) вам сообщение",
     notifOfficial: "официальное объявление", notifSystem: "KazNU Helper",
     broadcastLabel: "Общекампусное", latestAnnouncement: "Последнее объявление", fromOfficial: "Официально от KazNU",
+    // ---- 课程资料卡片 + 社团申请 / 创建（RU）----
+    latestMaterials: "НОВЫЕ МАТЕРИАЛЫ", noNewMaterials: "Новых материалов нет",
+    noNewMaterialsHint: "Слайды лекций появятся здесь сразу после загрузки преподавателем.",
+    done: "Готово",
+    clubs: "Клубы и организации", myClubApplications: "Мои заявки",
+    createClub: "Создать клуб или организацию", createClubHint: "Отправьте на проверку — после одобрения увидят все.",
+    clubAvatar: "Логотип клуба", clubAvatarHint: "Нажмите, чтобы выбрать из галереи — загрузится при отправке.",
+    clubName: "Название клуба", clubNamePlaceholder: "например, ACM Code Club",
+    clubCategory: "Категория",
+    clubDescription: "О клубе и набор", clubDescriptionPlaceholder: "Чем занимается клуб? Кому стоит присоединиться?",
+    clubContact: "Контакт / ответственный",
+    clubContactNamePlaceholder: "Оставьте пустым — подставим ваш профиль",
+    clubTelegramPlaceholder: "Telegram @handle",
+    clubContactHint: "Телефон остаётся приватным — его видят только вы и администраторы.",
+    clubSubmit: "Отправить", clubSubmitting: "Отправка…",
+    clubReviewHint: "Заявки рассматривает студенческий отдел — обычно 1–2 дня.",
+    clubStatusPending: "На проверке", clubStatusApproved: "Одобрено", clubStatusRejected: "Отклонено",
+    clubSubmittedTitle: "Заявка отправлена",
+    clubSubmittedHint: "Команда скоро рассмотрит её. Статус можно отслеживать прямо здесь.",
+    clubCatAcademic: "Академическое", clubCatSports: "Спорт", clubCatArts: "Искусство",
+    clubCatTech: "Технологии", clubCatVolunteer: "Волонтёрство", clubCatMedia: "Медиа",
+    clubApplyUnauth: "Войдите заново, чтобы отправить",
+    clubApplyDuplicate: "Заявка с таким названием уже отправлена",
+    clubApplyInvalid: "Проверьте форму — нужны название и описание",
+    clubApplyFailed: "Не удалось отправить — попробуйте позже",
   },
 };
 
@@ -240,7 +327,7 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
   }
 
   const t = (
-    key: TranslationKey | ExtendedTranslationKey | NewsTranslationKey | ExtraTranslationKey | ChatTranslationKey,
+    key: TranslationKey | ExtendedTranslationKey | NewsTranslationKey | ExtraTranslationKey | ChatTranslationKey | ClubTranslationKey,
   ) => ADDITIONAL_TRANSLATIONS[language][key] ?? TRANSLATIONS[language][key];
   return <LanguageContext.Provider value={{ language, setLanguage, t }}>{children}</LanguageContext.Provider>;
 }

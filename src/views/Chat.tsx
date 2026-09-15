@@ -196,7 +196,7 @@ export default function ChatList({
           <BackButton onClick={onBack} />
           <div className="flex items-center gap-2">
             <ConnectionPill state={connection} />
-            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: "rgba(0,122,255,0.16)", color: "#409CFF" }}>
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: "rgba(0,122,255,0.16)", color: "var(--accent-soft-text)" }}>
               {unread > 0 ? `${unread} ${t("chatUnreadShort")}` : t("chatAllRead")}
             </span>
           </div>
@@ -466,7 +466,7 @@ export function ChatDetail({
             <p className="text-sm font-bold text-white truncate">{conversation.peer.display_name}</p>
             <p
               className="text-[10px] truncate"
-              style={{ color: peerTyping ? "#30D158" : "rgba(235,235,245,0.45)" }}
+              style={{ color: peerTyping ? "#30D158" : "var(--tx-5)" }}
             >
               {peerTyping ? t("chatTyping") : (conversation.peer.department_tag ?? "")}
             </p>

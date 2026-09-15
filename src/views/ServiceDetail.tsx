@@ -29,24 +29,25 @@ interface DetailData {
 }
 
 const CHIP_META: Record<ChipKey, { k: AllTranslationKey; color: string; bg: string }> = {
-  pass: { k: "statusPass", color: "#30D158", bg: "rgba(48,209,88,0.15)" },
-  fail: { k: "statusNotPass", color: "#FF453A", bg: "rgba(255,69,58,0.14)" },
-  inProgress: { k: "statusInProgress", color: "#409CFF", bg: "rgba(0,122,255,0.15)" },
-  planned: { k: "statusPlanned", color: "#7B79F7", bg: "rgba(94,92,230,0.16)" },
-  open: { k: "statusOpen", color: "#30D158", bg: "rgba(48,209,88,0.15)" },
-  due: { k: "statusDue", color: "#FF9F0A", bg: "rgba(255,159,10,0.15)" },
-  retake: { k: "statusRetake", color: "#7B79F7", bg: "rgba(94,92,230,0.16)" },
+  pass: { k: "statusPass", color: "var(--success)", bg: "rgba(48,209,88,0.15)" },
+  fail: { k: "statusNotPass", color: "var(--danger)", bg: "rgba(255,69,58,0.14)" },
+  inProgress: { k: "statusInProgress", color: "var(--accent-soft-text)", bg: "var(--accent-soft-bg)" },
+  planned: { k: "statusPlanned", color: "var(--purple-soft-text)", bg: "rgba(94,92,230,0.16)" },
+  open: { k: "statusOpen", color: "var(--success)", bg: "rgba(48,209,88,0.15)" },
+  due: { k: "statusDue", color: "var(--warm-soft-text)", bg: "var(--warm-soft-bg)" },
+  retake: { k: "statusRetake", color: "var(--purple-soft-text)", bg: "rgba(94,92,230,0.16)" },
 };
 
 const SVC: Record<ServiceId, { icon: string; key: AllTranslationKey; accent: string }> = {
-  attestation: { icon: "📋", key: "serviceAttestation", accent: "#007AFF" },
-  journal: { icon: "📊", key: "serviceJournal", accent: "#5E5CE6" },
-  plan: { icon: "🗺️", key: "servicePlan", accent: "#30D158" },
-  transcript: { icon: "📜", key: "serviceTranscript", accent: "#FF9F0A" },
-  onlineTest: { icon: "💻", key: "serviceOnlineTest", accent: "#FF453A" },
-  debt: { icon: "💸", key: "serviceDebt", accent: "#FF9F0A" },
-  fx: { icon: "🔁", key: "serviceFx", accent: "#5E5CE6" },
-  anketa: { icon: "🪪", key: "serviceStudentAnketa", accent: "#007AFF" },
+  // accent 一律走 token：既保证浅色下可读，也让"服务色"与全局色板同源
+  attestation: { icon: "📋", key: "serviceAttestation", accent: "var(--accent)" },
+  journal: { icon: "📊", key: "serviceJournal", accent: "var(--purple-soft-text)" },
+  plan: { icon: "🗺️", key: "servicePlan", accent: "var(--success)" },
+  transcript: { icon: "📜", key: "serviceTranscript", accent: "var(--warm-soft-text)" },
+  onlineTest: { icon: "💻", key: "serviceOnlineTest", accent: "var(--danger)" },
+  debt: { icon: "💸", key: "serviceDebt", accent: "var(--warm-soft-text)" },
+  fx: { icon: "🔁", key: "serviceFx", accent: "var(--purple-soft-text)" },
+  anketa: { icon: "🪪", key: "serviceStudentAnketa", accent: "var(--accent)" },
 };
 
 function buildData(id: ServiceId): DetailData {
@@ -193,14 +194,14 @@ export default function ServiceDetail({ id, onBack }: { id: ServiceId; onBack: (
 
       <div className="flex-1 min-h-0 overflow-y-auto px-4 pt-3 pb-32 animate-slide-up">
         <div className="flex items-center gap-3 mb-1">
-          <div className="w-12 h-12 squircle-lg flex items-center justify-center text-2xl" style={{ background: `${data.accent}1f`, border: `1px solid ${data.accent}33` }}>{data.icon}</div>
+          <div className="w-12 h-12 squircle-lg flex items-center justify-center text-2xl" style={{ background: `color-mix(in srgb, ${data.accent} 12%, transparent)`, border: `1px solid color-mix(in srgb, ${data.accent} 20%, transparent)` }}>{data.icon}</div>
           <h1 className="text-2xl font-bold text-white flex-1" style={{ letterSpacing: "-0.5px" }}>{t(data.key)}</h1>
         </div>
 
         {data.sourceUniver && (
           <div className="mt-2 mb-3 px-3 py-2 rounded-lg flex items-center gap-2" style={{ background: "rgba(0,122,255,0.1)", border: "1px solid rgba(0,122,255,0.2)" }}>
-            <svg viewBox="0 0 20 20" fill="none" className="w-3.5 h-3.5 shrink-0"><path d="M10 2a6 6 0 00-6 6v3l-1.5 2.5A1 1 0 003.4 15h13.2a1 1 0 00.9-1.5L16 11V8a6 6 0 00-6-6zM8 16a2 2 0 004 0H8z" fill="#409CFF" /></svg>
-            <p className="text-[11px] font-semibold" style={{ color: "#409CFF" }}>{t("univerNote")}</p>
+            <svg viewBox="0 0 20 20" fill="none" className="w-3.5 h-3.5 shrink-0"><path d="M10 2a6 6 0 00-6 6v3l-1.5 2.5A1 1 0 003.4 15h13.2a1 1 0 00.9-1.5L16 11V8a6 6 0 00-6-6zM8 16a2 2 0 004 0H8z" fill="var(--accent-soft-text)" /></svg>
+            <p className="text-[11px] font-semibold" style={{ color: "var(--accent-soft-text)" }}>{t("univerNote")}</p>
           </div>
         )}
 
@@ -208,14 +209,14 @@ export default function ServiceDetail({ id, onBack }: { id: ServiceId; onBack: (
           {data.sections.map((section, si) => (
             <div key={si} className="glass squircle-lg overflow-hidden card-shadow">
               {section.heading && (
-                <p className="text-xs font-bold px-4 pt-3 pb-1" style={{ color: "rgba(235,235,245,0.6)" }}>{section.heading}</p>
+                <p className="text-xs font-bold px-4 pt-3 pb-1" style={{ color: "var(--tx-3)" }}>{section.heading}</p>
               )}
               <div className="divide-y divide-white/5">
                 {section.rows.map((row, ri) => (
                   <div key={ri} className="flex items-center justify-between gap-3 px-4 py-3">
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-semibold text-white truncate">{row.nameKey ? t(row.nameKey) : row.name}</p>
-                      {row.meta && <p className="text-[11px] mt-0.5" style={{ color: "rgba(235,235,245,0.45)" }}>{row.meta}</p>}
+                      {row.meta && <p className="text-[11px] mt-0.5" style={{ color: "var(--tx-5)" }}>{row.meta}</p>}
                       {typeof row.pct === "number" && (
                         <div className="mt-1.5 h-1 rounded-full overflow-hidden meter-track" style={{ maxWidth: 150 }}>
                           <div className="h-full rounded-full" style={{ width: `${row.pct}%`, background: "#30D158" }} />
@@ -238,7 +239,7 @@ export default function ServiceDetail({ id, onBack }: { id: ServiceId; onBack: (
             type="button"
             onClick={() => triggerHaptic(8)}
             className="haptic-action w-full mt-4 py-3.5 squircle-md text-sm font-bold transition-transform active:scale-95"
-            style={{ background: data.accent, color: "#fff", boxShadow: `0 8px 22px ${data.accent}55` }}
+            style={{ background: data.accent, color: "var(--on-accent)", boxShadow: `0 8px 22px color-mix(in srgb, ${data.accent} 33%, transparent)` }}
           >
             {data.action === "start" ? `▶ ${t("actionStart")}` : `✓ ${t("actionRegister")}`}
           </button>

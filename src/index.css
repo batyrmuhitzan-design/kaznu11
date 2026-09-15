@@ -51,6 +51,164 @@ body,
   --seg-active-fg: #ffffff;
 }
 
+/* =====================================================================
+   语义 Token（深浅色统一入口）—— 组件只允许引用这里，不要再写死颜色
+
+   背景：此前把 `rgba(235,235,245,0.5)` 这类"深色模式下的白字"直接内联到 JSX，
+   浅色模式下就成了"白底白字"，只能靠
+   `.light [style*="235"] { … !important }` 这种脆弱 hack 抢救 ——
+   而那条 hack 会把**所有**灰阶强行压成同一个值，于是对比度层级全丢了
+   （这正是"深色模式刺眼、浅色对比度混乱"的根因）。
+   现在改为：文字灰阶 = --tx-1..--tx-9（深色=白系 / 浅色=深灰系），
+   面板、分割线、底色、强调色同理 —— 换主题只改这一处。
+
+   | token  | 深色（默认 :root）      | 浅色（.light）       | 取代的内联值（深色 alpha）|
+   |--------|------------------------|---------------------|--------------------------|
+   | --tx-1 | rgba(235,235,245,0.92) | rgba(17,24,39,0.92) | 0.92 / 0.85 / 0.82 / 0.78|
+   | --tx-2 | rgba(235,235,245,0.75) | rgba(28,28,30,0.80) | 0.75 / 0.72 / 0.70       |
+   | --tx-3 | rgba(235,235,245,0.65) | rgba(28,28,30,0.74) | 0.65 / 0.60              |
+   | --tx-4 | rgba(235,235,245,0.55) | rgba(60,60,67,0.62) | 0.55 / 0.50              |
+   | --tx-5 | rgba(235,235,245,0.45) | rgba(60,60,67,0.55) | 0.45                     |
+   | --tx-6 | rgba(235,235,245,0.40) | rgba(60,60,67,0.50) | 0.40                     |
+   | --tx-7 | rgba(235,235,245,0.35) | rgba(60,60,67,0.45) | 0.35                     |
+   | --tx-8 | rgba(235,235,245,0.28) | rgba(60,60,67,0.40) | 0.28 / 0.25 / 0.22       |
+   | --tx-9 | rgba(235,235,245,0.15) | rgba(60,60,67,0.30) | 0.15                     |
+   ===================================================================== */
+:root {
+  --tx-1: rgba(235, 235, 245, 0.92);
+  --tx-2: rgba(235, 235, 245, 0.75);
+  --tx-3: rgba(235, 235, 245, 0.65);
+  --tx-4: rgba(235, 235, 245, 0.55);
+  --tx-5: rgba(235, 235, 245, 0.45);
+  --tx-6: rgba(235, 235, 245, 0.40);
+  --tx-7: rgba(235, 235, 245, 0.35);
+  --tx-8: rgba(235, 235, 245, 0.28);
+  --tx-9: rgba(235, 235, 245, 0.15);
+
+  --card-bg: rgba(255, 255, 255, 0.06);
+  --card-border: rgba(255, 255, 255, 0.08);
+  --hairline: rgba(255, 255, 255, 0.08);
+  --field-1: rgba(255, 255, 255, 0.04);
+  --field-2: rgba(255, 255, 255, 0.08);
+  --field-3: rgba(255, 255, 255, 0.12);
+
+  --scrim: rgba(0, 0, 0, 0.55);
+  --sheet-bg: #1c1c1e;
+  --sheet-bg-solid: #1c1c1e;
+  --sheet-text: #ffffff;
+  --sheet-text-2: rgba(235, 235, 245, 0.92);
+  --sheet-text-3: rgba(235, 235, 245, 0.72);
+  --sheet-border: rgba(255, 255, 255, 0.10);
+
+  --accent: #0a84ff;
+  --accent-strong: #0071e3;
+  --accent-soft-bg: rgba(0, 122, 255, 0.16);
+  --accent-soft-border: rgba(0, 122, 255, 0.32);
+  --accent-soft-text: #409cff;
+  --on-accent: #ffffff;
+
+  /* 暖色：深色下必须压暗，纯 #FFD60A 在纯黑背景上刺眼 */
+  --warm: #ffb340;
+  --warm-soft-bg: rgba(255, 159, 10, 0.16);
+  --warm-soft-border: rgba(255, 159, 10, 0.34);
+  --warm-soft-text: #ffb340;
+  --warm-grad: linear-gradient(135deg, #c97400, #ffb340);
+
+  --success: #30d158;
+  --danger: #ff453a;
+  /* 星标金：深色下用亮金，浅色下压暗（#FFD60A 在白底上几乎看不见） */
+  --star: #ffd60a;
+  --purple-soft-text: #7b79f7;
+}
+
+/* 浅色覆盖：同一批 token 换一套值（组件代码一行都不用改） */
+.light {
+  --tx-1: rgba(17, 24, 39, 0.92);
+  --tx-2: rgba(28, 28, 30, 0.80);
+  --tx-3: rgba(28, 28, 30, 0.74);
+  --tx-4: rgba(60, 60, 67, 0.62);
+  --tx-5: rgba(60, 60, 67, 0.55);
+  --tx-6: rgba(60, 60, 67, 0.50);
+  --tx-7: rgba(60, 60, 67, 0.45);
+  --tx-8: rgba(60, 60, 67, 0.40);
+  --tx-9: rgba(60, 60, 67, 0.30);
+
+  --card-bg: rgba(255, 255, 255, 0.86);
+  --card-border: rgba(0, 0, 0, 0.07);
+  --hairline: rgba(0, 0, 0, 0.09);
+  --field-1: rgba(0, 0, 0, 0.035);
+  --field-2: rgba(0, 0, 0, 0.06);
+  --field-3: rgba(0, 0, 0, 0.10);
+
+  --scrim: rgba(0, 0, 0, 0.35);
+  --sheet-bg: #ffffff;
+  --sheet-bg-solid: #ffffff;
+  --sheet-text: #111827;
+  --sheet-text-2: rgba(17, 24, 39, 0.86);
+  --sheet-text-3: rgba(17, 24, 39, 0.64);
+  --sheet-border: rgba(0, 0, 0, 0.10);
+
+  --accent: #0071e3;
+  --accent-strong: #0057b8;
+  --accent-soft-bg: rgba(0, 113, 227, 0.12);
+  --accent-soft-border: rgba(0, 113, 227, 0.28);
+  /* 浅色下必须够深，否则蓝字在白卡片上读不清 */
+  --accent-soft-text: #0060c7;
+  --on-accent: #ffffff;
+
+  --warm: #b26a00;
+  --warm-soft-bg: rgba(226, 124, 0, 0.13);
+  --warm-soft-border: rgba(226, 124, 0, 0.30);
+  --warm-soft-text: #a85d00;
+  --warm-grad: linear-gradient(135deg, #b26a00, #e08a00);
+
+  --success: #14883c;
+  --danger: #d70015;
+  --star: #d99a00;
+  --purple-soft-text: #4b49c9;
+}
+
+/* ---- 语义工具类（配合 Tailwind 使用，不引入新依赖）---- */
+.tx-1 { color: var(--tx-1); }
+.tx-2 { color: var(--tx-2); }
+.tx-3 { color: var(--tx-3); }
+.tx-4 { color: var(--tx-4); }
+.tx-5 { color: var(--tx-5); }
+.tx-6 { color: var(--tx-6); }
+.tx-7 { color: var(--tx-7); }
+.tx-8 { color: var(--tx-8); }
+.tx-9 { color: var(--tx-9); }
+.tx-accent { color: var(--accent-soft-text); }
+.tx-warm { color: var(--warm-soft-text); }
+.tx-danger { color: var(--danger); }
+.tx-success { color: var(--success); }
+
+.surface-card { background: var(--card-bg); border: 1px solid var(--card-border); }
+.hairline-b { border-bottom: 1px solid var(--hairline); }
+.hairline-t { border-top: 1px solid var(--hairline); }
+.field-surface { background: var(--field-2); border: 1px solid var(--hairline); }
+
+/* 强调色实体按钮（深浅色都保证足够对比度） */
+.btn-accent {
+  background: linear-gradient(135deg, var(--accent-strong), var(--accent));
+  color: var(--on-accent);
+}
+/* 暖色按钮：取代写死的 #FF9F0A→#FFD60A 渐变
+   （深色下刺眼 + 浅色下图一里那种"黄底黑字"失真，就是它造成的） */
+.btn-warm { background: var(--warm-grad); color: #ffffff; }
+
+/* 弹层：遮罩 + 面板（Modal / Bottom Sheet / LegalModal 统一） */
+.modal-scrim {
+  background: var(--scrim);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+.sheet-surface {
+  background: var(--sheet-bg);
+  color: var(--sheet-text);
+  border: 1px solid var(--sheet-border);
+}
+
 .app-surface { background: var(--app-bg); color: var(--app-text); }
 .theme-panel {
   background: rgba(28,28,30,0.85);
@@ -70,10 +228,19 @@ body,
 .light .tab-bar { background: var(--tab-bg); border-top-color: rgba(0,0,0,0.1); }
 .light [style*="28, 28, 30"] { background: rgba(255,255,255,0.88) !important; }
 .light [style*="44, 44, 46"] { background: rgba(245,245,247,0.95) !important; }
-.light [style*="235"] { color: rgba(60,60,67,0.62) !important; }
+/* 注：原先这里有一条 `.light [style*="235"] { color: rgba(60,60,67,.62) !important }`。
+   它是"内联白字"的补丁，但会把**所有**灰阶强行压成同一个值 → 层级/对比度全丢
+   （就是"深浅色下颜色失真"的元凶）。现在内联灰阶已全部换成 --tx-* token，
+   这条 hack 已删除；仅保留下面与"玻璃高光"有关的几条。 */
 .light [style*="255, 255, 255, 0.04"] { background: rgba(0,0,0,0.035) !important; }
 .light [style*="255, 255, 255, 0.06"] { border-color: rgba(0,0,0,0.08) !important; }
 .light input[style*="white"] { color: var(--app-text) !important; }
+/* 输入框占位符：跟随 token，浅色下不再是"白底白字" */
+input::placeholder,
+textarea::placeholder { color: var(--tx-7); }
+
+/* 行分隔线（替代 divide-white/5 —— 那个在浅色下完全看不见） */
+.hairline-rows > * + * { border-top: 1px solid var(--hairline); }
 .light .live-activity .text-white,
 .light [style*="0033A0"] .text-white { color: #fff !important; }
 .light .live-activity [style*="255, 255, 255"],
@@ -682,99 +849,54 @@ html {
   transform-origin: center;
 }
 
-/* ===== LegalModal：跟随主题，浅色=白底深字 / 深色=#1C1C1E 白字 ===== */
+/* ===== LegalModal：全部走语义 token（浅色=白底深字 / 深色=#1C1C1E 白字）=====
+   以前这里写了两大段硬编码（深色一整套 + .light 再覆盖一整套），
+   任何一处漏改就会出现"黑字黑底"。现在只引用 --sheet-* / --tx-*，
+   主题切换自动跟随，代码量也少了一半。 */
 .legal-modal-sheet {
-  background: #1c1c1e;
-  color: #ffffff;
-  border: none;
-  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.5);
+  color: var(--sheet-text);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.45);
 }
 .legal-modal-sheet .lms-title {
-  color: #ffffff;
+  color: var(--sheet-text);
 }
 .legal-modal-sheet .lms-meta {
-  color: rgba(235, 235, 245, 0.75);
+  color: var(--sheet-text-3);
 }
 .legal-modal-sheet .lms-section-title {
-  color: #ffffff;
+  color: var(--sheet-text);
 }
 .legal-modal-sheet .lms-body {
-  color: rgba(235, 235, 245, 0.92);
+  color: var(--sheet-text-2);
 }
 .legal-modal-sheet .lms-divider {
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  border-bottom: 1px solid var(--sheet-border);
 }
 .legal-modal-sheet .lms-tab {
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  color: rgba(235, 235, 245, 0.75);
+  background: var(--field-2);
+  border: 1px solid var(--sheet-border);
+  color: var(--sheet-text-3);
 }
 .legal-modal-sheet .lms-tab-active {
-  background: linear-gradient(135deg, #0033a0, #007aff);
-  border: 1px solid rgba(255, 255, 255, 0.4);
-  color: #ffffff;
-  box-shadow: 0 2px 10px rgba(0, 122, 255, 0.35);
+  background: linear-gradient(135deg, var(--accent-strong), var(--accent));
+  border: 1px solid transparent;
+  color: var(--on-accent);
+  box-shadow: 0 2px 10px rgba(0, 122, 255, 0.3);
 }
 .legal-modal-sheet .lms-close {
-  background: rgba(255, 255, 255, 0.12);
-  border: 1px solid rgba(255, 255, 255, 0.24);
-  color: #ffffff;
+  background: var(--field-3);
+  border: 1px solid var(--sheet-border);
+  color: var(--sheet-text);
 }
 .legal-modal-sheet .lms-btn-ghost {
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.26);
-  color: #ffffff;
+  background: var(--field-2);
+  border: 1px solid var(--sheet-border);
+  color: var(--sheet-text);
 }
 .legal-modal-sheet .lms-btn-primary {
-  background: linear-gradient(135deg, #0033a0, #007aff);
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  color: #ffffff;
-}
-.light .legal-modal-sheet {
-  background: #ffffff;
-  color: #111827;
-  border: none;
-  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.22);
-}
-.light .legal-modal-sheet .lms-title {
-  color: #111827;
-}
-.light .legal-modal-sheet .lms-meta {
-  color: #6b7280;
-}
-.light .legal-modal-sheet .lms-section-title {
-  color: #111827;
-}
-.light .legal-modal-sheet .lms-body {
-  color: #374151;
-}
-.light .legal-modal-sheet .lms-divider {
-  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
-}
-.light .legal-modal-sheet .lms-tab {
-  background: rgba(0, 0, 0, 0.05);
-  border: 1px solid rgba(0, 0, 0, 0.14);
-  color: #111827;
-}
-.light .legal-modal-sheet .lms-tab-active {
-  background: linear-gradient(135deg, #0033a0, #007aff);
-  border: 1px solid rgba(0, 0, 122, 0.35);
-  color: #ffffff;
-}
-.light .legal-modal-sheet .lms-close {
-  background: rgba(0, 0, 0, 0.06);
-  border: 1px solid rgba(0, 0, 0, 0.14);
-  color: #111827;
-}
-.light .legal-modal-sheet .lms-btn-ghost {
-  background: #f3f4f6;
-  border: 1px solid rgba(0, 0, 0, 0.12);
-  color: #111827;
-}
-.light .legal-modal-sheet .lms-btn-primary {
-  background: linear-gradient(135deg, #0033a0, #007aff);
-  border: 1px solid rgba(0, 0, 122, 0.35);
-  color: #ffffff;
+  background: linear-gradient(135deg, var(--accent-strong), var(--accent));
+  border: 1px solid transparent;
+  color: var(--on-accent);
 }
 /* =====================================================================
    ===== 交互细节优化：FAB / 紧凑胶囊 / 软键盘避让 =====
@@ -946,21 +1068,36 @@ html {
   font-size: 11px;
   line-height: 1.15;
   font-weight: 700;
-  color: var(--app-muted);
+  color: var(--tx-3);
   background: transparent;
   transition: background-color 200ms ease, color 200ms ease, transform 160ms ease;
 }
-.seg-compact > button[aria-selected="true"] { background: #007aff; color: #ffffff; }
+.seg-compact > button[aria-selected="true"] { background: var(--accent); color: var(--on-accent); }
 .seg-compact > button:active { transform: scale(0.96); }
 
+/* 三级分类胶囊：比二级 Tab 更小更轻（用户反馈"尺寸过于粗暴夸张"） */
 .pill-chip {
   padding: 4px 10px;
   border-radius: 999px;
   font-size: 11px;
   line-height: 1.15;
   font-weight: 700;
+  white-space: nowrap;
 }
 .pill-chip:active { transform: scale(0.96); }
+
+/* 横向滚动的胶囊条：隐藏滚动条 + 两端渐隐，避免"最后一个胶囊贴边被切"的粗糙感 */
+.chip-scroller {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  -webkit-overflow-scrolling: touch;
+  scroll-snap-type: x proximity;
+  overscroll-behavior-x: contain;
+  mask-image: linear-gradient(to right, transparent 0, #000 14px, #000 calc(100% - 14px), transparent 100%);
+  -webkit-mask-image: linear-gradient(to right, transparent 0, #000 14px, #000 calc(100% - 14px), transparent 100%);
+}
+.chip-scroller::-webkit-scrollbar { display: none; }
+.chip-scroller > * { scroll-snap-align: start; }
 
 /* --- 3) 软键盘避让 ---
    `html.kb-open` 与 `--kb-inset` 由 src/utils/keyboard.ts 写入（基于 visualViewport）。 */

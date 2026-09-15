@@ -388,7 +388,7 @@ export default function Schedule({ onOpenReviews }: { onOpenReviews?: (professor
               <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide" style={{ background: "rgba(94,92,230,0.18)", color: "#8E8CE9" }}>
                 {detailCourse.type === "lecture" ? t("lecture") : detailCourse.type === "lab" ? t("lab") : detailCourse.type === "exam" ? t("exam") : t("seminar")}
               </span>
-              <button type="button" onClick={() => setDetailCourse(null)} className="w-7 h-7 flex items-center justify-center rounded-full" style={{ background: "rgba(255,255,255,0.08)", color: "rgba(235,235,245,0.7)" }}>✕</button>
+              <button type="button" onClick={() => setDetailCourse(null)} className="w-7 h-7 flex items-center justify-center rounded-full" style={{ background: "rgba(255,255,255,0.08)", color: "var(--tx-2)" }}>✕</button>
             </div>
             <h2 className="text-xl font-bold text-white" style={{ letterSpacing: "-0.4px" }}>{detailCourse.name}</h2>
             <div className="mt-3 space-y-2 text-sm">
@@ -417,8 +417,7 @@ export default function Schedule({ onOpenReviews }: { onOpenReviews?: (professor
                   setDetailCourse(null);
                   onOpenReviews?.(course.prof, course.name);
                 }}
-                className="haptic-action w-full mt-5 py-3.5 squircle-sm text-sm font-bold flex items-center justify-center gap-2"
-                style={{ background: "linear-gradient(135deg,#FF9F0A,#FFD60A)", color: "#1c1c1e", boxShadow: "0 8px 22px rgba(255,159,10,0.35)" }}
+                className="haptic-action btn-warm w-full mt-5 py-3.5 squircle-sm text-sm font-bold flex items-center justify-center gap-2"
               >
                 ⭐ {tr("View Professor Rating", "Оқытушы бағасын қарау", "Рейтинг преподавателя")}
               </button>

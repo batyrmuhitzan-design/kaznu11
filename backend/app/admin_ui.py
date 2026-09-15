@@ -30,8 +30,10 @@ from .models import (
     ROLE_ADMIN,
     ROLE_SUPER_ADMIN,
     AdminApplication,
+    ClubApplication,
     ClubEvent,
     Course,
+    CourseMaterial,
     GlobalNotification,
     Post,
     PostComment,
@@ -40,6 +42,13 @@ from .models import (
     Review,
     User,
 )
+from .push import (
+    all_push_targets,
+    announce_club_event,
+    dispatch_alert,
+    notify_user,
+)
+from .push_payload import build_broadcast_payload
 
 SESSION_KEY = "kaznu_admin_user"
 
@@ -585,13 +594,26 @@ class ClubEventAdmin(ModelView, model=ClubEvent):
         add_in_detail=True,
     )
     async def approve_events(self, request: Request) -> RedirectResponse:
+        """审核通过 —— 并在**通过的这一刻**给全量设备发系统推送。
+
+        为什么要在这里推送（而不是等 App 自己发现）
+        ------------------------------------------
+        App 被用户划掉后没有任何后台执行权（iOS 限制），不可能轮询到"有新活动"。
+        所以在管理员点通过的时刻发一次 APNs alert 是唯一能让它在锁屏 / 灵动岛弹出来的途径。
+        只对**从「未通过 → 通过」这一刻**真正发生变化的行发通告，重复点 Approve 不会重复打扰。
+        """
         pks = [pk for pk in request.query_params.get("pks", "").split(",") if pk]
+        newly_approved: list[ClubEvent] = []
         async with self.session_maker() as session:
             for pk in pks:
                 event = await session.get(ClubEvent, pk)
-                if event is not None:
+                if event is not None and not event.is_approved:
                     event.is_approved = True
+                    newly_approved.append(event)
             await session.commit()
+            # 通告必须在 commit 之后：广播里会再开事务写日志，混在同一事务里容易锁表
+            for event in newly_approved:
+                await announce_club_event(session, event=event)
         return _redirect(request, self.identity)
 
     @action(
@@ -684,6 +706,230 @@ class GlobalNotificationAdmin(ModelView, model=GlobalNotification):
             await session.commit()
         return _redirect(request, self.identity)
 
+    @action(
+        name="push-notification",
+        label=L("📣 Push now"),
+        confirmation_message=L("Send this notification to all devices now?"),
+        add_in_detail=True,
+    )
+    async def push_notifications(self, request: Request) -> RedirectResponse:
+        """立刻把这条通知**推送到全量设备**（APNs 系统横幅，App 被划掉也能收到）。
+
+        为什么需要这个动作（而不是"新建即推送"）
+        ----------------------------------------
+        * 以前在后台**新建一行**只写数据库，App 只能靠 45s 前台轮询才看得到
+          → 杀掉 App 就完全收不到；
+        * 但也不能"保存即推送" —— 管理员常常先存草稿、改好文案再发，误推收不回来。
+
+        所以做成**显式动作**：勾选 → 📣 Push now → 同时把 ``is_active`` 打开
+        （在线用户立刻看到顶部通知栏）+ APNs 扇出给全量设备
+        （离线 / 被杀的用户走系统横幅，参照微信来消息体验）。
+
+        未配置 APNs 凭据时**不报错**：``dispatch_alert`` 如实返回 ``targets=0``，
+        数据库与在线通路照常生效（这也是没有付费开发者账号时的预期行为）。
+        """
+        pks = [pk for pk in request.query_params.get("pks", "").split(",") if pk]
+        async with self.session_maker() as session:
+            for pk in pks:
+                item = await session.get(GlobalNotification, pk)
+                if item is None:
+                    continue
+                item.is_active = True
+                await session.commit()
+                payload = build_broadcast_payload(
+                    title=item.title,
+                    message=item.message,
+                    level=item.level,
+                    notification_id=item.id,
+                )
+                targets = await all_push_targets(session)
+                await dispatch_alert(session, targets=targets, payload_for=lambda _t, p=payload: p)
+        return _redirect(request, self.identity)
+
+
+class CourseMaterialAdmin(ModelView, model=CourseMaterial):
+    """admin & super_admin：课程资料（首页「最新资料」卡片 / Materials 页的内容源）。"""
+
+    name = L("Course Material")
+    name_plural = L("Course Materials")
+    category = L("Academics")
+    icon = "fa-solid fa-file-lines"
+
+    can_create = True
+    can_edit = True
+    can_delete = True
+
+    column_list = [
+        CourseMaterial.id,
+        CourseMaterial.course_code,
+        CourseMaterial.course_title,
+        CourseMaterial.file_name,
+        CourseMaterial.file_format,
+        CourseMaterial.size_label,
+        CourseMaterial.is_visible,
+        CourseMaterial.created_at,
+    ]
+    column_labels = make_column_labels(
+        {
+            CourseMaterial.id: "ID",
+            CourseMaterial.course_code: "Course Code",
+            CourseMaterial.course_title: "Course Title",
+            CourseMaterial.professor_name: "Professor",
+            CourseMaterial.file_name: "File Name",
+            CourseMaterial.file_format: "Format",
+            CourseMaterial.size_label: "Size",
+            CourseMaterial.pages: "Pages",
+            CourseMaterial.file_url: "File URL",
+            CourseMaterial.uploaded_by: "Uploaded By",
+            CourseMaterial.is_visible: "Visible",
+            CourseMaterial.created_at: "Uploaded At",
+        }
+    )
+    column_searchable_list = [
+        CourseMaterial.course_code,
+        CourseMaterial.course_title,
+        CourseMaterial.file_name,
+    ]
+    column_default_sort = [("created_at", True)]
+    form_excluded_columns = [CourseMaterial.id]
+    page_size = 30
+
+    def is_accessible(self, request: Request) -> bool:
+        return _allowed(request, STAFF_ROLES)
+
+    @action(
+        name="hide-material",
+        label=L("🙈 Hide"),
+        confirmation_message=L("Hide the selected materials from students?"),
+        add_in_detail=True,
+    )
+    async def hide_materials(self, request: Request) -> RedirectResponse:
+        """下架（软隐藏）：首页卡片与 Materials 页立刻看不到，历史记录保留。"""
+        pks = [pk for pk in request.query_params.get("pks", "").split(",") if pk]
+        async with self.session_maker() as session:
+            for pk in pks:
+                row = await session.get(CourseMaterial, pk)
+                if row is not None:
+                    row.is_visible = False
+            await session.commit()
+        return _redirect(request, self.identity)
+
+    @action(
+        name="show-material",
+        label=L("👁 Unhide"),
+        confirmation_message=L("Show the selected materials again?"),
+        add_in_detail=True,
+    )
+    async def show_materials(self, request: Request) -> RedirectResponse:
+        pks = [pk for pk in request.query_params.get("pks", "").split(",") if pk]
+        async with self.session_maker() as session:
+            for pk in pks:
+                row = await session.get(CourseMaterial, pk)
+                if row is not None:
+                    row.is_visible = True
+            await session.commit()
+        return _redirect(request, self.identity)
+
+
+class ClubApplicationAdmin(ModelView, model=ClubApplication):
+    """admin & super_admin：社团 / 组织创建申请审核。
+
+    审核通过后该社团才会出现在 ``GET /clubs``（Campus Hub 的社团列表）里，
+    并**自动给申请人发一条结果通知**（站内可见；离线设备走 APNs 系统横幅）。
+    """
+
+    name = L("Club Application")
+    name_plural = L("Club Applications")
+    category = L("Campus Hub")
+    icon = "fa-solid fa-users-rectangle"
+
+    can_create = False
+    can_edit = True
+    can_delete = True
+
+    column_list = [
+        ClubApplication.id,
+        ClubApplication.club_name,
+        ClubApplication.category,
+        ClubApplication.status,
+        ClubApplication.is_visible,
+        ClubApplication.contact_name,
+        ClubApplication.contact_telegram,
+        ClubApplication.created_at,
+    ]
+    column_labels = make_column_labels(
+        {
+            ClubApplication.id: "ID",
+            ClubApplication.club_name: "Club Name",
+            ClubApplication.category: "Category",
+            ClubApplication.description: "Description",
+            ClubApplication.avatar_url: "Logo URL",
+            ClubApplication.contact_name: "Contact Name",
+            ClubApplication.contact_telegram: "Telegram",
+            ClubApplication.contact_phone: "Phone",
+            ClubApplication.status: "Status",
+            ClubApplication.is_visible: "Visible",
+            ClubApplication.review_note: "Review Note",
+            ClubApplication.created_at: "Submitted At",
+            ClubApplication.reviewed_at: "Reviewed At",
+        }
+    )
+    column_searchable_list = [ClubApplication.club_name, ClubApplication.description]
+    column_default_sort = [("created_at", True)]
+    form_excluded_columns = [ClubApplication.id, ClubApplication.user_id, ClubApplication.reviewed_at]
+    page_size = 30
+
+    def is_accessible(self, request: Request) -> bool:
+        return _allowed(request, STAFF_ROLES)
+
+    async def _decide(self, request: Request, *, approve: bool) -> RedirectResponse:
+        """通过 / 驳回的公共逻辑（两处只差 status 与文案）。"""
+        from datetime import datetime, timezone
+
+        pks = [pk for pk in request.query_params.get("pks", "").split(",") if pk]
+        async with self.session_maker() as session:
+            for pk in pks:
+                row = await session.get(ClubApplication, pk)
+                if row is None:
+                    continue
+                row.status = "approved" if approve else "rejected"
+                row.reviewed_at = datetime.now(timezone.utc)
+                await session.commit()
+                # 结果通知：申请人站内可见；App 不在线时走 APNs 系统横幅
+                await notify_user(
+                    session,
+                    user_id=row.user_id,
+                    kind="system",
+                    title=row.club_name,
+                    body=(
+                        "Your club was approved and is now visible on the campus hub."
+                        if approve
+                        else "Your club application was reviewed and not approved."
+                    ),
+                    route="campus",
+                    route_id=row.id,
+                    dedupe_key=f"club-{'approved' if approve else 'rejected'}:{row.id}",
+                )
+        return _redirect(request, self.identity)
+
+    @action(
+        name="approve-club",
+        label=L("✅ Approve club"),
+        confirmation_message=L("Approve the selected club applications?"),
+        add_in_detail=True,
+    )
+    async def approve_clubs(self, request: Request) -> RedirectResponse:
+        return await self._decide(request, approve=True)
+
+    @action(
+        name="reject-club",
+        label=L("⛔ Reject club"),
+        confirmation_message=L("Reject the selected club applications?"),
+        add_in_detail=True,
+    )
+    async def reject_clubs(self, request: Request) -> RedirectResponse:
+        return await self._decide(request, approve=False)
+
 
 def setup_admin_ui(app) -> Admin:
     """挂载 SQLAdmin 管理后台到 /admin（含 EN / RU / ZH 语言切换器）。"""
@@ -722,15 +968,18 @@ def setup_admin_ui(app) -> Admin:
     admin.add_model_view(CourseAdmin)
     admin.add_model_view(ReviewAdmin)
     admin.add_model_view(ReportAdmin)
-    # Campus Hub：校园墙帖子 / 评论 / 社团活动 / 全局紧急通知
+    # Campus Hub：校园墙帖子 / 评论 / 社团活动 / 全局紧急通知 / 社团申请
     admin.add_model_view(PostAdmin)
     admin.add_model_view(PostCommentAdmin)
     admin.add_model_view(ClubEventAdmin)
     admin.add_model_view(GlobalNotificationAdmin)
+    admin.add_model_view(ClubApplicationAdmin)
+    # 课程资料（首页「最新资料」卡片 / Materials 页）
+    admin.add_model_view(CourseMaterialAdmin)
     print(
         "[kaznu] SQLAdmin 管理后台已挂载: /admin"
-        " （Users / Admin Applications / Professors / Courses / Reviews / Reports"
-        " / Posts / Post Comments / Club Events / Global Notifications）"
+        " （Users / Admin Applications / Professors / Courses / Course Materials / Reviews"
+        " / Reports / Posts / Post Comments / Club Events / Club Applications / Global Notifications）"
     )
     print(
         "[kaznu] 管理后台语言: "

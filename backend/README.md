@@ -227,6 +227,45 @@ Campus 社区补全：**一对一私信 + 通知中心 + 全校广播 + 本地�
 
 **自检**：`python backend/tests/check_social_api.py` —— 48 项，包含**真起 uvicorn 子进程 + 真 WebSocket 客户端**的端到端断言（收发消息、多端回显、幂等重发、typing、已读回执、鉴权拒绝、异常事件不崩连接）。
 
+### 课程资料 + 社团申请（本轮产品重构）
+
+**模型**
+
+| 模型 | 表 | 说明 |
+|---|---|---|
+| `CourseMaterial` | course_materials | 教师上传的讲义 / PPT / 数据集；`course_code`/`course_title` 是**冗余快照**（课程改名不追改历史资料） |
+| `ClubApplication` | club_applications | 社团创建申请；`status` 默认 **pending**（绝不能默认 approved，否则任何人可凭空造"官方社团"） |
+
+**接口**
+
+| 方法 | 路径 | 用途 |
+|---|---|---|
+| GET | `/materials/summary` | 首页卡片专用：最新一条 + 总数 + 课程数（一次聚合，不用拉整页） |
+| GET | `/materials/latest` | 资料列表（`Page[T]` 信封；支持 `course_code` / `file_format` 过滤） |
+| POST | `/materials` | 登记资料（staff；query 参数形式，便于 curl 一行造数据） |
+| GET | `/clubs/categories` | 社团分类枚举（文案由前端 i18n 渲染） |
+| GET | `/clubs` | **公开**社团列表（只回 `status=approved` 且 `is_visible`） |
+| GET | `/clubs/mine` | 我提交过的申请（含 pending/rejected + 驳回原因） |
+| POST | `/clubs/apply` | 提交申请（**multipart/form-data**：字段 + Logo 文件） |
+
+**为什么首页那张卡从"作业 Deadline"改成"最新资料"**
+原实现写着 `NEXT DEADLINE` / "还剩 4h" / `Assignment 3` / `23:59 due`，全都是**写死的假数据**；
+而它的点击目标是 `materials` 页 —— 说明真实业务一直是"老师刚上传了什么资料"。
+现在卡片接 `/materials/summary`，显示真实文件名 + 课程 + 格式/体积 + "多久前上传"，
+拿不到数据时显示空状态，**不再编造倒计时**。
+
+**几条关键设计**
+
+1. **社团申请默认 pending**：`GET /clubs` 是公开列表，默认 approved 等于给所有人开了"官方社团"后门。管理员在 `/admin/club-application` 点 **✅ Approve club** 才进列表，并在那一刻给申请人发结果通知。
+2. **`POST /clubs/apply` 必须手写 Content-Type 以外的一切**：客户端**不能**手动设置 `Content-Type`（要交给浏览器补 multipart boundary），否则后端解析出的字段全是 `None`。前端 `ClubService` 有显式注释 + 守卫脚本会检查这一点。
+3. **同名未审申请去重**（409）：防止连点/反复提交刷出一堆重复记录；前端把 409 单独提示，不当作网络错误。
+4. **公开社团视图不含手机号**：`ClubOut` 故意没有 `contact_phone`（只在 `/clubs/mine` 与后台可见）—— 个人信息不进公开列表。
+5. **新内容会像课前提醒一样推送**：新官方公告（`create_official_post`）与新审批通过的活动（`ClubEventAdmin.approve_events`）都会调 `announce_content()` 做**全量 APNs 扇出**；后台 `GlobalNotificationAdmin` 还多了 **📣 Push now** 动作（显式推送已存在的通知，避免"存草稿=误推"）。
+
+**自检**：`python backend/tests/check_materials_clubs_api.py` —— 28 项（分页/排序/过滤/422/401、
+multipart Logo 上传落盘、默认 pending、409 去重、`/clubs/mine`、回执通知、
+后台 approve 动作闭环 + DB 复核）；另有 `check_campus_contract.py` 把前端 TS 接口与 OpenAPI 做双向字段比对。
+
 ### 管理后台多语言（EN / RU / ZH）
 
 `/admin` 导航栏与登录页都有语言切换器（🌐 下拉），支持 **EN / RU / ZH** 三种语言：

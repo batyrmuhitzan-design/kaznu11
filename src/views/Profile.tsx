@@ -113,7 +113,7 @@ function Settings({ onBack }: { onBack: () => void }) {
                   className="w-full px-3 py-2.5 squircle-sm text-sm text-white outline-none"
                   style={{ background: "var(--field-bg)", border: "1px solid var(--field-border)" }}
                 />
-                <p className="text-[10px] leading-relaxed" style={{ color: "rgba(235,235,245,0.45)" }}>
+                <p className="text-[10px] leading-relaxed" style={{ color: "var(--tx-5)" }}>
                   {tr("Auto-assigned on first login. Reviews never show this name — only the department tag.", "Алғашқы кіруде автоматты түрде беріледі. Бұл атау пікірлерде ешқашан көрсетілмейді — тек факультет белгісі.", "Выдаётся автоматически при входе. Имя не показывается в отзывах — только метка факультета.")}
                 </p>
                 <div className="flex gap-2">

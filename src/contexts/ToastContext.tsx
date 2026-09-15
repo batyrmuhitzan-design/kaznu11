@@ -21,9 +21,9 @@ const TOAST_ICON: Record<ToastKind, string> = {
 };
 
 const TOAST_COLOR: Record<ToastKind, string> = {
-  success: "#30D158",
-  info: "#409CFF",
-  error: "#FF453A",
+  success: "var(--success)",
+  info: "var(--accent-soft-text)",
+  error: "var(--danger)",
 };
 
 export function ToastProvider({ children }: { children: ReactNode }) {

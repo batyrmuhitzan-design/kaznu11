@@ -30,7 +30,7 @@ from .models import (
     NotificationReadCursor,
     UserNotification,
 )
-from .push_payload import build_alert_payload, build_broadcast_payload
+from .push_payload import THREAD_SYSTEM, build_alert_payload, build_broadcast_payload, snippet
 from .realtime import manager
 
 #: APNs 明确告诉"这个 token 废了"的两个 reason（收到了就删，别反复发）
@@ -387,3 +387,82 @@ async def broadcast_notification(
     push_result = await dispatch_alert(session, targets=targets, payload_for=lambda _t: payload)
 
     return {"id": row.id, "ws": ws_delivered, "push": push_result, "targets": len(targets)}
+
+
+# =====================================================================
+# 「有新内容」全量通告（新官方新闻 / 新社团活动）
+# =====================================================================
+
+
+async def announce_content(
+    session: AsyncSession,
+    *,
+    title: str,
+    body: str,
+    route: str,
+    route_id: str | None,
+    kind: str,
+    ws_event: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """把"新内容上线"通知**全量设备**（含 App 已被杀掉的那些）。
+
+    与 ``broadcast_notification`` 的区别（两者不能混用）：
+
+    |                | 全校广播（broadcast）        | 内容通告（本文）            |
+    |----------------|------------------------------|------------------------------|
+    | 数据源          | 写 ``GlobalNotification`` 行 | **不写表**，内容本身才是载体 |
+    | App 内表现      | 顶部紧急通知栏（可关闭）      | 通知中心 / Campus 里已有该条  |
+    | 典型场景        | 停水停电 / 考试周提醒         | 新官方公告 / 新社团活动       |
+
+    不写 ``GlobalNotification`` 是刻意的：新闻和活动**自己就是内容实体**，
+    再往紧急通知栏塞一条"有新新闻"会让紧急栏失去"紧急"的含义。
+
+    为什么需要它在服务端存在（而不是等 App 自己发现）
+    ------------------------------------------------
+    App 被用户划掉后**没有任何后台执行权**（iOS 限制），不可能自己轮询到新内容。
+    唯一能让"新新闻 / 新活动"像课前提醒那样弹在锁屏和灵动岛的途径，
+    就是服务端在他创建/审核通过的那一刻发 APNs alert 推给全量设备。
+    未配 APNs 凭据时这里会如实返回 ``push.targets=0``（不抛异常、不影响写入）。
+    """
+    payload = build_alert_payload(
+        title=title,
+        body=body,
+        route=route,
+        route_id=route_id,
+        kind=kind,
+        thread_id=f"{THREAD_SYSTEM}.content",
+    )
+    ws_delivered = await manager.broadcast(
+        ws_event
+        or {
+            "type": "content",
+            "content": {"kind": kind, "title": title, "body": body, "route": route, "route_id": route_id},
+        }
+    )
+    targets = await all_push_targets(session)
+    push_result = await dispatch_alert(session, targets=targets, payload_for=lambda _t: payload)
+    return {"ws": ws_delivered, "push": push_result, "targets": len(targets)}
+
+
+async def announce_official_post(session: AsyncSession, *, post: Any) -> dict[str, Any]:
+    """新官方公告（``Post.is_official``）→ 全量通告，点击进入该帖。"""
+    return await announce_content(
+        session,
+        title=(post.official_badge or "KazNU Official"),
+        body=snippet(post.content, 120),
+        route="post",
+        route_id=post.id,
+        kind="official",
+    )
+
+
+async def announce_club_event(session: AsyncSession, *, event: Any) -> dict[str, Any]:
+    """新社团活动（审核通过）→ 全量通告，点击进 Campus 活动区。"""
+    return await announce_content(
+        session,
+        title=f"{event.club_name} · {event.title}",
+        body=snippet(event.description or event.location or "New club event", 120),
+        route="campus",
+        route_id=event.id,
+        kind="club",
+    )

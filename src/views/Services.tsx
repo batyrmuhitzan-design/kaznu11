@@ -240,12 +240,14 @@ export default function Services({ onOpenReviews }: { onOpenReviews?: () => void
     }, 900);
   };
 
-  const statusColor = univerStatus === "ok" ? "#30D158" : "#FF9F0A";
+  const statusColor = univerStatus === "ok" ? "var(--success)" : "var(--warm-soft-text)";
   const statusLabel = univerStatus === "ok" ? t("allSystems") : t("degradedCache");
   const tiles = [
-    { id: "schedule", accent: "#10B981", ok: true, label: t("schedule"), meta: tr("Tomorrow 09:00 Data Structures · 2 sessions synced", "Ертең 09:00 Data Structures · 2 сабақ синхрондалды", "Завтра 09:00 Data Structures · синхронизировано 2 занятия") },
-    { id: "grades", accent: "#409CFF", ok: true, label: t("grades"), meta: tr("GPA 3.82 · updated 2 min ago", "GPA 3.82 · 2 минут бұрын жаңартылды", "GPA 3.82 · обновлено 2 мин назад") },
-    { id: "registration", accent: "#F59E0B", ok: false, label: t("registration"), meta: tr("Registration opens Sep 1 · 5/6 selected", "Тіркелу 1 қыркүйекте басталады · 5/6 таңдалды", "Регистрация с 1 сентября · выбрано 5/6") },
+    // accent 走语义 token（与 ServiceDetail 的 SVC 同源）：
+    // 浅色模式下 #409CFF 这类亮色在白卡片上对比度不足
+    { id: "schedule", accent: "var(--success)", ok: true, label: t("schedule"), meta: tr("Tomorrow 09:00 Data Structures · 2 sessions synced", "Ертең 09:00 Data Structures · 2 сабақ синхрондалды", "Завтра 09:00 Data Structures · синхронизировано 2 занятия") },
+    { id: "grades", accent: "var(--accent)", ok: true, label: t("grades"), meta: tr("GPA 3.82 · updated 2 min ago", "GPA 3.82 · 2 минут бұрын жаңартылды", "GPA 3.82 · обновлено 2 мин назад") },
+    { id: "registration", accent: "var(--warm-soft-text)", ok: false, label: t("registration"), meta: tr("Registration opens Sep 1 · 5/6 selected", "Тіркелу 1 қыркүйекте басталады · 5/6 таңдалды", "Регистрация с 1 сентября · выбрано 5/6") },
   ];
 
   if (activeService) {
@@ -279,7 +281,7 @@ export default function Services({ onOpenReviews }: { onOpenReviews?: () => void
             <span className="w-12 h-12 squircle-lg flex items-center justify-center text-2xl shrink-0" style={{ background: "rgba(255,255,255,0.12)" }}>⭐</span>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-bold text-white">{tr("Course & Professor Ratings", "Курс және оқытушы рейтингі", "Рейтинги курсов и преподавателей")}</p>
-              <p className="text-[11px] mt-1 leading-relaxed" style={{ color: "rgba(235,235,245,0.6)" }}>
+              <p className="text-[11px] mt-1 leading-relaxed" style={{ color: "var(--tx-3)" }}>
                 {tr("Rate your professors anonymously — insights from real students.", "Оқытушыларды анонимді бағалаңыз — нақты студенттердің пікірі.", "Анонимно оценивайте преподавателей — мнения реальных студентов.")}
               </p>
             </div>
@@ -323,17 +325,17 @@ export default function Services({ onOpenReviews }: { onOpenReviews?: () => void
                   type="button"
                   onClick={() => { triggerHaptic(6); setOpenTile(active ? null : item.id); }}
                   className="haptic-action flex flex-col items-center gap-1.5 py-2 squircle-sm transition-transform active:scale-95"
-                  style={{ background: active ? `${item.accent}1f` : "rgba(255,255,255,0.04)", border: `1px solid ${active ? `${item.accent}55` : "rgba(255,255,255,0.06)"}` }}
+                  style={{ background: active ? `color-mix(in srgb, ${item.accent} 12%, transparent)` : "rgba(255,255,255,0.04)", border: `1px solid ${active ? `color-mix(in srgb, ${item.accent} 33%, transparent)` : "rgba(255,255,255,0.06)"}` }}
                 >
-                  <div className="w-1.5 h-1.5 rounded-full" style={{ background: item.ok ? "#30D158" : "#FF9F0A", boxShadow: `0 0 4px ${item.ok ? "#30D158" : "#FF9F0A"}` }} />
-                  <p className="text-xs" style={{ color: active ? item.accent : "rgba(235,235,245,0.6)" }}>{item.label}</p>
+                  <div className="w-1.5 h-1.5 rounded-full" style={{ background: item.ok ? "var(--success)" : "var(--warm-soft-text)", boxShadow: `0 0 4px ${item.ok ? "var(--success)" : "var(--warm-soft-text)"}` }} />
+                  <p className="text-xs" style={{ color: active ? item.accent : "var(--tx-3)" }}>{item.label}</p>
                 </button>
               );
             })}
           </div>
 
           {openTile && (
-            <div className="animate-slide-up mt-2 px-3 py-2.5 squircle-sm text-xs leading-relaxed" style={{ background: "rgba(255,255,255,0.04)", color: "rgba(235,235,245,0.7)" }}>
+            <div className="animate-slide-up mt-2 px-3 py-2.5 squircle-sm text-xs leading-relaxed" style={{ background: "rgba(255,255,255,0.04)", color: "var(--tx-2)" }}>
               {tiles.find((x) => x.id === openTile)?.meta}
               {openTile === "registration" && <p className="mt-1 text-[11px]" style={{ color: "#FF9F0A" }}>Registration opens in Univer web — preview only.</p>}
             </div>
@@ -346,7 +348,7 @@ export default function Services({ onOpenReviews }: { onOpenReviews?: () => void
               <div className="w-10 h-10 squircle-sm flex items-center justify-center text-xl" style={{ background: "rgba(0,122,255,0.15)" }}>📚</div>
               <div className="text-left">
                 <p className="text-sm font-bold text-white">{t("libraryCard")}</p>
-                <p className="text-xs" style={{ color: "rgba(235,235,245,0.45)" }}>{t("showBarcode")}</p>
+                <p className="text-xs" style={{ color: "var(--tx-5)" }}>{t("showBarcode")}</p>
               </div>
             </div>
             <div className="px-2 py-1 squircle-xs text-xs font-semibold" style={{ background: "rgba(0,122,255,0.15)", color: "#407AFF" }}>
@@ -364,7 +366,7 @@ export default function Services({ onOpenReviews }: { onOpenReviews?: () => void
                 </div>
                 <p className="text-xs font-bold text-black" style={{ fontFamily: "JetBrains Mono", letterSpacing: "0.2em" }}>KZ-2024-058-7821</p>
               </div>
-              <p className="text-xs mt-2.5 text-center" style={{ color: "rgba(235,235,245,0.4)" }}>Aisha Bekova · Faculty of Computer Science</p>
+              <p className="text-xs mt-2.5 text-center" style={{ color: "var(--tx-6)" }}>Aisha Bekova · Faculty of Computer Science</p>
             </div>
           )}
         </div>
@@ -411,7 +413,7 @@ export default function Services({ onOpenReviews }: { onOpenReviews?: () => void
                 <span className="font-bold" style={{ color: feeBarColor, transition: "color 1s linear" }}>
                   {dormOverdue ? t("overdue") : `${t("paid")} · ${feeDaysLeft} ${t("daysLeft")}`}
                 </span>
-                <span style={{ color: "rgba(235,235,245,0.45)", fontFamily: "JetBrains Mono" }}>{feeDaysLeft} d</span>
+                <span style={{ color: "var(--tx-5)", fontFamily: "JetBrains Mono" }}>{feeDaysLeft} d</span>
               </div>
               <div className="h-2 rounded-full overflow-hidden meter-track">
                 <div
@@ -424,7 +426,7 @@ export default function Services({ onOpenReviews }: { onOpenReviews?: () => void
                   }}
                 />
               </div>
-              <div className="mt-1 text-[9px]" style={{ color: "rgba(235,235,245,0.35)" }}>
+              <div className="mt-1 text-[9px]" style={{ color: "var(--tx-7)" }}>
                 30 {t("daysLeft")}
               </div>
             </div>
@@ -450,9 +452,9 @@ export default function Services({ onOpenReviews }: { onOpenReviews?: () => void
           <div className="flex items-center justify-between mb-1">
             <div>
               <p className="text-sm font-bold text-white">{t("courseRadar")}</p>
-              <p className="text-[11px] mt-0.5" style={{ color: "rgba(235,235,245,0.45)" }}>{t("alarmCourses")} · 30′</p>
+              <p className="text-[11px] mt-0.5" style={{ color: "var(--tx-5)" }}>{t("alarmCourses")} · 30′</p>
             </div>
-            <span className="px-2 py-1 squircle-xs flex items-center gap-1.5 text-xs font-bold" style={{ background: alarmCount > 0 ? "rgba(255,159,10,0.14)" : "rgba(255,255,255,0.05)", color: alarmCount > 0 ? "#FF9F0A" : "rgba(235,235,245,0.45)" }}>
+            <span className="px-2 py-1 squircle-xs flex items-center gap-1.5 text-xs font-bold" style={{ background: alarmCount > 0 ? "rgba(255,159,10,0.14)" : "rgba(255,255,255,0.05)", color: alarmCount > 0 ? "#FF9F0A" : "var(--tx-5)" }}>
               <svg viewBox="0 0 20 20" fill="currentColor" className="w-3.5 h-3.5"><path d="M10 2a6 6 0 00-6 6v3l-1.5 2.5A1 1 0 003.4 15h13.2a1 1 0 00.9-1.5L16 11V8a6 6 0 00-6-6zM8 16a2 2 0 004 0H8z" /></svg>
               {alarmCount}
             </span>
@@ -466,9 +468,9 @@ export default function Services({ onOpenReviews }: { onOpenReviews?: () => void
                 <div key={c.id} className="rounded-2xl px-3.5 py-3" style={{ background: "rgba(255,255,255,0.04)", borderLeft: `3px solid ${accent}` }}>
                   <div className="flex items-start gap-3">
                     <div className="flex-1 min-w-0">
-                      <p className="text-[10px] font-semibold" style={{ color: on ? c.color : "rgba(235,235,245,0.5)", fontFamily: "JetBrains Mono" }}>{c.when}</p>
+                      <p className="text-[10px] font-semibold" style={{ color: on ? c.color : "var(--tx-4)", fontFamily: "JetBrains Mono" }}>{c.when}</p>
                       <p className="text-sm font-semibold text-white mt-1 leading-snug" style={{ overflowWrap: "anywhere", wordBreak: "break-word" }}>{c.name}</p>
-                      <p className="text-[11px] mt-1 truncate" style={{ color: "rgba(235,235,245,0.45)" }}>{c.prof} · {t("room")} {c.room}</p>
+                      <p className="text-[11px] mt-1 truncate" style={{ color: "var(--tx-5)" }}>{c.prof} · {t("room")} {c.room}</p>
                     </div>
                     <button
                       type="button"
@@ -478,7 +480,7 @@ export default function Services({ onOpenReviews }: { onOpenReviews?: () => void
                       className="haptic-action shrink-0 mt-0.5 w-11 h-11 rounded-full flex items-center justify-center transition-all active:scale-90"
                       style={{
                         background: on ? `${c.color}22` : "rgba(255,255,255,0.06)",
-                        color: on ? c.color : "rgba(235,235,245,0.55)",
+                        color: on ? c.color : "var(--tx-4)",
                         border: `1px solid ${on ? `${c.color}55` : "rgba(255,255,255,0.1)"}`,
                       }}
                     >
@@ -493,11 +495,11 @@ export default function Services({ onOpenReviews }: { onOpenReviews?: () => void
               );
             })}
           </div>
-          <p className="text-[10px] mt-2 leading-relaxed" style={{ color: "rgba(235,235,245,0.35)" }}>{t("alarmHint")}</p>
+          <p className="text-[10px] mt-2 leading-relaxed" style={{ color: "var(--tx-7)" }}>{t("alarmHint")}</p>
         </div>
         {/* All Services Grid */}
         <div>
-          <p className="text-sm font-semibold mb-2.5" style={{ color: "rgba(235,235,245,0.7)" }}>{t("allServices")}</p>
+          <p className="text-sm font-semibold mb-2.5" style={{ color: "var(--tx-2)" }}>{t("allServices")}</p>
           <div className="grid grid-cols-3 gap-2.5">
             {SERVICE_ENTRIES.map((s) => (
               <button
@@ -518,7 +520,7 @@ export default function Services({ onOpenReviews }: { onOpenReviews?: () => void
                 <div className="w-11 h-11 squircle-md flex items-center justify-center text-2xl" style={{ background: s.bg }}>{s.icon}</div>
                 <div className="text-center">
                   <p className="text-xs font-semibold text-white leading-tight">{t(s.labelKey)}</p>
-                  {s.sub && <p className="text-xs mt-0.5" style={{ color: "rgba(235,235,245,0.4)", fontSize: 10 }}>{s.sub}</p>}
+                  {s.sub && <p className="text-xs mt-0.5" style={{ color: "var(--tx-6)", fontSize: 10 }}>{s.sub}</p>}
                 </div>
               </button>
             ))}
@@ -549,7 +551,7 @@ export default function Services({ onOpenReviews }: { onOpenReviews?: () => void
               )}
             </p>
             <div className="flex gap-2.5 mt-5">
-              <button type="button" onClick={() => setDeniedOpen(false)} className="haptic-action flex-1 py-3 squircle-sm text-sm font-bold" style={{ background: "rgba(0,122,255,0.16)", color: "#409CFF", border: "1px solid rgba(0,122,255,0.3)" }}>
+              <button type="button" onClick={() => setDeniedOpen(false)} className="haptic-action flex-1 py-3 squircle-sm text-sm font-bold" style={{ background: "rgba(0,122,255,0.16)", color: "var(--accent-soft-text)", border: "1px solid rgba(0,122,255,0.3)" }}>
                 {tr("OK", "Жарайды", "OK")}
               </button>
             </div>
@@ -570,7 +572,7 @@ export default function Services({ onOpenReviews }: { onOpenReviews?: () => void
               <div className="flex justify-between"><span className="theme-muted">Period</span><span className="font-semibold text-white">September 2026</span></div>
               <div className="flex justify-between"><span className="theme-muted">{t("monthlyFee")}</span><span className="font-bold" style={{ color: "#FF453A", fontFamily: "JetBrains Mono" }}>₸{DORM_FEE.toLocaleString()}</span></div>
             </div>
-            <p className="text-[11px] mb-4 px-3 py-2 rounded-lg" style={{ background: "rgba(0,122,255,0.1)", color: "#409CFF" }}>
+            <p className="text-[11px] mb-4 px-3 py-2 rounded-lg" style={{ background: "rgba(0,122,255,0.1)", color: "var(--accent-soft-text)" }}>
               {t("payWithKaspi")} — opens the installed Kaspi app on your phone (native build).
             </p>
             <button type="button" onClick={confirmPay} disabled={paying} className="haptic-action w-full py-3 squircle-sm text-sm font-bold flex items-center justify-center gap-2 disabled:opacity-70" style={{ background: "#FF453A", color: "#fff" }}>

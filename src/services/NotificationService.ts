@@ -176,8 +176,8 @@ export interface InAppBanner {
   title: string;
   message: string;
   level: NotificationLevel;
-  /** broadcast = 全校广播；notification = 定向通知（点赞/评论/官方公告） */
-  origin: "broadcast" | "notification";
+  /** broadcast = 全校广播；notification = 定向通知；content = 新官方公告 / 新社团活动 */
+  origin: "broadcast" | "notification" | "content";
 }
 
 let banner: InAppBanner | null = null;
@@ -203,7 +203,12 @@ function setBanner(next: InAppBanner | null): void {
   // 同一事件走两条通路：应用内浮层（上）+ 真实 iOS 系统横幅（下，走本地通知）
   void postSystemBannerNow({
     id: bannerNotificationId(next.id),
-    threadId: next.origin === "broadcast" ? "kaznu.broadcast" : "kaznu.notify",
+    threadId:
+      next.origin === "broadcast"
+        ? "kaznu.broadcast"
+        : next.origin === "content"
+          ? "kaznu.content"
+          : "kaznu.notify",
     title: next.title,
     body: next.message,
   });
@@ -315,6 +320,34 @@ export function handleRealtimeNotificationEvent(event: {
     bumpRevision();
     return true;
   }
+  // 新内容上线（新官方公告 / 新社团活动）—— 后端 announce_content 推的帧。
+  // 走和全校广播完全相同的两条通路：应用内浮层 + **真实 iOS 系统横幅**（有声音、
+  // 进通知中心、锁屏可见），这就是"有新 news / 新活动也要像课前提醒那样在应用外通知"。
+  const content = (event as { content?: Record<string, unknown> }).content;
+  if (event.type === "content" && content) {
+    setBanner({
+      id: `content:${String(content.route ?? "")}:${String(content.route_id ?? Date.now())}`,
+      title: String(content.title ?? ""),
+      message: String(content.body ?? ""),
+      level: "info",
+      origin: "content",
+    });
+    bumpRevision();
+    return true;
+  }
+  // 官方公告帖：后端 create_official_post 会广播 {"type":"official", post_id}。
+  // 这里做一次"有新公告"的横幅（正文要等 Feed 拉到，所以只给标题级提示）。
+  if (event.type === "official") {
+    setBanner({
+      id: `official:${String((event as { post_id?: string }).post_id ?? Date.now())}`,
+      title: "KazNU Official",
+      message: String((event as { title?: string }).title ?? ""),
+      level: "info",
+      origin: "content",
+    });
+    bumpRevision();
+    return true;
+  }
   return false;
 }
 
@@ -347,9 +380,82 @@ interface LatestBroadcast {
  * ⚠️ **App 被系统杀掉时收不到**：iOS 不允许常驻进程，唯一途径是 APNs 远程推送，
  * 服务器需配 `.p8` 凭据（客户端 token 上报已在 `PushRegistrationService` 就绪，配好即生效）。
  */
+/**
+ * 新内容看护（官方公告 / 新社团活动）。
+ *
+ * 与"全校广播"同样的两条通路：应用内浮层 + 真实系统横幅，只是数据源不同：
+ *  - 官方公告 = Campus Feed 里 `is_official=true` 的帖子（News 已并入 Campus，
+ *    官方帖就是新闻，后端按 `is_official DESC` 排序，所以 limit=5 必含最新的）；
+ *  - 新活动 = `GET /club-events` 里最新的几条。
+ *
+ * 为什么不能只靠 WebSocket 帧：用户**离线几分钟**再回到 App 时帧已经错过，
+ * 而这期间学校可能刚好发了公告 / 批了新活动。所以前台轮询一次兜底。
+ *
+ * ⚠️ App 被划掉时仍然收不到 —— iOS 不允许常驻。那种情况由服务端 APNs 负责
+ * （`announce_official_post` / `announce_club_event` 会扇出全量设备推送）。
+ */
+async function pollContentUpdates(silent = false): Promise<void> {
+  const res = await apiFetchAuthed("/posts?limit=5", {}, 5000);
+  if (res?.ok) {
+    try {
+      const page = (await res.json()) as { items?: Array<Record<string, unknown>> };
+      const official = (page.items ?? []).find((p) => p.is_official === true);
+      if (official?.id) {
+        const id = `post:${String(official.id)}`;
+        if (!hasSeenBanner(id)) {
+          if (silent) {
+            // 首次运行只"登记已见"，不弹：否则刚装 App 登录就被历史公告刷一屏横幅
+            rememberBanner(id);
+          } else {
+            setBanner({
+              id,
+              title: String(official.official_badge ?? "KazNU Official"),
+              message: String(official.content ?? "").replace(/\s+/g, " ").slice(0, 120),
+              level: "info",
+              origin: "content",
+            });
+            bumpRevision();
+          }
+        }
+      }
+    } catch {
+      /* 结构异常就当没有新公告 */
+    }
+  }
+
+  const eventsRes = await apiFetchAuthed("/club-events?limit=3", {}, 5000);
+  if (eventsRes?.ok) {
+    try {
+      const page = (await eventsRes.json()) as { items?: Array<Record<string, unknown>> };
+      for (const event of page.items ?? []) {
+        if (!event.id) continue;
+        const id = `event:${String(event.id)}`;
+        if (hasSeenBanner(id)) continue;
+        if (silent) {
+          rememberBanner(id);
+          continue;
+        }
+        setBanner({
+          id,
+          title: `${String(event.club_name ?? "")} · ${String(event.title ?? "")}`,
+          message: String(event.location ?? event.description ?? "").replace(/\s+/g, " ").slice(0, 120),
+          level: "info",
+          origin: "content",
+        });
+        bumpRevision();
+        break; // 一轮最多提示一条，避免刚进 App 就被 5 条横幅刷屏
+      }
+    } catch {
+      /* 同上 */
+    }
+  }
+}
+
 export function startNotificationWatcher(): () => void {
   let timer: number | undefined;
   let stopped = false;
+  /** 第一次轮询只登记"已见"，不弹横幅（避免登录瞬间被历史内容刷屏） */
+  let firstRun = true;
 
   const tick = async () => {
     if (stopped || document.visibilityState !== "visible") return;
@@ -373,6 +479,9 @@ export function startNotificationWatcher(): () => void {
         bumpRevision();
       }
     }
+    // 新官方公告 / 新活动（离线期间错过的 WS 帧在这里补上）
+    await pollContentUpdates(firstRun);
+    firstRun = false;
     void fetchNotificationUnread();
   };
 

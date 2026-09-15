@@ -675,3 +675,83 @@ class UploadStatusOut(BaseModel):
     max_bytes: int
     allowed_types: list[str] = []
 
+
+# =====================================================================
+# 课程资料（首页「最新资料」卡片 + Materials 页）
+# =====================================================================
+
+
+class MaterialOut(BaseModel):
+    """一条课程资料。字段与前端 ``MaterialItem``（src/services/MaterialService.ts）对齐。"""
+
+    id: str
+    course_code: str
+    course_title: str
+    professor_name: str | None = None
+    file_name: str
+    #: PDF | PPT | DOC | XLS | ZIP
+    file_format: str
+    size_label: str | None = None
+    pages: int | None = None
+    file_url: str | None = None
+    uploaded_by: str | None = None
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class MaterialListOut(Page[MaterialOut]):
+    """``GET /materials/latest`` 的返回（与 Campus 列表同构的分页信封）。"""
+
+
+class MaterialSummaryOut(BaseModel):
+    """首页卡片用的轻量摘要：只回最新一条 + 总数，避免首页为了一个卡片拉整页数据。"""
+
+    latest: MaterialOut | None = None
+    total: int = 0
+    course_count: int = 0
+
+
+# =====================================================================
+# 社团 / 组织申请（CreateClubScreen → /clubs/apply）
+# =====================================================================
+
+
+class ClubOut(BaseModel):
+    """已通过审核、公开展示的社团。
+
+    ``contact_*`` 只在**公开渠道**（Telegram / 邮箱之外）返回：
+    手机号属于个人信息，仅申请人自己（``/clubs/mine``）与管理员可见。
+    """
+
+    id: str
+    club_name: str
+    #: academic | sports | arts | tech | volunteer | media
+    category: str
+    description: str | None = None
+    avatar_url: str | None = None
+    contact_name: str | None = None
+    contact_telegram: str | None = None
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ClubApplicationOut(ClubOut):
+    """我提交的申请（``/clubs/mine``）：额外带审核状态与备注，且含自己的手机号。"""
+
+    status: str
+    is_visible: bool = True
+    review_note: str | None = None
+    contact_phone: str | None = None
+    reviewed_at: datetime | None = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ClubCreatedOut(BaseModel):
+    """``POST /clubs/apply`` 的返回。"""
+
+    message: str
+    club: ClubApplicationOut
+

@@ -35,6 +35,8 @@ import {
 } from "../services/CampusService";
 import { startConversation, type Conversation } from "../services/ChatService";
 import { MAX_UPLOAD_FILES, uploadImages } from "../services/UploadService";
+import { loadClubs, loadMyClubs, type ClubApplication, type ClubItem } from "../services/ClubService";
+import CreateClub from "./CreateClub";
 import { NewsList, NewsDetail, type NewsItem } from "./News";
 import { useChatUnread } from "./Chat";
 import { hapticTap, motorHaptic } from "../utils/haptics";
@@ -62,7 +64,7 @@ function categoryEmoji(id: PostCategory): string {
 
 /** 通知级别 → 颜色（背景 / 边框 / 文字），与 App 的语义色一致。 */
 const LEVEL_STYLE: Record<CampusNotificationItem["level"], { bg: string; border: string; text: string; icon: string }> = {
-  info: { bg: "rgba(0,122,255,0.14)", border: "rgba(0,122,255,0.32)", text: "#409CFF", icon: "ℹ️" },
+  info: { bg: "rgba(0,122,255,0.14)", border: "rgba(0,122,255,0.32)", text: "var(--accent-soft-text)", icon: "ℹ️" },
   warning: { bg: "rgba(245,158,11,0.16)", border: "rgba(245,158,11,0.34)", text: "#FFB340", icon: "⚠️" },
   danger: { bg: "rgba(239,68,68,0.16)", border: "rgba(239,68,68,0.36)", text: "#FF6B6B", icon: "🚨" },
 };
@@ -136,7 +138,7 @@ function EmptyState({ icon, title, hint }: { icon: string; title: string; hint: 
     <div className="glass squircle-lg px-4 py-10 flex flex-col items-center text-center">
       <span className="text-3xl">{icon}</span>
       <p className="text-sm font-bold text-white mt-2">{title}</p>
-      <p className="text-xs mt-1" style={{ color: "rgba(235,235,245,0.45)" }}>
+      <p className="text-xs mt-1" style={{ color: "var(--tx-5)" }}>
         {hint}
       </p>
     </div>
@@ -178,6 +180,12 @@ export default function CampusView({
   const [openPost, setOpenPost] = useState<CampusPost | null>(null);
   const [openEvent, setOpenEvent] = useState<ClubEventItem | null>(null);
   const [composerOpen, setComposerOpen] = useState(false);
+  /** 申请创建社团（CreateClubScreen）—— Campus 的子屏 */
+  const [createClubOpen, setCreateClubOpen] = useState(false);
+  /** 已通过审核的公开社团 */
+  const [clubs, setClubs] = useState<ClubItem[]>([]);
+  /** 我提交过的申请（含 pending / rejected，让用户能看到审核进度） */
+  const [myClubs, setMyClubs] = useState<ClubApplication[]>([]);
 
   const [dismissedNotification, setDismissedNotification] = useState<string | null>(() => {
     try {
@@ -200,6 +208,17 @@ export default function CampusView({
   useEffect(() => {
     void refresh(category);
   }, [category, refresh]);
+
+  /** 拉社团：公开列表（已审核通过）+ 我提交的（含 pending）。两个都拿不到就保持空态。 */
+  const refreshClubs = useCallback(async () => {
+    const [publicClubs, mine] = await Promise.all([loadClubs(30), loadMyClubs()]);
+    if (publicClubs) setClubs(publicClubs);
+    if (mine) setMyClubs(mine);
+  }, []);
+
+  useEffect(() => {
+    void refreshClubs();
+  }, [refreshClubs]);
 
   // 从通知 / 推送点进来的帖子：Feed 加载完成后自动打开（live / demo 数据都适用）
   useEffect(() => {
@@ -274,7 +293,22 @@ export default function CampusView({
     }
   };
 
-  // ---- 子屏（帖子详情 / 活动详情 / 发帖）优先渲染 ----
+  // ---- 子屏（帖子详情 / 活动详情 / 发帖 / 申请创建社团）优先渲染 ----
+  if (createClubOpen) {
+    return (
+      <div className="app-surface h-full flex flex-col overflow-hidden">
+        <CreateClub
+          onBack={() => setCreateClubOpen(false)}
+          onSubmitted={() => {
+            // 提交成功后刷新社团列表（新申请此时仍是 pending，公开列表不会出现，
+            // 但"我提交的"区域要能马上看到状态）
+            void refreshClubs();
+          }}
+        />
+      </div>
+    );
+  }
+
   if (openPost) {
     return (
       <div className="app-surface h-full flex flex-col overflow-hidden">
@@ -316,18 +350,23 @@ export default function CampusView({
 
   return (
     <div className="app-surface relative h-full flex flex-col overflow-hidden">
-      {/* 顶部栏：标题 + live/demo 角标 + 紧凑分段控件（发帖入口已改为右下角悬浮圆钮 FAB） */}
-      <div className="screen-pin px-4 pt-1 shrink-0">
-        <div className="flex items-center justify-between gap-2">
+      {/* 顶部栏
+          ⚠️ 排版要点（用户反馈"Title / LIVE / 聊天图标 / 二级 Tab / 三级 Chips 挤成一团"）：
+          1) 顶部不再只有 pt-1 的敷衍留白：标题行 pt-2、分段控件 mt-3.5、chips 区 pt-3.5/pb-3，
+             三段之间形成清晰的纵向节奏（safe-area 由 .app-root 统一让出，这里不重复加）；
+          2) 分段控件（二级 Tab）改居中内缩 mx-4，不再贴边；
+          3) 分类胶囊（三级）在下面独立成一行横向滚动区，与二级 Tab 分成两层。 */}
+      <div className="screen-pin pt-2 pb-2.5 shrink-0">
+        <div className="flex items-center justify-between gap-2 px-4">
           <h1 className="text-xl font-bold text-white flex items-center gap-1.5" style={{ letterSpacing: "-0.4px" }}>
             <span>🎓</span> {t("campus")}
           </h1>
           <div className="flex items-center gap-2">
             <span
-              className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded-full"
+              className="text-[9px] font-bold uppercase px-2 py-0.5 rounded-full"
               style={{
-                background: source === "live" ? "rgba(48,209,88,0.14)" : "rgba(255,159,10,0.14)",
-                color: source === "live" ? "#30D158" : "#FF9F0A",
+                background: source === "live" ? "rgba(48,209,88,0.14)" : "var(--warm-soft-bg)",
+                color: source === "live" ? "var(--success)" : "var(--warm-soft-text)",
               }}
             >
               {source === "live" ? t("live") : t("offlineDemo")}
@@ -341,7 +380,7 @@ export default function CampusView({
               data-haptic="light"
               className="haptic-action icon-button relative"
             >
-              <div className="w-8 h-8 flex items-center justify-center" style={{ color: "rgba(235,235,245,0.6)" }}>
+              <div className="w-8 h-8 flex items-center justify-center" style={{ color: "var(--tx-3)" }}>
                 <svg viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6" aria-hidden="true">
                   <path d="M12 3C6.99 3 3 6.36 3 10.5c0 2.16 1.05 4.1 2.73 5.44-.16 1.05-.66 2.06-1.5 2.9a.6.6 0 0 0 .5 1.02c1.9-.14 3.4-.8 4.44-1.44.9.22 1.86.34 2.83.34 5.01 0 9-3.36 9-7.5S17.01 3 12 3Z" />
                 </svg>
@@ -353,7 +392,7 @@ export default function CampusView({
           </div>
         </div>
 
-        <div className="seg-compact mt-2" role="tablist" aria-label={t("campus")}>
+        <div className="seg-compact mt-3.5 mx-4" role="tablist" aria-label={t("campus")}>
           {(["wall", "events", "news"] as const).map((m) => {
             const active = mode === m;
             const label = m === "wall" ? t("campusWall") : m === "events" ? t("campusEvents") : t("news");
@@ -392,7 +431,7 @@ export default function CampusView({
           />
           <div className="flex-1 min-h-0 overflow-y-auto px-4 pt-1 pb-28 space-y-3 animate-slide-up">
             {loading && posts.length === 0 ? (
-              <p className="text-xs text-center py-10" style={{ color: "rgba(235,235,245,0.4)" }}>
+              <p className="text-xs text-center py-10" style={{ color: "var(--tx-6)" }}>
                 …
               </p>
             ) : posts.length === 0 ? (
@@ -411,7 +450,18 @@ export default function CampusView({
           </div>
         </>
       ) : mode === "events" ? (
-        <div className="flex-1 min-h-0 overflow-y-auto px-4 pt-1 pb-28 space-y-3 animate-slide-up">
+        <div className="flex-1 min-h-0 overflow-y-auto px-4 pt-3 pb-28 space-y-3 animate-slide-up">
+          {/* 社团（Clubs）区块 + 「申请创建社团」入口（CreateClubScreen） */}
+          <ClubsSection
+            clubs={clubs}
+            myClubs={myClubs}
+            onCreate={() => {
+              hapticTap();
+              setCreateClubOpen(true);
+            }}
+          />
+
+          <p className="theme-section-title text-sm font-semibold pt-1">{t("campusEvents")}</p>
           {events.length === 0 ? (
             <EmptyState icon="🎪" title={t("noEvents")} hint={t("noEventsHint")} />
           ) : (
@@ -478,7 +528,7 @@ function NotificationBanner({
           <p className="text-xs font-bold" style={{ color: style.text }}>
             {item.title}
           </p>
-          <p className="text-[11px] mt-0.5 leading-snug" style={{ color: "rgba(235,235,245,0.78)" }}>
+          <p className="text-[11px] mt-0.5 leading-snug" style={{ color: "var(--tx-1)" }}>
             {item.message}
           </p>
         </div>
@@ -487,11 +537,127 @@ function NotificationBanner({
           aria-label={t("hide")}
           onClick={onDismiss}
           className="haptic-action shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-[11px]"
-          style={{ background: "rgba(255,255,255,0.12)", color: "rgba(235,235,245,0.75)" }}
+          style={{ background: "rgba(255,255,255,0.12)", color: "var(--tx-2)" }}
         >
           ✕
         </button>
       </div>
+    </div>
+  );
+}
+
+/**
+ * 社团区块（Clubs & Events 分段顶部）。
+ *
+ * 三块内容：
+ *  1) 「申请创建社团 / 组织」入口卡片 → CreateClubScreen；
+ *  2) 我提交的申请（pending / approved / rejected）—— 用户能自己看到审核进度，
+ *     否则提交完只有一片空白，很容易以为失败了而重复提交；
+ *  3) 已通过审核的公开社团横向列表（Logo + 名称 + 分类 + Telegram 联系方式）。
+ *
+ * 数据拿不到（离线 / 未登录）时整块安静隐藏，不显示空壳。
+ */
+function ClubsSection({
+  clubs,
+  myClubs,
+  onCreate,
+}: {
+  clubs: ClubItem[];
+  myClubs: ClubApplication[];
+  onCreate: () => void;
+}) {
+  const t = useI18n();
+  const statusStyle: Record<string, { bg: string; color: string; label: string }> = {
+    pending: { bg: "var(--warm-soft-bg)", color: "var(--warm-soft-text)", label: t("clubStatusPending") },
+    approved: { bg: "rgba(48,209,88,0.14)", color: "var(--success)", label: t("clubStatusApproved") },
+    rejected: { bg: "rgba(239,68,68,0.14)", color: "var(--danger)", label: t("clubStatusRejected") },
+  };
+
+  return (
+    <div className="space-y-2.5">
+      <p className="theme-section-title text-sm font-semibold">{t("clubs")}</p>
+
+      {myClubs.length > 0 && (
+        <div className="glass squircle-lg p-3.5 space-y-2">
+          <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "var(--tx-5)" }}>
+            {t("myClubApplications")}
+          </p>
+          {myClubs.map((app) => {
+            const style = statusStyle[app.status] ?? statusStyle.pending;
+            return (
+              <div key={app.id} className="flex items-center gap-2.5">
+                <span className="w-8 h-8 rounded-lg overflow-hidden shrink-0 flex items-center justify-center" style={{ background: "var(--field-2)" }}>
+                  {app.avatar_url ? (
+                    <img src={app.avatar_url} alt="" className="w-full h-full object-cover" />
+                  ) : (
+                    <span className="text-sm">🏛️</span>
+                  )}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-semibold text-white truncate">{app.club_name}</p>
+                  {app.status === "rejected" && app.review_note && (
+                    <p className="text-[10px] truncate" style={{ color: "var(--danger)" }}>
+                      {app.review_note}
+                    </p>
+                  )}
+                </div>
+                <span
+                  className="shrink-0 text-[9px] font-bold px-2 py-0.5 rounded-full"
+                  style={{ background: style.bg, color: style.color }}
+                >
+                  {style.label}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {clubs.length > 0 && (
+        <div className="chip-scroller flex gap-2.5 overflow-x-auto pb-1">
+          {clubs.map((club) => (
+            <div
+              key={club.id}
+              className="glass squircle-lg p-3 w-[150px] shrink-0 flex flex-col gap-2"
+            >
+              <div className="w-full h-[70px] rounded-xl overflow-hidden flex items-center justify-center" style={{ background: "var(--field-2)" }}>
+                {club.avatar_url ? (
+                  <img src={club.avatar_url} alt="" className="w-full h-full object-cover" />
+                ) : (
+                  <span className="text-2xl">🏛️</span>
+                )}
+              </div>
+              <p className="text-xs font-bold text-white truncate">{club.club_name}</p>
+              {club.contact_telegram && (
+                <p className="text-[10px] truncate" style={{ color: "var(--accent-soft-text)", fontFamily: "JetBrains Mono" }}>
+                  {club.contact_telegram}
+                </p>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* 申请创建入口 —— 需求里的 CreateClubScreen 唯一入口 */}
+      <button
+        type="button"
+        onClick={onCreate}
+        className="haptic-action interactive-card w-full glass squircle-lg px-4 py-3.5 flex items-center gap-3 text-left"
+      >
+        <span
+          className="w-10 h-10 squircle-sm flex items-center justify-center text-xl shrink-0"
+          style={{ background: "var(--accent-soft-bg)", color: "var(--accent-soft-text)" }}
+        >
+          ＋
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block text-sm font-semibold text-white">{t("createClub")}</span>
+          <span className="block text-[11px] mt-0.5" style={{ color: "var(--tx-5)" }}>
+            {t("createClubHint")}
+          </span>
+        </span>
+        <span style={{ color: "var(--tx-6)" }}>›</span>
+      </button>
     </div>
   );
 }
@@ -510,7 +676,7 @@ function CategoryChips({
     ...CAMPUS_CATEGORIES.map((c) => ({ id: c.id as CategoryFilter, label: t(CATEGORY_KEY[c.id]), emoji: c.emoji })),
   ];
   return (
-    <div className="shrink-0 flex gap-1.5 overflow-x-auto px-4 pb-2.5">
+    <div className="chip-scroller shrink-0 flex items-center gap-1.5 overflow-x-auto px-4 pt-3.5 pb-3">
       {chips.map((chip) => {
         const active = chip.id === value;
         return (
@@ -521,8 +687,8 @@ function CategoryChips({
             data-haptic="light"
             className="haptic-action pill-chip shrink-0"
             style={{
-              background: active ? "#007AFF" : "rgba(255,255,255,0.07)",
-              color: active ? "#fff" : "rgba(235,235,245,0.7)",
+              background: active ? "var(--accent)" : "var(--field-2)",
+              color: active ? "var(--on-accent)" : "var(--tx-3)",
             }}
           >
             {chip.emoji} {chip.label}
@@ -568,7 +734,7 @@ function PostCard({
               </span>
             )}
           </p>
-          <p className="text-[10px] mt-0.5 truncate" style={{ color: "rgba(235,235,245,0.45)" }}>
+          <p className="text-[10px] mt-0.5 truncate" style={{ color: "var(--tx-5)" }}>
             {post.author.department_tag ? `${post.author.department_tag} · ` : ""}
             {timeAgo(post.created_at)}
           </p>
@@ -576,14 +742,14 @@ function PostCard({
         {post.is_official ? (
           <span className="official-badge shrink-0">📢 {t("officialBadge")}</span>
         ) : (
-          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0" style={{ background: "rgba(255,255,255,0.07)", color: "rgba(235,235,245,0.65)" }}>
+          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0" style={{ background: "rgba(255,255,255,0.07)", color: "var(--tx-3)" }}>
             {categoryEmoji(post.category)} {t(CATEGORY_KEY[post.category])}
           </span>
         )}
       </div>
 
       <button type="button" onClick={onOpen} className="block w-full text-left mt-2.5">
-        <p className="text-sm leading-relaxed whitespace-pre-line" style={{ color: "rgba(235,235,245,0.92)" }}>
+        <p className="text-sm leading-relaxed whitespace-pre-line" style={{ color: "var(--tx-1)" }}>
           {post.content}
         </p>
       </button>
@@ -594,7 +760,7 @@ function PostCard({
           type="button"
           onClick={onLike}
           className="haptic-action flex items-center gap-1.5 text-xs font-bold"
-          style={{ color: post.liked ? "#FF453A" : "rgba(235,235,245,0.55)" }}
+          style={{ color: post.liked ? "#FF453A" : "var(--tx-4)" }}
         >
           <span>{post.liked ? "❤️" : "🤍"}</span>
           {post.likes_count}
@@ -603,7 +769,7 @@ function PostCard({
           type="button"
           onClick={onOpen}
           className="haptic-action flex items-center gap-1.5 text-xs font-bold"
-          style={{ color: "rgba(235,235,245,0.55)" }}
+          style={{ color: "var(--tx-4)" }}
         >
           <span>💬</span>
           {post.comment_count}
@@ -614,7 +780,7 @@ function PostCard({
             type="button"
             onClick={onMessage}
             className="haptic-action ml-auto flex items-center gap-1.5 text-xs font-bold"
-            style={{ color: "#409CFF" }}
+            style={{ color: "var(--accent-soft-text)" }}
           >
             <span>✉️</span>
             {t("dmAuthor")}
@@ -687,7 +853,7 @@ function Composer({
             type="button"
             onClick={onClose}
             className="haptic-action text-sm font-semibold"
-            style={{ color: "rgba(235,235,245,0.6)" }}
+            style={{ color: "var(--tx-3)" }}
           >
             {t("cancel")}
           </button>
@@ -714,7 +880,7 @@ function Composer({
           placeholder={t("postPlaceholder")}
           className="w-full glass squircle-lg p-4 outline-none text-sm text-white placeholder:text-xs resize-none leading-relaxed"
         />
-        <p className="text-[10px] text-right px-1" style={{ color: "rgba(235,235,245,0.35)", fontFamily: "JetBrains Mono" }}>
+        <p className="text-[10px] text-right px-1" style={{ color: "var(--tx-7)", fontFamily: "JetBrains Mono" }}>
           {content.length}/2000
         </p>
 
@@ -732,7 +898,7 @@ function Composer({
                 className="haptic-action px-2.5 py-1.5 rounded-full text-[11px] font-semibold"
                 style={{
                   background: active ? "rgba(0,122,255,0.24)" : "rgba(255,255,255,0.07)",
-                  color: active ? "#409CFF" : "rgba(235,235,245,0.7)",
+                  color: active ? "var(--accent-soft-text)" : "var(--tx-2)",
                   border: active ? "1px solid rgba(0,122,255,0.55)" : "1px solid transparent",
                 }}
               >
@@ -764,7 +930,7 @@ function Composer({
 
         {/* 相册选图（自动压缩后上传，最多 6 张）——取代了原来"手贴图片链接"的输入框 */}
         <div className="glass squircle-lg p-4">
-          <p className="text-[10px] font-bold uppercase tracking-wider mb-2" style={{ color: "rgba(235,235,245,0.5)" }}>
+          <p className="text-[10px] font-bold uppercase tracking-wider mb-2" style={{ color: "var(--tx-4)" }}>
             {t("addPhotos")}
           </p>
           <input
@@ -801,13 +967,13 @@ function Composer({
                   photoRef.current?.click();
                 }}
                 className="haptic-action photo-thumb flex items-center justify-center text-2xl"
-                style={{ color: "rgba(235,235,245,0.55)" }}
+                style={{ color: "var(--tx-4)" }}
               >
                 {uploading ? "…" : "+"}
               </button>
             )}
           </div>
-          <p className="text-[10px] mt-2" style={{ color: "rgba(235,235,245,0.4)" }}>
+          <p className="text-[10px] mt-2" style={{ color: "var(--tx-6)" }}>
             {uploading ? t("uploading") : t("uploadHint")}
           </p>
         </div>
@@ -884,7 +1050,7 @@ function PostDetail({
             </svg>
             {t("back")}
           </button>
-          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: "rgba(255,255,255,0.07)", color: "rgba(235,235,245,0.65)" }}>
+          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: "rgba(255,255,255,0.07)", color: "var(--tx-3)" }}>
             {post.is_official ? `📢 ${t("officialBadge")}` : `${categoryEmoji(post.category)} ${t(CATEGORY_KEY[post.category])}`}
           </span>
         </div>
@@ -904,7 +1070,7 @@ function PostDetail({
             </span>
             <div className="min-w-0">
               <p className="text-sm font-bold text-white truncate">{authorLabel(post, t)}</p>
-              <p className="text-[10px] mt-0.5" style={{ color: "rgba(235,235,245,0.45)" }}>
+              <p className="text-[10px] mt-0.5" style={{ color: "var(--tx-5)" }}>
                 {post.author.department_tag ? `${post.author.department_tag} · ` : ""}
                 {timeAgo(post.created_at)}
               </p>
@@ -915,14 +1081,14 @@ function PostDetail({
                 type="button"
                 onClick={onMessage}
                 className="haptic-action ml-auto shrink-0 flex items-center gap-1.5 text-xs font-bold"
-                style={{ color: "#409CFF" }}
+                style={{ color: "var(--accent-soft-text)" }}
               >
                 <span>✉️</span>
                 {t("dmAuthor")}
               </button>
             )}
           </div>
-          <p className="text-sm leading-relaxed whitespace-pre-line mt-3" style={{ color: "rgba(235,235,245,0.92)" }}>
+          <p className="text-sm leading-relaxed whitespace-pre-line mt-3" style={{ color: "var(--tx-1)" }}>
             {post.content}
           </p>
           <MediaStrip urls={post.media_urls} />
@@ -931,32 +1097,32 @@ function PostDetail({
               type="button"
               onClick={onLike}
               className="haptic-action flex items-center gap-1.5 text-xs font-bold"
-              style={{ color: post.liked ? "#FF453A" : "rgba(235,235,245,0.55)" }}
+              style={{ color: post.liked ? "#FF453A" : "var(--tx-4)" }}
             >
               <span>{post.liked ? "❤️" : "🤍"}</span>
               {post.likes_count}
             </button>
-            <span className="flex items-center gap-1.5 text-xs font-bold" style={{ color: "rgba(235,235,245,0.55)" }}>
+            <span className="flex items-center gap-1.5 text-xs font-bold" style={{ color: "var(--tx-4)" }}>
               💬 {comments.length}
             </span>
           </div>
         </div>
 
-        <p className="text-xs font-bold px-1" style={{ color: "rgba(235,235,245,0.6)" }}>
+        <p className="text-xs font-bold px-1" style={{ color: "var(--tx-3)" }}>
           {t("comments")}
         </p>
 
         {loading ? (
-          <p className="text-xs px-1" style={{ color: "rgba(235,235,245,0.4)" }}>…</p>
+          <p className="text-xs px-1" style={{ color: "var(--tx-6)" }}>…</p>
         ) : comments.length === 0 ? (
-          <p className="text-xs px-1" style={{ color: "rgba(235,235,245,0.4)" }}>{t("noComments")}</p>
+          <p className="text-xs px-1" style={{ color: "var(--tx-6)" }}>{t("noComments")}</p>
         ) : (
           <div className="glass squircle-lg overflow-hidden divide-y divide-white/5">
             {comments.map((c) => (
               <div key={c.id} className="px-4 py-3">
                 <div className="flex items-center gap-2">
                   <span className="text-[11px] font-bold text-white">{authorLabel(c, t)}</span>
-                  <span className="text-[10px]" style={{ color: "rgba(235,235,245,0.4)" }}>
+                  <span className="text-[10px]" style={{ color: "var(--tx-6)" }}>
                     {timeAgo(c.created_at)}
                   </span>
                   {c.local_only && (
@@ -965,7 +1131,7 @@ function PostDetail({
                     </span>
                   )}
                 </div>
-                <p className="text-xs leading-relaxed mt-1 whitespace-pre-line" style={{ color: "rgba(235,235,245,0.82)" }}>
+                <p className="text-xs leading-relaxed mt-1 whitespace-pre-line" style={{ color: "var(--tx-1)" }}>
                   {c.content}
                 </p>
               </div>
@@ -1039,11 +1205,11 @@ function EventCard({ event, onOpen }: { event: ClubEventItem; onOpen: () => void
         </div>
       )}
       <div className="p-3.5">
-        <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "#409CFF" }}>
+        <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "var(--accent-soft-text)" }}>
           {event.club_name}
         </p>
         <p className="text-sm font-bold text-white mt-1 leading-snug">{event.title}</p>
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2 text-[11px]" style={{ color: "rgba(235,235,245,0.55)" }}>
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2 text-[11px]" style={{ color: "var(--tx-4)" }}>
           <span>🗓 {formatEventTime(event.event_time)}</span>
           {event.location && <span>📍 {event.location}</span>}
         </div>
@@ -1090,11 +1256,11 @@ function EventDetail({ event, onBack }: { event: ClubEventItem; onBack: () => vo
         )}
 
         <div className="glass squircle-lg p-4">
-          <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "#409CFF" }}>
+          <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "var(--accent-soft-text)" }}>
             {event.club_name}
           </p>
           <h1 className="text-lg font-bold text-white mt-1 leading-snug">{event.title}</h1>
-          <div className="mt-3 space-y-1.5 text-xs" style={{ color: "rgba(235,235,245,0.7)" }}>
+          <div className="mt-3 space-y-1.5 text-xs" style={{ color: "var(--tx-2)" }}>
             <p>🗓 {formatEventTime(event.event_time)}</p>
             {event.location && <p>📍 {event.location}</p>}
             <p>
@@ -1104,7 +1270,7 @@ function EventDetail({ event, onBack }: { event: ClubEventItem; onBack: () => vo
           {event.description && (
             <p
               className="text-sm leading-relaxed mt-3 pt-3 whitespace-pre-line"
-              style={{ color: "rgba(235,235,245,0.85)", borderTop: "1px solid rgba(255,255,255,0.06)" }}
+              style={{ color: "var(--tx-1)", borderTop: "1px solid rgba(255,255,255,0.06)" }}
             >
               {event.description}
             </p>

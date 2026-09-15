@@ -7,10 +7,16 @@ import { postClassReminderBannerNow } from "../native/notifications";
 import { useNotificationUnread } from "../services/NotificationService";
 import { useChatUnread } from "./Chat";
 import { motorHaptic } from "../utils/haptics";
-import { tr } from "../utils/locale";
+import { tr, trf } from "../utils/locale";
 import { playAlarmSound } from "../utils/alarm";
 import { academicWeekOf, ACADEMIC_YEAR } from "../utils/calendar";
 import { courseStatusFromDate } from "../utils/courseStatus";
+import {
+  demoSummary,
+  loadMaterialSummary,
+  materialAge,
+  type MaterialSummary,
+} from "../services/MaterialService";
 
 const RADIUS = 36;
 const CIRC = 2 * Math.PI * RADIUS;
@@ -151,11 +157,6 @@ function AnimatedNumber({ value, decimals = 0, duration = 1200, className, style
       {display.toFixed(decimals)}
     </span>
   );
-}
-
-function AnimatedProgress({ value, duration = 1200, style }: { value: number; duration?: number; style?: CSSProperties }) {
-  const w = useCountUp(value, duration);
-  return <div className="h-full rounded-full" style={{ width: `${w}%`, ...style }} />;
 }
 
 function AnimatedSparkline({ data, width = 96, height = 32 }: { data: number[]; width?: number; height?: number }) {
@@ -356,8 +357,8 @@ function GpaScale({ value }: { value: number }) {
         <div className="h-full rounded-full" style={{ width: `${w}%`, background: fillColor, boxShadow: `0 0 8px ${fillColor}` }} />
       </div>
       <div className="flex justify-between mt-1">
-        <span className="text-[8px]" style={{ color: "rgba(235,235,245,0.35)", fontFamily: "JetBrains Mono" }}>0.0</span>
-        <span className="text-[8px]" style={{ color: "rgba(235,235,245,0.35)", fontFamily: "JetBrains Mono" }}>4.0</span>
+        <span className="text-[8px]" style={{ color: "var(--tx-7)", fontFamily: "JetBrains Mono" }}>0.0</span>
+        <span className="text-[8px]" style={{ color: "var(--tx-7)", fontFamily: "JetBrains Mono" }}>4.0</span>
       </div>
     </div>
   );
@@ -390,7 +391,7 @@ function GpaCard({ onNavigate }: { onNavigate: (tab: string) => void }) {
   return (
     <button type="button" onClick={() => onNavigate("grades")} className="haptic-action interactive-card flex-1 glass squircle-lg p-4 card-shadow inner-glow-blue text-left">
       <div className="flex items-center justify-between">
-        <p className="text-xs font-medium" style={{ color: "rgba(235,235,245,0.5)" }}>{t("cumulativeGpa")}</p>
+        <p className="text-xs font-medium" style={{ color: "var(--tx-4)" }}>{t("cumulativeGpa")}</p>
         <div className="px-1.5 py-0.5 rounded-full text-xs font-semibold" style={{ background: "rgba(16,185,129,0.15)", color: "#10B981", fontSize: 10 }}>▲ {t("top")} 5%</div>
       </div>
       {data ? (
@@ -399,7 +400,7 @@ function GpaCard({ onNavigate }: { onNavigate: (tab: string) => void }) {
             <AnimatedNumber value={data.gpa} decimals={2} duration={1400} className="gpa-grow text-3xl font-bold text-white" style={{ fontFamily: "JetBrains Mono", letterSpacing: "-1px" }} />
           </div>
           <GpaScale value={data.gpa} />
-          <p className="text-xs mt-1.5" style={{ color: "rgba(235,235,245,0.4)", fontFamily: "JetBrains Mono" }}>
+          <p className="text-xs mt-1.5" style={{ color: "var(--tx-6)", fontFamily: "JetBrains Mono" }}>
             ↑ <AnimatedNumber value={data.change} decimals={2} duration={1400} /> {t("thisSemester")}
           </p>
         </>
@@ -417,6 +418,9 @@ export default function Dashboard({ onOpenProfile, onNavigate, onOpenReviews, on
   const unreadNotifications = useNotificationUnread();
   /** 私信未读（与私信列表共用同一个 store，红点永远一致） */
   const unreadMessages = useChatUnread();
+  /** 最新资料卡片：后端 /materials/summary；拿不到就回退离线演示（不编造假 deadline） */
+  const [materialSummary, setMaterialSummary] = useState<MaterialSummary | null>(null);
+  const [materialsLoading, setMaterialsLoading] = useState(true);
   const t = useI18n();
   const realNow = useNow(1000);
   const now = realNow;
@@ -563,13 +567,29 @@ export default function Dashboard({ onOpenProfile, onNavigate, onOpenReviews, on
     }
   }, [countdown, hasCountdown, activeCourse, countdownStatus]);
 
+  // 最新课程资料：进首页拉一次 /materials/summary。
+  // 后端不可达（离线 / 后端未部署）时回退到本地演示数据 —— 卡片始终有内容，
+  // 但**不会再像以前那样显示编造的"还剩 4h / 23:59 due"**。
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const summary = await loadMaterialSummary();
+      if (cancelled) return;
+      setMaterialSummary(summary && (summary.latest || summary.total > 0) ? summary : demoSummary());
+      setMaterialsLoading(false);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   return (
     <div className="app-surface h-full flex flex-col overflow-hidden">
         {/* Header — 固定顶栏，列表在下方独立滚动 */}
         <div className="screen-pin px-4 pt-1">
           <div className="flex items-center justify-between pt-1">
           <div>
-            <p className="text-xs font-medium" style={{ color: "rgba(235,235,245,0.5)" }}>
+            <p className="text-xs font-medium" style={{ color: "var(--tx-4)" }}>
               {t("week")} {week} · {t("fall")} {ACADEMIC_YEAR}
             </p>
             <h1 className="text-2xl font-bold text-white mt-0.5" style={{ letterSpacing: "-0.5px" }}>
@@ -586,7 +606,7 @@ export default function Dashboard({ onOpenProfile, onNavigate, onOpenReviews, on
               data-haptic="light"
               className="haptic-action icon-button relative"
             >
-              <div className="w-8 h-8 flex items-center justify-center" style={{ color: "rgba(235,235,245,0.6)" }}>
+              <div className="w-8 h-8 flex items-center justify-center" style={{ color: "var(--tx-3)" }}>
                 <svg viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6">
                   <path d="M12 3C6.99 3 3 6.36 3 10.5c0 2.16 1.05 4.1 2.73 5.44-.16 1.05-.66 2.06-1.5 2.9a.6.6 0 0 0 .5 1.02c1.9-.14 3.4-.8 4.44-1.44.9.22 1.86.34 2.83.34 5.01 0 9-3.36 9-7.5S17.01 3 12 3Z" />
                 </svg>
@@ -596,7 +616,7 @@ export default function Dashboard({ onOpenProfile, onNavigate, onOpenReviews, on
               )}
             </button>
             <button type="button" aria-label="Notifications" onClick={() => onNavigate("notifications")} className="haptic-action icon-button relative">
-              <div className="w-8 h-8 flex items-center justify-center" style={{ color: "rgba(235,235,245,0.6)" }}>
+              <div className="w-8 h-8 flex items-center justify-center" style={{ color: "var(--tx-3)" }}>
                 <svg viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6">
                   <path d="M12 22c1.1 0 2-.9 2-2h-4a2 2 0 002 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z" />
                 </svg>
@@ -606,10 +626,13 @@ export default function Dashboard({ onOpenProfile, onNavigate, onOpenReviews, on
             <button
               type="button"
               aria-label="Open profile"
-              onClick={() => onOpenProfile()}
+              onClick={(event) => {
+                event.stopPropagation();
+                onOpenProfile();
+              }}
               title="Profile"
               data-haptic="light"
-              className="haptic-action w-9 h-9 rounded-full flex items-center justify-center text-white font-bold text-sm transition-transform active:scale-95 select-none"
+              className="haptic-action relative z-10 w-10 h-10 -mr-1 rounded-full flex items-center justify-center text-white font-bold transition-transform active:scale-95 select-none shrink-0"
               style={{ background: "linear-gradient(135deg, #0033A0, #007AFF)", fontSize: 13, touchAction: "manipulation" }}
             >
               AB
@@ -648,7 +671,7 @@ export default function Dashboard({ onOpenProfile, onNavigate, onOpenReviews, on
             <p className="text-white font-bold text-lg leading-tight" style={{ letterSpacing: "-0.3px" }}>
               {noMoreToday ? lastToday.name : activeCourse.name}
             </p>
-            <p className="text-sm mt-1" style={{ color: "rgba(235,235,245,0.55)" }}>{noMoreToday ? t("noMoreToday") : activeCourse.prof}</p>
+            <p className="text-sm mt-1" style={{ color: "var(--tx-4)" }}>{noMoreToday ? t("noMoreToday") : activeCourse.prof}</p>
             {!noMoreToday && (
               <>
                 <p className="text-xs mt-1 font-medium" style={{ color: "#007AFF" }}>📍 {t("room")} {activeCourse.room}, {activeCourse.building}</p>
@@ -657,11 +680,11 @@ export default function Dashboard({ onOpenProfile, onNavigate, onOpenReviews, on
                     {countdownStatus} {formatCountdown(countdown.remaining)}
                   </p>
                 ) : (
-                  <p className="text-xs mt-1.5" style={{ color: "rgba(235,235,245,0.45)", fontFamily: "JetBrains Mono", fontVariantNumeric: "tabular-nums" }}>
+                  <p className="text-xs mt-1.5" style={{ color: "var(--tx-5)", fontFamily: "JetBrains Mono", fontVariantNumeric: "tabular-nums" }}>
                     {hhmm(activeCourse.startH, activeCourse.startM)}–{hhmm(activeCourse.endH, activeCourse.endM)}
                   </p>
                 )}
-                <button type="button" onClick={() => open2gisClassroom(activeCourse.building, activeCourse.room)} className="haptic-action mt-3 px-3 py-1.5 rounded-full text-xs font-semibold flex items-center gap-1.5 transition-opacity active:opacity-70" style={{ background: "rgba(0,122,255,0.2)", color: "#409CFF", border: "1px solid rgba(0,122,255,0.3)" }}>
+                <button type="button" onClick={() => open2gisClassroom(activeCourse.building, activeCourse.room)} className="haptic-action mt-3 px-3 py-1.5 rounded-full text-xs font-semibold flex items-center gap-1.5 transition-opacity active:opacity-70" style={{ background: "rgba(0,122,255,0.2)", color: "var(--accent-soft-text)", border: "1px solid rgba(0,122,255,0.3)" }}>
                   <svg viewBox="0 0 20 20" fill="currentColor" className="w-3 h-3">
                     <path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z" />
                   </svg>
@@ -676,18 +699,81 @@ export default function Dashboard({ onOpenProfile, onNavigate, onOpenReviews, on
         <div className="flex gap-3">
           <GpaCard onNavigate={onNavigate} />
 
-          {/* DDL Card */}
-          <button type="button" onClick={() => onNavigate("materials")} className="haptic-action interactive-card flex-1 glass squircle-lg p-4 card-shadow text-left" style={{ borderLeft: "1px solid rgba(239,68,68,0.2)" }}>
+          {/* 最新课程资料卡片
+              ⚠️ 产品修正：这张卡以前被写成"NEXT DEADLINE / 作业提醒"（含"还剩 4h"、
+              进度条、23:59 due 这类假数据），但它真正的业务是
+              **最新课程教材 / 资料更新**（老师刚上传的讲义/PPT）。
+              现在标题 = 最新资料，内容 = 真实后端 /materials/summary 的最新一条，
+              点击进入 Materials 页（该页承载完整列表 + 下载）。
+              数据拿不到时（离线/后端未部署）显示优雅空状态，不再编造 "4h left"。 */}
+          <button
+            type="button"
+            onClick={() => onNavigate("materials")}
+            className="haptic-action interactive-card flex-1 glass squircle-lg p-4 card-shadow text-left"
+          >
             <div className="flex items-center justify-between mb-1">
-              <p className="text-xs font-medium" style={{ color: "rgba(235,235,245,0.5)" }}>{t("nextDeadline")}</p>
-              <span className="text-xs" style={{ color: "#EF4444" }}>⚠ 4{t("hoursLeft")}</span>
+              <p className="text-xs font-medium" style={{ color: "var(--tx-4)" }}>
+                {t("latestMaterials")}
+              </p>
+              {materialSummary?.latest && (
+                <span className="text-xs" style={{ color: "var(--tx-5)", fontFamily: "JetBrains Mono" }}>
+                  {materialAge(materialSummary.latest.created_at)}
+                </span>
+              )}
             </div>
-            <p className="text-sm font-bold text-white leading-tight">Data Structures</p>
-            <p className="text-xs mt-0.5" style={{ color: "rgba(235,235,245,0.5)" }}>{t("assignment")} 3</p>
-            <div className="mt-3 h-1.5 rounded-full overflow-hidden" style={{ background: "rgba(239,68,68,0.15)" }}>
-              <AnimatedProgress value={85} duration={1400} style={{ background: "linear-gradient(90deg, #F59E0B, #EF4444)" }} />
-            </div>
-            <p className="text-xs mt-1.5" style={{ color: "rgba(235,235,245,0.4)", fontFamily: "JetBrains Mono" }}>{t("dueToday")} 23:59</p>
+
+            {materialsLoading ? (
+              <p className="text-sm font-bold text-white leading-tight" style={{ opacity: 0.3 }}>
+                …
+              </p>
+            ) : materialSummary?.latest ? (
+              <>
+                <p className="text-sm font-bold text-white leading-tight" style={{ overflowWrap: "anywhere" }}>
+                  {materialSummary.latest.file_name}
+                </p>
+                <p className="text-xs mt-0.5 truncate" style={{ color: "var(--tx-4)" }}>
+                  {materialSummary.latest.course_code} · {materialSummary.latest.course_title}
+                </p>
+                <div className="flex items-center gap-1.5 mt-2">
+                  <span
+                    className="text-[9px] font-bold px-1.5 py-0.5 rounded-full"
+                    style={{
+                      background: "var(--accent-soft-bg)",
+                      color: "var(--accent-soft-text)",
+                      fontFamily: "JetBrains Mono",
+                    }}
+                  >
+                    {materialSummary.latest.file_format}
+                  </span>
+                  {materialSummary.latest.size_label && (
+                    <span className="text-[9px]" style={{ color: "var(--tx-6)", fontFamily: "JetBrains Mono" }}>
+                      {materialSummary.latest.size_label}
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs mt-1.5" style={{ color: "var(--tx-6)" }}>
+                  {materialSummary.total > 1
+                    ? trf(
+                        {
+                          en: "{n} files · {c} courses",
+                          kz: "{n} файл · {c} курс",
+                          ru: "{n} файлов · {c} курсов",
+                        },
+                        { n: String(materialSummary.total), c: String(materialSummary.course_count) },
+                      )
+                    : t("viewAll")}
+                </p>
+              </>
+            ) : (
+              <>
+                <p className="text-sm font-bold text-white leading-tight" style={{ opacity: 0.7 }}>
+                  {t("noNewMaterials")}
+                </p>
+                <p className="text-xs mt-1" style={{ color: "var(--tx-6)" }}>
+                  {t("noNewMaterialsHint")}
+                </p>
+              </>
+            )}
           </button>
         </div>
 
@@ -761,7 +847,7 @@ export default function Dashboard({ onOpenProfile, onNavigate, onOpenReviews, on
                     <p
                       className="text-xs font-semibold"
                       style={{
-                        color: live ? "#10B981" : done ? "rgba(235,235,245,0.35)" : "rgba(235,235,245,0.6)",
+                        color: live ? "#10B981" : done ? "var(--tx-7)" : "rgba(235,235,245,0.6)",
                         fontFamily: "JetBrains Mono",
                       }}
                     >

@@ -624,3 +624,113 @@ class NotificationReadCursor(Base):
     broadcasts_read_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, onupdate=_now)
 
+
+# =====================================================================
+# 课程资料（首页「最新资料 / Соңғы материалдар」卡片的数据源）
+# =====================================================================
+
+#: 资料文件格式（与前端 Materials 页的 DocFormat 一一对应，后端只校验、不渲染文案）
+MATERIAL_FORMATS = ("PDF", "PPT", "DOC", "XLS", "ZIP")
+
+
+class CourseMaterial(Base):
+    """教师上传的课程讲义 / PPT / 数据集。
+
+    为什么单独建表而不是复用 ``Course``：一门课在一个学期里会持续新增资料
+    （Lecture 1..N、Problem Set、Lab Manual…），首页卡片要的是**跨课程的"最新 N 条"**，
+    按 ``created_at`` 倒序取；这正是 ``Course`` 表表达不了的粒度。
+
+    ``course_code`` / ``course_title`` 是**冗余快照**（不是外键）：资料是历史产物，
+    课程改名/归档后旧资料的署名必须保持当时的样貌，否则历史记录会被追改。
+    """
+
+    __tablename__ = "course_materials"
+    __table_args__ = (
+        Index("ix_course_material_visible_created", "is_visible", "created_at"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    #: 如 "CS 201"（冗余快照，见类文档）
+    course_code: Mapped[str] = mapped_column(String(40), nullable=False, index=True)
+    course_title: Mapped[str] = mapped_column(String(200), nullable=False)
+    professor_name: Mapped[str | None] = mapped_column(String(160), nullable=True)
+    file_name: Mapped[str] = mapped_column(String(240), nullable=False)
+    #: PDF / PPT / DOC / XLS / ZIP
+    file_format: Mapped[str] = mapped_column(String(8), default="PDF", nullable=False)
+    #: 人类可读体积（"3.2 MB"）—— 前端只显示，不做计算，所以直接存成品字符串
+    size_label: Mapped[str | None] = mapped_column(String(24), nullable=True)
+    pages: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    #: 下载 / 预览外链（只允许 http(s)）
+    file_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    #: 上传者署名（教师 / 助教显示名）
+    uploaded_by: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    #: 下架开关（软隐藏，不物理删行）
+    is_visible: Mapped[bool] = mapped_column(Boolean, default=True, index=True, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, index=True)
+
+
+# =====================================================================
+# 社团 / 组织申请（Campus Hub「申请创建社团」→ CreateClubScreen）
+# =====================================================================
+
+#: 社团分类（前端 Chip 选项；文案由前端 i18n 渲染）
+CLUB_CATEGORIES = (
+    "academic",    # 学术
+    "sports",      # 体育
+    "arts",        # 艺术
+    "tech",        # 科技
+    "volunteer",   # 志愿公益
+    "media",       # 媒体 / 文化
+)
+
+#: 申请状态：pending 待审核 / approved 通过（进入社团列表）/ rejected 驳回
+CLUB_APPLICATION_STATUSES = ("pending", "approved", "rejected")
+
+
+class ClubApplication(Base):
+    """学生提交的社团 / 组织创建申请。
+
+    设计要点：
+
+    * ``status`` 默认 ``pending`` —— 按需求"存入数据库并默认为 Pending/Approved 状态"，
+      但**绝不能默认 approved**：否则任何人都能凭空在公开列表里造出一个"官方社团"。
+      所以默认 pending，由 admin 在 ``/admin`` 里点 Approve；
+    * ``user_id`` 记录申请人（与社区匿名不同 —— 社团创建是**实名行为**，
+      需要一个可追责的责任人，这也是需求里"自动关联当前登录学生"的含义）；
+    * ``contact_name`` 默认取用户全局显示名，但允许覆盖（负责人可能不是申请人）；
+    * ``avatar_url`` 存上传后的绝对 URL（走 ``/uploads/image``，不含用户信息）。
+    """
+
+    __tablename__ = "club_applications"
+    __table_args__ = (
+        Index("ix_club_application_status_created", "status", "created_at"),
+        Index("ix_club_application_visible_status", "is_visible", "status"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    user_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    club_name: Mapped[str] = mapped_column(String(160), nullable=False, index=True)
+    #: academic / sports / arts / tech / volunteer / media
+    category: Mapped[str] = mapped_column(String(24), default="academic", nullable=False, index=True)
+    #: 简介 + 招新宣言
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    #: 社团 Logo（上传后的绝对 URL）
+    avatar_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    contact_name: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    contact_telegram: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    contact_phone: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    #: pending | approved | rejected
+    status: Mapped[str] = mapped_column(
+        String(16), default="pending", index=True, nullable=False
+    )
+    #: 上架开关（与 status 解耦：已通过的社团也能临时下线）
+    is_visible: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    #: 审核备注（驳回原因 / 内部记录）
+    review_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, index=True)
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    applicant: Mapped[User] = relationship()
+

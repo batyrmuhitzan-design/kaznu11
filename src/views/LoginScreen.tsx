@@ -360,7 +360,7 @@ export default function LoginScreen({ onSuccess }: { onSuccess: () => void }) {
                 type="button"
                 onClick={() => setShowLegal(true)}
                 className="inline text-[13px] font-bold underline decoration-1 underline-offset-2"
-                style={{ color: "#409CFF" }}
+                style={{ color: "var(--accent-soft-text)" }}
               >
                 {language === "KZ" ? "Terms & Privacy Policy" : language === "RU" ? "Terms & Privacy Policy" : "Terms & Privacy Policy"}
               </button>

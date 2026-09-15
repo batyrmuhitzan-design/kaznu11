@@ -379,12 +379,12 @@ export default function App() {
               className="haptic-action flex flex-col items-center gap-1 px-2 py-1 transition-all duration-200"
               style={{ minWidth: 60 }}
             >
-              <span style={{ color: active ? "#007AFF" : "rgba(235,235,245,0.45)", transition: "color 0.2s" }}>
+              <span style={{ color: active ? "#007AFF" : "var(--tx-5)", transition: "color 0.2s" }}>
                 <TabIcon icon={tab.icon} active={active} />
               </span>
               <span
                 className="text-xs font-medium"
-                style={{ color: active ? "#007AFF" : "rgba(235,235,245,0.45)", fontSize: 10, transition: "color 0.2s" }}
+                style={{ color: active ? "#007AFF" : "var(--tx-5)", fontSize: 10, transition: "color 0.2s" }}
               >
                 {tabLabels[tab.id as keyof typeof tabLabels]}
               </span>

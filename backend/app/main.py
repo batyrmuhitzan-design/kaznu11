@@ -22,8 +22,10 @@ from .routers import (
     auth,
     campus,
     chat,
+    clubs,
     courses,
     live_activity,
+    materials,
     me,
     notifications,
     professors,
@@ -31,7 +33,12 @@ from .routers import (
     uploads,
 )
 from .routers import reviews, super_admin
-from .seed import seed_campus_if_empty, seed_if_empty
+from .seed import (
+    seed_campus_if_empty,
+    seed_clubs_if_empty,
+    seed_if_empty,
+    seed_materials_if_empty,
+)
 
 # SlowAPI rate limiter — optional import keeps the app runnable if the wheel
 # can't be installed on an exotic Python build (fallback = no limiting).
@@ -61,6 +68,10 @@ def _make_app() -> FastAPI:
                 # 独立判空（不走 seed_if_empty 的教授判空），保证已上线库也会补数据
                 if settings.seed_on_startup:
                     await seed_campus_if_empty(session, admin_user)
+                    # 课程资料与社团申请**各自独立判空**：它们与 posts 表无关，
+                    # 已上线的库（posts 非空）也必须能补上这两份新数据。
+                    await seed_materials_if_empty(session)
+                    await seed_clubs_if_empty(session, admin_user)
             _app.state.db_ready = True
         except Exception as exc:  # pragma: no cover - 取决于部署环境
             _app.state.db_ready = False
@@ -139,6 +150,10 @@ def _make_app() -> FastAPI:
     app.include_router(notifications.router, prefix="/api/v1")
     # 图片上传（本地相册 → FormData → 存储 → URL）
     app.include_router(uploads.router, prefix="/api/v1")
+    # 课程资料（首页「最新资料」卡片 + Materials 页）
+    app.include_router(materials.router, prefix="/api/v1")
+    # 社团 / 组织申请与展示（CreateClubScreen → POST /clubs/apply）
+    app.include_router(clubs.router, prefix="/api/v1")
 
     # 上传的图片：本地存储后端下通过 /media 静态提供（云存储后端则由其公网域名直接提供）
     _mount_media(app)

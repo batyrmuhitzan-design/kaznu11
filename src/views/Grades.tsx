@@ -21,9 +21,10 @@ const CUM_GPA = 3.82;
 const REMAINING_SEMS = 5;
 
 const GRAD_TARGETS = [
-  { id: "pass", labelKey: "justGraduate", min: 2.0, color: "#30D158" },
-  { id: "magna", labelKey: "magna", min: 3.7, color: "#409CFF" },
-  { id: "summa", labelKey: "summa", min: 3.9, color: "#FF9F0A" },
+  // 颜色一律走语义 token（浅色模式下 #409CFF 这类"iOS 亮蓝"在白底上根本看不清）
+  { id: "pass", labelKey: "justGraduate", min: 2.0, color: "var(--success)" },
+  { id: "magna", labelKey: "magna", min: 3.7, color: "var(--accent-soft-text)" },
+  { id: "summa", labelKey: "summa", min: 3.9, color: "var(--warm-soft-text)" },
 ] as const;
 type TargetId = (typeof GRAD_TARGETS)[number]["id"];
 
@@ -111,7 +112,7 @@ function GpaMeter({ value, color: _color = "#007AFF", height = 7, showLabels = t
       {showLabels && (
         <div className="flex justify-between mt-1 px-0.5">
           {[0, 1, 2, 3, 4].map((n) => (
-            <span key={n} className="text-[9px]" style={{ color: "rgba(235,235,245,0.4)", fontFamily: "JetBrains Mono" }}>
+            <span key={n} className="text-[9px]" style={{ color: "var(--tx-6)", fontFamily: "JetBrains Mono" }}>
               {n}.0
             </span>
           ))}
@@ -186,7 +187,7 @@ function GPAChart({ whatIfBonus }: { whatIfBonus: number }) {
                 <text x={toX(i)} y={toY(v) - 14} textAnchor="middle" fill="white" fontSize="10" fontWeight="600" fontFamily="JetBrains Mono">{v.toFixed(2)}</text>
               </g>
             )}
-            <text x={toX(i)} y={H - 1} textAnchor="middle" fill="rgba(235,235,245,0.35)" fontSize="8.5" fontFamily="Inter">{labels[i]}</text>
+            <text x={toX(i)} y={H - 1} textAnchor="middle" fill="var(--tx-7)" fontSize="8.5" fontFamily="Inter">{labels[i]}</text>
           </g>
         ))}
       </svg>
@@ -310,22 +311,22 @@ export default function Grades({ onBack }: { onBack?: () => void }) {
         <div className="glass squircle-lg p-5 mb-3 card-shadow inner-glow-blue">
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0">
-              <p className="text-xs font-medium mb-1" style={{ color: "rgba(235,235,245,0.5)" }}>{t("cumulativeGpa")}</p>
+              <p className="text-xs font-medium mb-1" style={{ color: "var(--tx-4)" }}>{t("cumulativeGpa")}</p>
               <div className="flex items-baseline gap-2">
                 <AnimatedNumber value={gpaData.gpa} decimals={2} duration={1600} className="gpa-grow text-5xl font-bold text-white" style={{ fontFamily: "JetBrains Mono", letterSpacing: "-2px" }} />
-                <span className="text-lg font-medium" style={{ color: "rgba(235,235,245,0.4)" }}>/4.0</span>
+                <span className="text-lg font-medium" style={{ color: "var(--tx-6)" }}>/4.0</span>
               </div>
               <div className="flex flex-wrap items-center gap-2 mt-2">
                 <div className="px-2 py-0.5 rounded-full text-xs font-bold" style={{ background: "rgba(48,209,88,0.15)", color: "#30D158" }}>
                   ▲ {gpaData.rank}
                 </div>
-                <span className="text-xs" style={{ color: "rgba(235,235,245,0.45)" }}>{honorNow} {t("track")}</span>
+                <span className="text-xs" style={{ color: "var(--tx-5)" }}>{honorNow} {t("track")}</span>
               </div>
             </div>
             <div className="text-right shrink-0">
-              <p className="text-xs" style={{ color: "rgba(235,235,245,0.4)" }}>{t("credits")}</p>
+              <p className="text-xs" style={{ color: "var(--tx-6)" }}>{t("credits")}</p>
               <AnimatedNumber value={ects.earned} duration={1600} delay={200} className="text-2xl font-bold text-white" style={{ fontFamily: "JetBrains Mono" }} />
-              <p className="text-xs" style={{ color: "rgba(235,235,245,0.35)" }}>{t("of")} {ects.total} ECTS</p>
+              <p className="text-xs" style={{ color: "var(--tx-7)" }}>{t("of")} {ects.total} ECTS</p>
             </div>
           </div>
 
@@ -340,13 +341,13 @@ export default function Grades({ onBack }: { onBack?: () => void }) {
         </div>
 
         {/* Graduation Plan: 按学校学分制预算 */}
-        <div className="glass squircle-lg p-4 mb-3 card-shadow" style={{ border: `1px solid ${targetDef.color}33` }}>
+        <div className="glass squircle-lg p-4 mb-3 card-shadow" style={{ border: `1px solid color-mix(in srgb, ${targetDef.color} 22%, transparent)` }}>
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
               <span style={{ fontSize: 15 }}>🎯</span>
               <p className="text-sm font-bold text-white">{t("degreePlan")}</p>
             </div>
-            <span className="text-[10px] font-semibold px-2 py-1 rounded-full" style={{ background: `${targetDef.color}1f`, color: targetDef.color }}>
+            <span className="text-[10px] font-semibold px-2 py-1 rounded-full" style={{ background: `color-mix(in srgb, ${targetDef.color} 14%, transparent)`, color: targetDef.color }}>
               {ects.earned}/{ects.total} ECTS
             </span>
           </div>
@@ -363,8 +364,10 @@ export default function Grades({ onBack }: { onBack?: () => void }) {
                   className="haptic-action flex-1 text-center py-2 squircle-xs text-xs font-semibold transition-all"
                   style={{
                     background: active ? g.color : "transparent",
-                    color: active ? "#fff" : "rgba(235,235,245,0.6)",
+                    color: active ? "#fff" : "var(--tx-3)",
                     border: `1px solid ${active ? g.color : "rgba(255,255,255,0.07)"}`,
+                    // 选中态：用 token 色做底、白字（text-shadow 保证在任何强调色上都可读）
+                    textShadow: active ? "0 1px 2px rgba(0,0,0,0.35)" : "none",
                   }}
                 >
                   {t(g.labelKey)}
@@ -376,12 +379,12 @@ export default function Grades({ onBack }: { onBack?: () => void }) {
 
           {/* 反推结果 */}
           <div className="grid grid-cols-3 gap-2 mb-3">
-            <div className="px-2 py-2 squircle-sm text-center" style={{ background: `${targetDef.color}14`, border: `1px solid ${targetDef.color}26` }}>
-              <p className="text-[9px] uppercase tracking-wide mb-0.5" style={{ color: "rgba(235,235,245,0.45)" }}>{t("targetStandard")} GPA</p>
+            <div className="px-2 py-2 squircle-sm text-center" style={{ background: `color-mix(in srgb, ${targetDef.color} 10%, transparent)`, border: `1px solid color-mix(in srgb, ${targetDef.color} 18%, transparent)` }}>
+              <p className="text-[9px] uppercase tracking-wide mb-0.5" style={{ color: "var(--tx-5)" }}>{t("targetStandard")} GPA</p>
               <p className="text-lg font-bold" style={{ color: targetDef.color, fontFamily: "JetBrains Mono" }}>{targetDef.min.toFixed(1)}</p>
             </div>
             <div className="px-2 py-2 squircle-sm text-center" style={{ background: "rgba(255,255,255,0.04)" }}>
-              <p className="text-[9px] uppercase tracking-wide mb-0.5" style={{ color: "rgba(235,235,245,0.45)" }}>{t("futureAvg")}</p>
+              <p className="text-[9px] uppercase tracking-wide mb-0.5" style={{ color: "var(--tx-5)" }}>{t("futureAvg")}</p>
               {unreachable ? (
                 <p className="text-lg font-bold" style={{ color: "#FF453A", fontFamily: "JetBrains Mono" }}>—</p>
               ) : (
@@ -389,7 +392,7 @@ export default function Grades({ onBack }: { onBack?: () => void }) {
               )}
             </div>
             <div className="px-2 py-2 squircle-sm text-center" style={{ background: "rgba(255,255,255,0.04)" }}>
-              <p className="text-[9px] uppercase tracking-wide mb-0.5" style={{ color: "rgba(235,235,245,0.45)" }}>{t("ectsLeft")}</p>
+              <p className="text-[9px] uppercase tracking-wide mb-0.5" style={{ color: "var(--tx-5)" }}>{t("ectsLeft")}</p>
               <p className="text-lg font-bold text-white" style={{ fontFamily: "JetBrains Mono" }}>{remaining}</p>
             </div>
           </div>
@@ -397,7 +400,7 @@ export default function Grades({ onBack }: { onBack?: () => void }) {
           {/* 剩余学分内需达到的 GPA 进度 */}
           <div className="mb-3">
             <div className="flex items-center justify-between text-[10px] mb-1.5">
-              <span className="font-semibold" style={{ color: "rgba(235,235,245,0.6)" }}>
+              <span className="font-semibold" style={{ color: "var(--tx-3)" }}>
                 {t("needsPerfect")} · {t("avgPerSem")}
               </span>
               <span style={{ color: targetDef.color, fontFamily: "JetBrains Mono" }}>≈ {Math.max(0, Math.min(4, needed)).toFixed(2)}</span>
@@ -424,7 +427,7 @@ export default function Grades({ onBack }: { onBack?: () => void }) {
             </svg>
             <p className="text-sm font-bold text-white">{t("whatIf")}</p>
           </div>
-          <p className="text-xs mb-3" style={{ color: "rgba(235,235,245,0.45)" }}>
+          <p className="text-xs mb-3" style={{ color: "var(--tx-5)" }}>
             {t("ifAlgorithm")} = <span className="font-semibold" style={{ color: "#5E5CE6" }}>{["B", "B+", "A-", "A", "A+"][whatIf]}</span>, {t("projectedGpa")}:{" "}
             <AnimatedNumber value={Math.min(4, gpaData.gpa + whatIf * 0.035)} decimals={2} duration={600} className="font-bold text-white" style={{ fontFamily: "JetBrains Mono" }} />
           </p>
@@ -436,7 +439,7 @@ export default function Grades({ onBack }: { onBack?: () => void }) {
           />
           <div className="flex justify-between mt-1.5">
             {["B", "B+", "A-", "A", "A+"].map((g) => (
-              <span key={g} className="text-xs" style={{ color: "rgba(235,235,245,0.35)", fontFamily: "JetBrains Mono" }}>{g}</span>
+              <span key={g} className="text-xs" style={{ color: "var(--tx-7)", fontFamily: "JetBrains Mono" }}>{g}</span>
             ))}
           </div>
           {whatIf >= 3 && (
@@ -449,7 +452,7 @@ export default function Grades({ onBack }: { onBack?: () => void }) {
         </div>
 
         {/* Semester Accordion */}
-        <p className="text-sm font-semibold mb-2.5 mt-1" style={{ color: "rgba(235,235,245,0.7)" }}>{t("semesters")}</p>
+        <p className="text-sm font-semibold mb-2.5 mt-1" style={{ color: "var(--tx-2)" }}>{t("semesters")}</p>
         <div className="space-y-2.5">
           {SEMESTERS.map((sem) => {
             const open = expanded === sem.id;
@@ -464,7 +467,7 @@ export default function Grades({ onBack }: { onBack?: () => void }) {
                   <div className="text-left min-w-0">
                     <p className="text-sm font-bold text-white">{sem.label}</p>
                     <div className="flex items-center gap-2 mt-1">
-                      <span className="text-xs" style={{ color: "rgba(235,235,245,0.45)" }}>{sem.credits} {t("credits")}</span>
+                      <span className="text-xs" style={{ color: "var(--tx-5)" }}>{sem.credits} {t("credits")}</span>
                       <div className="w-16 shrink-0"><GpaMeter value={sem.gpa} height={3} showLabels={false} /></div>
                     </div>
                   </div>
@@ -491,11 +494,11 @@ export default function Grades({ onBack }: { onBack?: () => void }) {
                           >
                             <div className="flex-1 min-w-0">
                               <p className="text-sm font-semibold text-white truncate">{c.name}</p>
-                              <p className="text-xs mt-0.5" style={{ color: "rgba(235,235,245,0.4)" }}>{c.prof} · {c.ects} ECTS</p>
+                              <p className="text-xs mt-0.5" style={{ color: "var(--tx-6)" }}>{c.prof} · {c.ects} ECTS</p>
                             </div>
                             <div className="text-right shrink-0">
                               <GradeChip grade={c.grade} />
-                              <p className="text-xs mt-1" style={{ color: "rgba(235,235,245,0.35)", fontFamily: "JetBrains Mono" }}>{c.score}%</p>
+                              <p className="text-xs mt-1" style={{ color: "var(--tx-7)", fontFamily: "JetBrains Mono" }}>{c.score}%</p>
                             </div>
                           </div>
                         ))}
@@ -510,10 +513,10 @@ export default function Grades({ onBack }: { onBack?: () => void }) {
 
         {/* Floating Action Row */}
         <div className="flex gap-2.5 mt-4">
-          <button type="button" onClick={handleExportPdf} disabled={exporting} data-action="export" data-haptic="heavy" className="haptic-action flex-1 flex items-center justify-center gap-2 py-3.5 squircle-md font-semibold text-sm transition-opacity active:opacity-70 disabled:opacity-50" style={{ background: "rgba(0,122,255,0.15)", color: "#409CFF", border: "1px solid rgba(0,122,255,0.25)" }}>
+          <button type="button" onClick={handleExportPdf} disabled={exporting} data-action="export" data-haptic="heavy" className="haptic-action flex-1 flex items-center justify-center gap-2 py-3.5 squircle-md font-semibold text-sm transition-opacity active:opacity-70 disabled:opacity-50" style={{ background: "rgba(0,122,255,0.15)", color: "var(--accent-soft-text)", border: "1px solid rgba(0,122,255,0.25)" }}>
             {exporting ? (
               <>
-                <span className="inline-block w-3.5 h-3.5 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: "#409CFF", borderTopColor: "transparent" }} />
+                <span className="inline-block w-3.5 h-3.5 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: "var(--accent-soft-text)", borderTopColor: "transparent" }} />
                 ……
               </>
             ) : (

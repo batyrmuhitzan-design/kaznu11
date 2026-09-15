@@ -1,4 +1,5 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import legalContent from "../locales/legal_content.json";
 import { openLegalPdf } from "../native/legalPdf";
 
@@ -44,7 +45,7 @@ export function persistTermsAccepted(): void {
 }
 
 export default function LegalModal({
-  open,
+  open: openProp,
   onClose,
   initialLanguage,
 }: {
@@ -55,23 +56,48 @@ export default function LegalModal({
   const [lang, setLang] = useState<LegalLang>(() =>
     typeof window === "undefined" ? "en" : toLegalLang(window.localStorage.getItem("language")),
   );
-  if (typeof initialLanguage === "string" && initialLanguage !== lang) setLang(initialLanguage);
+
+  // 语言同步：必须放在 effect 里。
+  // 以前写成 render 期间 `if (initialLanguage !== lang) setLang(...)` ——
+  // 那是"渲染中改状态"，React 会立刻重渲染，一旦父组件每次渲染都传新对象/新值，
+  // 就会陷入 "Too many re-renders" 直接白屏（用户遇到的"免责声明白屏/卡死"）。
+  useEffect(() => {
+    if (typeof initialLanguage === "string" && initialLanguage !== lang) {
+      setLang(initialLanguage);
+    }
+  }, [initialLanguage]);
+
+  const open = Boolean(openProp);
+
+  // 打开期间锁住背景滚动：否则弹层后面的页面会跟着手指滑，
+  // 关掉后位置全乱（"往下滚一段就白屏"的观感来源之一）。
+  useEffect(() => {
+    if (!open) return;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previous;
+    };
+  }, [open]);
 
   if (!open) return null;
   const doc = LEGAL_DATA[lang];
 
-  return (
-    <div className="fixed inset-0 z-50 flex flex-col justify-end" onClick={onClose}>
-      {/* 背景毛玻璃（不用黑色遮罩条，两侧不再出现黑边） */}
-      <div
-        className="absolute inset-0"
-        style={{ background: "rgba(0,0,0,0.22)", backdropFilter: "blur(6px)", WebkitBackdropFilter: "blur(6px)" }}
-      />
+  const content = (
+    <div className="fixed inset-0 z-[80] flex flex-col justify-end" onClick={onClose}>
+      {/* 遮罩：跟随主题（深色 dark scrim / 浅色 light scrim），不再写死 rgba(0,0,0,.22) */}
+      <div className="modal-scrim absolute inset-0" />
       <div
         role="dialog"
         aria-modal="true"
         aria-label={doc.docTitle}
-        className="legal-modal-sheet relative flex flex-col w-full h-[92vh] rounded-t-[28px] overflow-hidden"
+        className="legal-modal-sheet sheet-surface relative flex flex-col w-full overflow-hidden"
+        style={{
+          // dvh 而不是 vh：iOS 地址栏/键盘出现时 vh 不会收缩，会顶出屏幕
+          height: "min(92dvh, 92vh)",
+          borderRadius: "28px 28px 0 0",
+          paddingBottom: "env(safe-area-inset-bottom, 0px)",
+        }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* 标题 + 语言切换 */}
@@ -146,4 +172,12 @@ export default function LegalModal({
       </div>
     </div>
   );
+
+  // Portal 到 body：渲染在页面结构之外，彻底摆脱父级
+  // overflow / transform / z-index 层叠上下文的影响。
+  // 以前直接内联在 About 页面的滚动容器里，任何祖先只要带 transform 或
+  // overflow:hidden，fixed 就会被"关"在那个容器里 —— 表现为弹层只盖住半屏、
+  // 或者干脆看不见（用户报的"白屏/卡死"之一）。
+  if (typeof document === "undefined") return content;
+  return createPortal(content, document.body);
 }

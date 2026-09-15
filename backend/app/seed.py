@@ -13,8 +13,10 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .models import (
+    ClubApplication,
     ClubEvent,
     Course,
+    CourseMaterial,
     GlobalNotification,
     Post,
     PostComment,
@@ -450,6 +452,195 @@ async def seed_campus_if_empty(session: AsyncSession, author: User) -> bool:
             )
         )
 
+    await session.commit()
+    return True
+
+
+# =====================================================================
+# 课程资料（首页「最新资料」卡片）—— 独立判空
+# =====================================================================
+
+#: 演示资料。``hours_ago`` 越小越新 —— 首页卡片取的就是最新的那条。
+#: 文件名刻意做成「课程 - Lecture N.pdf」这种真实命名习惯（需求里的示例形状）。
+_DEMO_MATERIALS: list[dict] = [
+    {
+        "course_code": "CS 201",
+        "course_title": "Data Structures & Algorithms",
+        "professor_name": "Akhmetov N.T.",
+        "file_name": "Data Structures - Lecture 3.pdf",
+        "file_format": "PDF",
+        "size_label": "3.2 MB",
+        "pages": 48,
+        "hours_ago": 3,
+        "uploaded_by": "Akhmetov N.T.",
+    },
+    {
+        "course_code": "CS 201",
+        "course_title": "Data Structures & Algorithms",
+        "professor_name": "Akhmetov N.T.",
+        "file_name": "Assignment 3 - Starter Code",
+        "file_format": "ZIP",
+        "size_label": "12 MB",
+        "pages": None,
+        "hours_ago": 26,
+        "uploaded_by": "Akhmetov N.T.",
+    },
+    {
+        "course_code": "MATH 201",
+        "course_title": "Higher Mathematics II",
+        "professor_name": "Bekova A.K.",
+        "file_name": "Differential Equations - Lecture Notes",
+        "file_format": "PPT",
+        "size_label": "6 MB",
+        "pages": None,
+        "hours_ago": 30,
+        "uploaded_by": "Bekova A.K.",
+    },
+    {
+        "course_code": "PHYS 120",
+        "course_title": "Physics Lab",
+        "professor_name": "Serikova G.M.",
+        "file_name": "Experiment 2 data sheet",
+        "file_format": "XLS",
+        "size_label": "0.4 MB",
+        "pages": None,
+        "hours_ago": 52,
+        "uploaded_by": "Serikova G.M.",
+    },
+    {
+        "course_code": "MATH 150",
+        "course_title": "Linear Algebra",
+        "professor_name": "Akhmetov N.T.",
+        "file_name": "Linear Algebra and its Applications (4th ed.)",
+        "file_format": "PDF",
+        "size_label": "42 MB",
+        "pages": 714,
+        "hours_ago": 96,
+        "uploaded_by": "Library",
+    },
+    {
+        "course_code": "LANG 310",
+        "course_title": "English C1 — Academic Writing",
+        "professor_name": "Ivanova O.P.",
+        "file_name": "Academic Writing Handbook",
+        "file_format": "DOC",
+        "size_label": "0.8 MB",
+        "pages": 96,
+        "hours_ago": 120,
+        "uploaded_by": "Ivanova O.P.",
+    },
+]
+
+
+async def seed_materials_if_empty(session: AsyncSession) -> bool:
+    """插入演示课程资料；``course_materials`` 非空时跳过（幂等）。
+
+    独立判空是刻意的：线上的库早就有了 posts / 教授数据，
+    若和 ``seed_campus_if_empty`` 共用判空条件，新表永远补不上数据。
+    """
+    existing = await session.scalar(select(func.count(CourseMaterial.id)))
+    if existing:
+        return False
+
+    now = datetime.now(timezone.utc)
+    for spec in _DEMO_MATERIALS:
+        session.add(
+            CourseMaterial(
+                course_code=spec["course_code"],
+                course_title=spec["course_title"],
+                professor_name=spec["professor_name"],
+                file_name=spec["file_name"],
+                file_format=spec["file_format"],
+                size_label=spec["size_label"],
+                pages=spec["pages"],
+                uploaded_by=spec["uploaded_by"],
+                is_visible=True,
+                created_at=now - timedelta(hours=spec["hours_ago"]),
+            )
+        )
+    await session.commit()
+    return True
+
+
+# =====================================================================
+# 社团申请（Campus Hub → Clubs）—— 独立判空
+# =====================================================================
+
+#: 演示社团。``status`` 里混入一条 ``pending`` 是刻意的 ——
+#: 让管理员一进 /admin 就能看到"待审核"长什么样，而不是只看到已通过的。
+_DEMO_CLUBS: list[dict] = [
+    {
+        "club_name": "ACM Code Club",
+        "category": "tech",
+        "description": (
+            "Weekly competitive programming sessions, mock interviews and a "
+            "semester-long project team. Beginners welcome — we pair you with a mentor."
+        ),
+        "contact_name": "Campus Assistant",
+        "contact_telegram": "@acm_kaznu",
+        "status": "approved",
+        "days_ago": 12,
+    },
+    {
+        "club_name": "Dance Society",
+        "category": "arts",
+        "description": "Hip-hop, contemporary and folk dance crews. Open rehearsals every Thursday.",
+        "contact_name": "Campus Assistant",
+        "contact_telegram": "@kaznu_dance",
+        "status": "approved",
+        "days_ago": 8,
+    },
+    {
+        "club_name": "Debate Union",
+        "category": "academic",
+        "description": "Parliamentary debate training in EN / KZ / RU. We compete across Almaty.",
+        "contact_name": "Campus Assistant",
+        "contact_telegram": "@kaznu_debate",
+        "status": "approved",
+        "days_ago": 4,
+    },
+    {
+        "club_name": "Astro Photography Lab",
+        "category": "media",
+        "description": "Night-sky shoots from the observatory roof. Waiting for staff approval.",
+        "contact_name": "Campus Assistant",
+        "contact_telegram": "@astro_kaznu",
+        "status": "pending",
+        "days_ago": 1,
+    },
+]
+
+
+async def seed_clubs_if_empty(session: AsyncSession, author: User) -> bool:
+    """插入演示社团；``club_applications`` 非空时跳过（幂等）。
+
+    ``author`` 作为申请人（外键必须指向真实行）；线上早已建好超管账号，
+    所以直接复用，不额外造用户。
+    """
+    existing = await session.scalar(select(func.count(ClubApplication.id)))
+    if existing:
+        return False
+
+    now = datetime.now(timezone.utc)
+    for spec in _DEMO_CLUBS:
+        session.add(
+            ClubApplication(
+                user_id=author.id,
+                club_name=spec["club_name"],
+                category=spec["category"],
+                description=spec["description"],
+                contact_name=spec["contact_name"],
+                contact_telegram=spec["contact_telegram"],
+                status=spec["status"],
+                is_visible=True,
+                created_at=now - timedelta(days=spec["days_ago"]),
+                reviewed_at=(
+                    None
+                    if spec["status"] == "pending"
+                    else now - timedelta(days=spec["days_ago"])
+                ),
+            )
+        )
     await session.commit()
     return True
 

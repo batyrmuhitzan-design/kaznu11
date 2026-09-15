@@ -96,14 +96,14 @@ const FORMAT_BG: Record<string, string> = {
 const FORMAT_COLOR: Record<string, string> = {
   PDF: "#FF453A",
   PPT: "#FF9F0A",
-  DOC: "#409CFF",
+  DOC: "var(--accent-soft-text)",
   XLS: "#30D158",
   ZIP: "#7B79F7",
 };
 
 function FileIcon({ format }: { format: string }) {
   return (
-    <div className="w-10 h-10 squircle-sm flex items-center justify-center shrink-0" style={{ background: FORMAT_BG[format] ?? "rgba(255,255,255,0.08)", color: FORMAT_COLOR[format] ?? "#fff" }}>
+    <div className="w-10 h-10 squircle-sm flex items-center justify-center shrink-0" style={{ background: FORMAT_BG[format] ?? "var(--field-2)", color: FORMAT_COLOR[format] ?? "var(--tx-1)" }}>
       <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
         <path d="M6 2h8l6 6v12a2 2 0 01-2 2H6a2 2 0 01-2-2V4a2 2 0 012-2zm7 1.5V9h5.5L13 3.5zM8 13h8v-1H8v1zm0 3h8v-1H8v1zm0 3h5v-1H8v1z" />
       </svg>
@@ -301,25 +301,25 @@ export default function Materials({ onBack }: { onBack?: () => void }) {
           )}
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-xs font-medium" style={{ color: "rgba(235,235,245,0.5)" }}>{t("fall")} 2026</p>
+              <p className="text-xs font-medium" style={{ color: "var(--tx-4)" }}>{t("fall")} 2026</p>
               <h1 className="text-2xl font-bold text-white mt-0.5" style={{ letterSpacing: "-0.5px" }}>{t("courseMaterials")}</h1>
             </div>
-            <span className="px-2.5 py-1.5 rounded-full text-xs font-bold" style={{ background: "rgba(0,122,255,0.14)", color: "#409CFF", border: "1px solid rgba(0,122,255,0.25)", fontFamily: "JetBrains Mono" }}>
+            <span className="px-2.5 py-1.5 rounded-full text-xs font-bold" style={{ background: "var(--accent-soft-bg)", color: "var(--accent-soft-text)", border: "1px solid var(--accent-soft-border)", fontFamily: "JetBrains Mono" }}>
               {totalFiles}
             </span>
           </div>
 
           {/* 搜索 */}
-          <div className="flex items-center gap-2 px-3.5 py-2.5 squircle-md" style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.08)" }}>
+          <div className="field-surface flex items-center gap-2 px-3.5 py-2.5 squircle-md">
             <svg viewBox="0 0 20 20" fill="none" className="w-4 h-4 shrink-0">
-              <circle cx="9" cy="9" r="6" stroke="rgba(235,235,245,0.5)" strokeWidth="1.6" />
-              <path d="m13.5 13.5 3.5 3.5" stroke="rgba(235,235,245,0.5)" strokeWidth="1.6" strokeLinecap="round" />
+              <circle cx="9" cy="9" r="6" stroke="var(--tx-4)" strokeWidth="1.6" />
+              <path d="m13.5 13.5 3.5 3.5" stroke="var(--tx-4)" strokeWidth="1.6" strokeLinecap="round" />
             </svg>
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder={t("searchMaterials")}
-              className="flex-1 bg-transparent text-sm text-white outline-none placeholder:text-white/35"
+              className="flex-1 bg-transparent text-sm text-white outline-none placeholder:text-[color:var(--tx-7)]"
             />
           </div>
         </div>
@@ -341,12 +341,12 @@ export default function Materials({ onBack }: { onBack?: () => void }) {
                   <p className="text-sm font-bold text-white truncate">{section.course}</p>
                   <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full" style={{ background: `${section.color}1f`, color: section.color, fontFamily: "JetBrains Mono" }}>{section.code}</span>
                 </div>
-                <p className="text-xs mt-0.5 truncate" style={{ color: "rgba(235,235,245,0.5)" }}>{section.prof}</p>
+                <p className="text-xs mt-0.5 truncate" style={{ color: "var(--tx-4)" }}>{section.prof}</p>
               </div>
-              <span className="text-xs font-semibold shrink-0" style={{ color: "rgba(235,235,245,0.45)" }}>{section.files.length}</span>
+              <span className="text-xs font-semibold shrink-0" style={{ color: "var(--tx-5)" }}>{section.files.length}</span>
             </div>
 
-            <div className="divide-y divide-white/5 border-t border-white/5">
+            <div className="hairline-rows hairline-t">
               {section.files.map((file) => {
                 const isSaved = saved.has(file.id);
                 return (
@@ -355,7 +355,7 @@ export default function Materials({ onBack }: { onBack?: () => void }) {
                       <FileIcon format={file.format} />
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-semibold text-white truncate">{file.name}</p>
-                        <p className="text-[11px] mt-0.5" style={{ color: "rgba(235,235,245,0.45)", fontFamily: "JetBrains Mono" }}>
+                        <p className="text-[11px] mt-0.5" style={{ color: "var(--tx-5)", fontFamily: "JetBrains Mono" }}>
                           {file.format} · {file.size}
                           {file.pages ? ` · ${file.pages} pp` : ""} · {file.date}
                         </p>
@@ -366,9 +366,9 @@ export default function Materials({ onBack }: { onBack?: () => void }) {
                           aria-valuenow={active.progress}
                           aria-label={`${active.progress}%`}
                           className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 squircle-xs text-xs font-bold"
-                          style={{ background: "rgba(0,122,255,0.12)", color: "#409CFF", border: "1px solid rgba(0,122,255,0.3)" }}
+                          style={{ background: "var(--accent-soft-bg)", color: "var(--accent-soft-text)", border: "1px solid var(--accent-soft-border)" }}
                         >
-                          <span className="inline-block w-3 h-3 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: "#409CFF", borderTopColor: "transparent" }} />
+                          <span className="inline-block w-3 h-3 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: "var(--accent-soft-text)", borderTopColor: "transparent" }} />
                           {active.progress}%
                         </span>
                       ) : (
@@ -379,9 +379,9 @@ export default function Materials({ onBack }: { onBack?: () => void }) {
                           data-haptic="heavy"
                           className="haptic-action shrink-0 flex items-center gap-1.5 px-3 py-1.5 squircle-xs text-xs font-bold transition-all active:scale-95"
                           style={{
-                            background: isSaved ? "rgba(48,209,88,0.16)" : "rgba(0,122,255,0.16)",
-                            color: isSaved ? "#30D158" : "#409CFF",
-                            border: `1px solid ${isSaved ? "rgba(48,209,88,0.3)" : "rgba(0,122,255,0.3)"}`,
+                            background: isSaved ? "rgba(48,209,88,0.16)" : "var(--accent-soft-bg)",
+                            color: isSaved ? "var(--success)" : "var(--accent-soft-text)",
+                            border: `1px solid ${isSaved ? "rgba(48,209,88,0.3)" : "var(--accent-soft-border)"}`,
                           }}
                         >
                           <DownloadIcon filled={isSaved} />
@@ -391,7 +391,7 @@ export default function Materials({ onBack }: { onBack?: () => void }) {
                     </div>
                     {active && active.id === file.id ? (
                       <div className="px-4 pb-3.5">
-                        <div className="h-1.5 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.08)" }}>
+                        <div className="h-1.5 rounded-full overflow-hidden" style={{ background: "var(--field-2)" }}>
                           <div
                             className="h-full rounded-full"
                             style={{
