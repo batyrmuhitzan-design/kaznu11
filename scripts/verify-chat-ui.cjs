@@ -289,6 +289,22 @@ if (/class MessageAdmin\(ModelView, model=Message\)/.test(adminUiPy) && /add_mod
   ok("管理端: 私信内容审核（MessageAdmin）已挂载");
 } else bad("管理端: 私信审核视图缺失/未挂载");
 
+// 管理端私信列表**必须有数据时也不崩**：格式化函数要读 message.sender / conversation.user_a，
+// 行对象在模板渲染时已脱离 Session → 直接访问会 DetachedInstanceError → 整页 500
+// （线上实测踩到；本地空表不会触发格式化函数，所以空库测试一直是绿的）。
+if (/selectinload\(Message\.conversation\)/.test(adminUiPy) && /def list_query\(self, request/.test(adminUiPy)) {
+  ok("管理端: 私信列表/详情预加载 sender + conversation.user_a/b（否则有数据就 500）");
+} else bad("管理端: 缺少关联预加载 —— 私信审核页有数据时会 500");
+
+if (/sa_inspect\(model\)\.unloaded/.test(adminUiPy) && /sa_inspect\(conversation\)/.test(adminUiPy) && /state\.unloaded/.test(adminUiPy)) {
+  ok("管理端: 格式化函数有未加载兜底（宁可少显示名字也不能整页 500）");
+} else bad("管理端: 格式化函数没有兜底，脱离 Session 时会 500");
+
+// ⚠️ 这一版 sqladmin 的 list_query 是方法：写成类属性会 TypeError: 'Select' object is not callable
+if (!/^\s*list_query = select\(/m.test(adminUiPy)) {
+  ok("管理端: list_query 用的是方法重载（不是类属性，否则 TypeError）");
+} else bad("管理端: list_query 被写成了类属性 —— sqladmin 会抛 'Select' object is not callable");
+
 // —— ③ Campus 离线发件箱 ——
 const enqueueCalls = (campusService.match(/enqueueOutbox\(\{/g) || []).length;
 if (enqueueCalls >= 3) {
