@@ -34,6 +34,9 @@ os.environ["SUPER_ADMIN_USERNAME"] = "admin@1losion.me"
 os.environ["SUPER_ADMIN_PASSWORD"] = "admin123456"
 os.environ["ADMIN_SESSION_SECRET"] = "check-admin-session-secret"
 
+SUPER_ADMIN_USERNAME = "admin@1losion.me"
+SUPER_ADMIN_PASSWORD = "admin123456"
+
 import httpx  # noqa: E402
 
 import main as entrypoint  # noqa: E402  ← 被测对象：仓库根 main.py（线上 uvicorn main:app 用的入口）
@@ -129,6 +132,38 @@ async def _run() -> None:
             ok("/admin/login → 200 登录页可渲染")
         else:
             bad(f"/admin/login → {login.status_code}")
+
+        # ---- 2b) 管理端视图真的挂上了（不是"代码里写了 add_model_view"就算数）----
+        # ⚠️ 必须先登录：SQLAdmin 的认证中间件在**路由匹配之前**就把匿名请求 302 到
+        # 登录页，所以未登录时"不存在的视图"也返回 302 —— 那时 302/404 无法区分。
+        # 登录后：已挂载的视图 → 200，编造的 identity → 404（对照组才成立）。
+        signed_in = await client.post(
+            "/admin/login",
+            data={"username": SUPER_ADMIN_USERNAME, "password": SUPER_ADMIN_PASSWORD},
+            follow_redirects=False,
+        )
+        if signed_in.status_code in (302, 303) and "session" in str(signed_in.cookies):
+            ok(f"管理后台登录成功（{signed_in.status_code}，已拿到会话 cookie）")
+        else:
+            bad(f"管理后台登录失败：{signed_in.status_code} {signed_in.text[:120]}")
+
+        expected_views = {
+            "/admin/message/list": "私信内容审核（Message）",
+            "/admin/global-notification/list": "全校通知（GlobalNotification）",
+            "/admin/post-comment/list": "校园墙评论（PostComment）",
+        }
+        for path, label in expected_views.items():
+            res = await client.get(path, follow_redirects=False)
+            if res.status_code == 200:
+                ok(f"{path} → 200（{label} 视图已挂载）")
+            else:
+                bad(f"{path} → {res.status_code}（{label} 视图**没挂上**）")
+
+        control = await client.get("/admin/definitely-not-a-view/list", follow_redirects=False)
+        if control.status_code == 404:
+            ok("/admin/definitely-not-a-view/list → 404（对照组成立，上面的断言有效）")
+        else:
+            bad(f"对照视图竟然返回 {control.status_code} —— 上面的断言不可信")
 
         # ---- 3) /healthz ----
         health = (await client.get("/healthz")).json()

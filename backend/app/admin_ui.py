@@ -1101,11 +1101,10 @@ def setup_admin_ui(app) -> Admin:
     admin.add_model_view(MessageAdmin)
     # 课程资料（首页「最新资料」卡片 / Materials 页）
     admin.add_model_view(CourseMaterialAdmin)
-    print(
-        "[kaznu] SQLAdmin 管理后台已挂载: /admin"
-        " （Users / Admin Applications / Professors / Courses / Course Materials / Reviews"
-        " / Reports / Posts / Post Comments / Club Events / Club Applications / Global Notifications）"
-    )
+    # 视图清单**从实际挂载结果生成**：之前这行是手写死的字符串，加了 MessageAdmin
+    # 之后日志里没有它 —— 排查"管理端看不到私信"时会被这行日志误导（踩过）。
+    mounted = " / ".join(str(view.name_plural) for view in admin.views)
+    print(f"[kaznu] SQLAdmin 管理后台已挂载: /admin （{mounted}）")
     print(
         "[kaznu] 管理后台语言: "
         + " / ".join(ADMIN_LOCALES)

@@ -590,6 +590,30 @@ async def _run_websocket(alice: str, bob: str, staff: str, ids: dict[str, str]) 
             return {"type": "__timeout__"}
         return json.loads(raw)
 
+    async def recv_type(sock, kind: str, label: str) -> dict:
+        """等到一个指定 type 的帧，途中的其它帧直接丢弃。
+
+        为什么需要它：一个动作可能往同一连接推**多个**帧（例：管理员下架消息后，
+        ws_a 上先来 ``message-deleted``，随后才是对下一条请求的 ``error`` 回复）。
+        按"收一帧就对答案"的写法，谁先到就成败不定 —— 本文件之前就是**偶发失败**
+        （同一份代码连跑两次 FAIL / PASS），真根因在此，不是被测代码的问题。
+        """
+        loop = asyncio.get_event_loop()
+        deadline = loop.time() + 10
+        while True:
+            left = deadline - loop.time()
+            if left <= 0:
+                bad(f"WS 等待 {kind} 超时（10s）：{label}")
+                return {"type": "__timeout__"}
+            try:
+                raw = await asyncio.wait_for(sock.recv(), timeout=left)
+            except asyncio.TimeoutError:
+                bad(f"WS 等待 {kind} 超时（10s）：{label}")
+                return {"type": "__timeout__"}
+            frame = json.loads(raw)
+            if frame.get("type") == kind:
+                return frame
+
     async def rest(method: str, path: str, token: str) -> httpx.Response:
         """本函数里也要打几个 REST 接口（撤回 / 历史），单独开一个短连接客户端。
 
@@ -727,11 +751,19 @@ async def _run_websocket(alice: str, bob: str, staff: str, ids: dict[str, str]) 
                 else:
                     bad(f"本人撤回失败：{deleted.status_code} {deleted.text[:120]}")
 
-                frame = await recv_json(ws_b, "message-deleted@bob")
+                frame = await recv_type(ws_b, "message-deleted", "message-deleted@bob")
                 if frame.get("type") == "message-deleted" and frame.get("message_id") == recalled_id:
                     ok("撤回帧实时推给对端（对方 UI 立即变占位文案）")
                 else:
                     bad(f"撤回帧异常：{frame}")
+
+                # 自己这边也要收到帧：不然用户多设备/多标签页之间会不一致
+                # （顺带把它从缓冲区读掉，避免污染后面的断言）
+                mine = await recv_type(ws_a, "message-deleted", "message-deleted@alice")
+                if mine.get("message_id") == recalled_id and mine.get("deleted_by") == "user":
+                    ok("撤回帧同样推给发送者自己（多端状态一致）")
+                else:
+                    bad(f"发送者没收到自己撤回的帧：{mine}")
 
                 history = await rest(
                     "GET", f"/api/v1/chat/conversations/{conversation_id}/messages?limit=50", alice
@@ -773,20 +805,38 @@ async def _run_websocket(alice: str, bob: str, staff: str, ids: dict[str, str]) 
                         ok("staff 可下架任意私信（deleted_by=staff，与后台审核同一条接口）")
                     else:
                         bad(f"staff 下架失败：{staff_delete.status_code} {staff_delete.text[:120]}")
+
+                    # 下架帧必须推给**双方**：发送者自己的其它设备也要立刻变灰
+                    # （顺带把这两帧从缓冲区读掉，否则会污染紧随其后的 error 断言）
+                    for sock, who in ((ws_a, "发送者"), (ws_b, "接收方")):
+                        takedown = await recv_type(sock, "message-deleted", f"staff-delete@{who}")
+                        if (
+                            takedown.get("message_id") == target2
+                            and takedown.get("deleted_by") == "staff"
+                        ):
+                            ok(f"管理员下架帧实时推给{who}（deleted_by=staff）")
+                        else:
+                            bad(f"{who} 收到的下架帧异常：{takedown}")
             else:
                 bad("撤回用例：拿不到刚发送消息的 id")
 
             # ---- 异常输入不能把连接搞崩
             await ws_a.send(json.dumps({"type": "definitely-not-a-thing"}))
-            if (await recv_json(ws_a, "unknown-event")).get("type") == "error":
-                ok("未知事件返回 error 且连接存活")
+            unknown = await recv_type(ws_a, "error", "unknown-event")
+            # ⚠️ 这里断言的是"必须回一个 error 帧、连接还活着"，而不是具体 reason：
+            # 未知事件若没带 conversation_id，服务端会先撞上"缺会话"校验，
+            # 于是 reason 是 missing-conversation。之前写死断言 unknown-event，
+            # 结果是**偶发失败**（谁先到不定），还掩盖了真实行为。
+            if unknown.get("type") == "error" and unknown.get("reason"):
+                ok(f"未知事件返回 error 且连接存活（reason={unknown['reason']}）")
             else:
-                bad("未知事件未返回 error")
+                bad(f"未知事件未返回 error：{unknown}")
             await ws_a.send(json.dumps({"type": "read", "conversation_id": "does-not-exist"}))
-            if (await recv_json(ws_a, "bad-conversation")).get("reason") == "conversation-not-found":
+            missing = await recv_type(ws_a, "error", "bad-conversation")
+            if missing.get("reason") == "conversation-not-found":
                 ok("非法会话 id 返回 conversation-not-found")
             else:
-                bad("非法会话 id 未返回预期 error")
+                bad(f"非法会话 id 未返回预期 error：{missing}")
 
 
 async def _whoami(token: str) -> str:

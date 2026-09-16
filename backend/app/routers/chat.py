@@ -529,17 +529,18 @@ async def delete_message(
             conversation.last_message_preview = "🚫"
     await session.commit()
 
-    # 告知**对方**（若在线）这条消息被撤回了，对方 UI 立即把它替换成占位文案
-    peer_id = conversation.peer_of(current.id)
-    await manager.send_to_user(
-        peer_id,
-        {
-            "type": "message-deleted",
-            "conversation_id": message.conversation_id,
-            "message_id": message.id,
-            "deleted_by": message.deleted_by,
-        },
-    )
+    # 告知会话**双方**（若在线）这条消息被撤回了，UI 立即替换成占位文案。
+    # ⚠️ 不能用 ``peer_of(current.id)``：管理员下架时 current 并不是会话参与者，
+    #    peer_of 只会返回其中一个学生 —— 另一个学生直到重进会话才看到"已撤回"，
+    #    也就是"管理端点下架，App 里没反应"。改成遍历会话的两个参与者。
+    frame = {
+        "type": "message-deleted",
+        "conversation_id": message.conversation_id,
+        "message_id": message.id,
+        "deleted_by": message.deleted_by,
+    }
+    for participant_id in {conversation.user_a_id, conversation.user_b_id}:
+        await manager.send_to_user(participant_id, frame)
     return {
         "message": "Message deleted.",
         "id": message.id,
