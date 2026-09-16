@@ -365,6 +365,28 @@ curl -s https://1losion.me/openapi.json | grep -c '/api/v1/reviews'
 浏览器打开 `https://1losion.me/docs`（应能看到 professors / courses / reviews / admin / super-admin / reports 分组）
 与 `https://1losion.me/admin`（账号密码见下）。
 
+### 线上验证（部署后必做，两个脚本）
+```bash
+# 1) 本地跑：真 WebSocket + 真推送 + 私信撤回（打 https://1losion.me）
+python backend/tests/check_live_e2e.py
+
+# 2) 服务器跑：迁移补列 / 后台审核页 / /app 静态站是否换新
+scp backend/tests/check_live_server.py kaznu:/tmp/check_deploy.py
+ssh kaznu "python3 /tmp/check_deploy.py"
+```
+
+为什么这两个不能省（本地自检证明不了的事）：
+
+| 事实 | 本地测试为什么证明不了 |
+|---|---|
+| `global_notifications.pushed_at` / `messages.deleted_by` 真的被 ALTER 到线上老库上了 | 本地临时库永远是**新 schema**，`create_all` 不给已存在的表加列；缺列时广播推送与撤回都会 500 |
+| 广播帧经过 nginx + 真 WS 后仍带 `delivery_id` / `pushed_at` | 本地是桩 socket，只证明逻辑对；而 App 的弹窗/响铃**只认这两个字段** |
+| `/app` 里是**这次**构建的资源 | 静态站是 `cap sync` / 手工上传的产物，与 `git push` 无关（本地另有 `npm run verify:ios-bundle` 查 iOS 工程） |
+
+⚠️ `check_live_e2e.py` 会写生产数据（2 条全校广播 + 1 条私信），所以它**自己清理**：
+广播跑完自动下线（`is_active=0` → 真机不再显示），断言失败也照样清理；清理失败判为失败并打印手动下线链接。
+不会删行（留审计痕迹）——后台 Global Notifications 里能看到 `E2E 广播 A/B · <时间戳>` 这两条已停用的记录，可手工删除。
+
 > **管理后台登录凭据（实测确认）**
 >
 > | 部署方式 | 用户名 | 密码 |
