@@ -32,9 +32,11 @@ from .models import (
     AdminApplication,
     ClubApplication,
     ClubEvent,
+    Conversation,
     Course,
     CourseMaterial,
     GlobalNotification,
+    Message,
     Post,
     PostComment,
     Professor,
@@ -47,8 +49,10 @@ from .push import (
     announce_club_event,
     dispatch_alert,
     notify_user,
+    push_existing_notification,
 )
 from .push_payload import build_broadcast_payload
+from .realtime import manager
 
 SESSION_KEY = "kaznu_admin_user"
 
@@ -713,17 +717,20 @@ class GlobalNotificationAdmin(ModelView, model=GlobalNotification):
         add_in_detail=True,
     )
     async def push_notifications(self, request: Request) -> RedirectResponse:
-        """立刻把这条通知**推送到全量设备**（APNs 系统横幅，App 被划掉也能收到）。
+        """立刻把这条通知**推送到全量设备**（APNs 系统横幅 + WebSocket 实时帧）。
 
         为什么需要这个动作（而不是"新建即推送"）
         ----------------------------------------
-        * 以前在后台**新建一行**只写数据库，App 只能靠 45s 前台轮询才看得到
-          → 杀掉 App 就完全收不到；
+        * 在后台**新建一行**只写数据库，App 只能靠 45s 前台轮询才看得到；
         * 但也不能"保存即推送" —— 管理员常常先存草稿、改好文案再发，误推收不回来。
 
-        所以做成**显式动作**：勾选 → 📣 Push now → 同时把 ``is_active`` 打开
-        （在线用户立刻看到顶部通知栏）+ APNs 扇出给全量设备
-        （离线 / 被杀的用户走系统横幅，参照微信来消息体验）。
+        所以做成**显式动作**：勾选 → 📣 Push now →
+          · 打开 ``is_active``（在线用户立刻看到顶部通知栏）
+          · **WebSocket 实时帧**（在线设备秒到，带新的 delivery_id）
+          · APNs 扇出（离线 / 被杀掉的用户走系统横幅，参照微信来消息体验）
+
+        每次点击都会写入新的 ``pushed_at`` 并生成新的 delivery_id，
+        所以**重复推送仍会响铃 + 弹窗**（客户端按投递 id 去重，而不是按通知 id）。
 
         未配置 APNs 凭据时**不报错**：``dispatch_alert`` 如实返回 ``targets=0``，
         数据库与在线通路照常生效（这也是没有付费开发者账号时的预期行为）。
@@ -734,16 +741,7 @@ class GlobalNotificationAdmin(ModelView, model=GlobalNotification):
                 item = await session.get(GlobalNotification, pk)
                 if item is None:
                     continue
-                item.is_active = True
-                await session.commit()
-                payload = build_broadcast_payload(
-                    title=item.title,
-                    message=item.message,
-                    level=item.level,
-                    notification_id=item.id,
-                )
-                targets = await all_push_targets(session)
-                await dispatch_alert(session, targets=targets, payload_for=lambda _t, p=payload: p)
+                await push_existing_notification(session, item)
         return _redirect(request, self.identity)
 
 
@@ -931,6 +929,131 @@ class ClubApplicationAdmin(ModelView, model=ClubApplication):
         return await self._decide(request, approve=False)
 
 
+def _chat_sender_label(model: Message, _attr: str) -> str:
+    """私信发送者（管理端要能追责，这里显示全局显示名 + 学号）。"""
+    sender = model.sender
+    if sender is None:
+        return "—"
+    name = sender.global_display_name or "—"
+    return f"{name} (@{sender.univer_username})"
+
+
+def _chat_conversation_label(model: Message, _attr: str) -> str:
+    """会话参与者摘要（a ↔ b），让人一眼看懂这条私信在谁和谁之间。"""
+    conversation = model.conversation
+    if conversation is None:
+        return model.conversation_id or "—"
+    a = conversation.user_a
+    b = conversation.user_b
+    if a is None or b is None:
+        return conversation.id
+    return f"{a.global_display_name} ↔ {b.global_display_name}"
+
+
+class MessageAdmin(ModelView, model=Message):
+    """admin & super_admin：**私信内容审核**（查看 / 下架违规私信）。
+
+    为什么私信也要进后台
+    --------------------
+    私信是用户生成内容里**最容易出问题**的部分（骚扰、诈骗、交易）。
+    之前没有任何后台可见性 —— 用户举报了也无从核实。
+    这里把最近的消息按时间倒序列出，支持按正文搜索、一键下架（软删除，
+    对方 App 立刻显示"消息已被撤回"）+ 恢复。
+    """
+
+    name = L("Chat Message")
+    name_plural = L("Chat Messages")
+    category = L("Campus Hub")
+    icon = "fa-solid fa-comment-sms"
+
+    can_create = False
+    can_edit = False
+    can_delete = True
+
+    column_list = [
+        Message.id,
+        Message.conversation,
+        Message.sender,
+        Message.body,
+        Message.media_urls,
+        Message.is_deleted,
+        Message.deleted_by,
+        Message.created_at,
+    ]
+    column_labels = make_column_labels(
+        {
+            Message.id: "ID",
+            Message.conversation: "Conversation",
+            Message.sender: "Chat Sender",
+            Message.body: "Message Body",
+            Message.media_urls: "Media",
+            Message.is_deleted: "Deleted",
+            Message.deleted_by: "Deleted By",
+            Message.read_at: "Read At",
+            Message.created_at: "Sent At",
+        }
+    )
+    column_formatters = {
+        Message.conversation: _chat_conversation_label,
+        Message.sender: _chat_sender_label,
+    }
+    column_searchable_list = [Message.body]
+    column_default_sort = [("created_at", True)]
+    page_size = 40
+
+    def is_accessible(self, request: Request) -> bool:
+        return _allowed(request, STAFF_ROLES)
+
+    @action(
+        name="hide-message",
+        label=L("🙈 Take down"),
+        confirmation_message=L("Take down the selected messages? The sender and receiver will both see “message recalled”."),
+        add_in_detail=True,
+    )
+    async def hide_messages(self, request: Request) -> RedirectResponse:
+        """下架违规私信（软删除，保留审计）：双方 UI 立即可见"已撤回"。"""
+        pks = [pk for pk in request.query_params.get("pks", "").split(",") if pk]
+        async with self.session_maker() as session:
+            for pk in pks:
+                row = await session.get(Message, pk)
+                if row is None or row.is_deleted:
+                    continue
+                row.is_deleted = True
+                row.deleted_by = "staff"
+                await session.commit()
+                conversation = await session.get(Conversation, row.conversation_id)
+                if conversation is not None:
+                    for participant in (conversation.user_a_id, conversation.user_b_id):
+                        await manager.send_to_user(
+                            participant,
+                            {
+                                "type": "message-deleted",
+                                "conversation_id": row.conversation_id,
+                                "message_id": row.id,
+                                "deleted_by": "staff",
+                            },
+                        )
+        return _redirect(request, self.identity)
+
+    @action(
+        name="restore-message",
+        label=L("♻️ Restore"),
+        confirmation_message=L("Restore the selected messages?"),
+        add_in_detail=True,
+    )
+    async def restore_messages(self, request: Request) -> RedirectResponse:
+        pks = [pk for pk in request.query_params.get("pks", "").split(",") if pk]
+        async with self.session_maker() as session:
+            for pk in pks:
+                row = await session.get(Message, pk)
+                if row is None:
+                    continue
+                row.is_deleted = False
+                row.deleted_by = None
+            await session.commit()
+        return _redirect(request, self.identity)
+
+
 def setup_admin_ui(app) -> Admin:
     """挂载 SQLAdmin 管理后台到 /admin（含 EN / RU / ZH 语言切换器）。"""
     secret = settings.admin_session_secret or settings.anon_hash_secret
@@ -974,6 +1097,8 @@ def setup_admin_ui(app) -> Admin:
     admin.add_model_view(ClubEventAdmin)
     admin.add_model_view(GlobalNotificationAdmin)
     admin.add_model_view(ClubApplicationAdmin)
+    # 私信审核（用户生成内容里最容易出问题的部分：骚扰 / 诈骗 / 交易）
+    admin.add_model_view(MessageAdmin)
     # 课程资料（首页「最新资料」卡片 / Materials 页）
     admin.add_model_view(CourseMaterialAdmin)
     print(

@@ -17,7 +17,9 @@ import { useToast } from "../contexts/ToastContext";
 import { hapticTap, motorHaptic } from "../utils/haptics";
 import { useKeyboardOpen } from "../utils/keyboard";
 import {
+  applyMessageDeleted,
   createClientId,
+  deleteChatMessage,
   mergeMessage,
   chatOutboxSize,
   getChatUnread,
@@ -298,6 +300,9 @@ export function ChatDetail({
   const [uploading, setUploading] = useState(false);
   const [preview, setPreview] = useState<string | null>(null);
   const [connection, setConnection] = useState<ChatConnectionState>("idle");
+  /** 待确认撤回的消息 id（长按自己的气泡后弹底部确认条） */
+  const [recallTarget, setRecallTarget] = useState<string | null>(null);
+  const [recalling, setRecalling] = useState(false);
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const fileRef = useRef<HTMLInputElement | null>(null);
   const typingTimer = useRef<number | undefined>(undefined);
@@ -360,6 +365,11 @@ export function ChatDetail({
           );
           return;
         }
+        // 撤回 / 管理员下架：立即把气泡换成占位文案（两端都实时生效）
+        if (event.type === "message-deleted" && event.conversation_id === conversation.id) {
+          setMessages((prev) => applyMessageDeleted(prev, event.message_id));
+          return;
+        }
         if (event.type === "typing" && event.conversation_id === conversation.id) {
           setPeerTyping(true);
           window.clearTimeout(typingTimer.current);
@@ -370,6 +380,22 @@ export function ChatDetail({
   );
 
   useEffect(() => subscribeChatConnection(setConnection), []);
+
+  /** 确认撤回：调接口 → 本地立刻替换成占位（对方通过 WS 帧同步） */
+  const confirmRecall = async () => {
+    const messageId = recallTarget;
+    if (!messageId || recalling) return;
+    setRecalling(true);
+    const result = await deleteChatMessage(messageId);
+    setRecalling(false);
+    setRecallTarget(null);
+    if (result.ok) {
+      motorHaptic();
+      setMessages((prev) => applyMessageDeleted(prev, messageId));
+    } else {
+      toast.push(t("chatRecallFailed"), "error");
+    }
+  };
 
   // 键盘弹出：把最新消息顶进可视区（否则输入条会盖住最后一条）
   useEffect(() => {
@@ -500,6 +526,10 @@ export function ChatDetail({
               previous={index > 0 ? messages[index - 1] : undefined}
               isLast={index === messages.length - 1}
               onOpenImage={setPreview}
+              onRecall={(messageId) => {
+                hapticTap();
+                setRecallTarget(messageId);
+              }}
             />
           ))
         )}
@@ -591,6 +621,38 @@ export function ChatDetail({
       </div>
 
       {/* 图片放大预览 */}
+      {/* 撤回确认（底部动作条）：避免误触 —— 长按自己的气泡才会出现 */}
+      {recallTarget && (
+        <div
+          className="absolute inset-0 z-[75] flex items-end justify-center"
+          style={{ background: "var(--scrim)" }}
+          onClick={() => setRecallTarget(null)}
+        >
+          <div
+            className="w-full glass squircle-lg p-4 pb-[max(16px,env(safe-area-inset-bottom))]"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <p className="text-xs text-center theme-muted mb-3">{t("chatTapToRecall")}</p>
+            <button
+              type="button"
+              onClick={() => void confirmRecall()}
+              disabled={recalling}
+              className="haptic-action w-full py-3.5 squircle-sm text-sm font-bold disabled:opacity-50"
+              style={{ background: "rgba(239,68,68,0.16)", color: "var(--danger)" }}
+            >
+              🚫 {recalling ? "…" : t("chatRecall")}
+            </button>
+            <button
+              type="button"
+              onClick={() => setRecallTarget(null)}
+              className="haptic-action w-full mt-2 py-3 squircle-sm text-sm font-semibold theme-secondary"
+            >
+              {t("cancel")}
+            </button>
+          </div>
+        </div>
+      )}
+
       {preview && (
         <button
           type="button"
@@ -619,16 +681,21 @@ function MessageRow({
   previous,
   isLast,
   onOpenImage,
+  onRecall,
 }: {
   message: ChatMessage;
   previous?: ChatMessage;
   isLast: boolean;
   onOpenImage: (url: string) => void;
+  /** 长按自己的消息 → 请求撤回（由 ChatDetail 弹确认后调接口） */
+  onRecall: (messageId: string) => void;
 }) {
   const t = useI18n();
   const mine = message.is_mine;
   const newDay = isNewDay(previous, message);
   const showTime = isQuietGap(previous, message);
+  /** 长按计时器：移动/抬手立即取消（避免"滑动列表时误触撤回"） */
+  const longPressTimer = useRef(0);
 
   const status = mine
     ? message.queued
@@ -652,24 +719,52 @@ function MessageRow({
       )}
 
       <div className={`chat-row${mine ? " is-mine" : ""}`}>
-        {message.media_urls.length > 0 && (
-          <div className="chat-photos">
-            {message.media_urls.map((url) => (
-              <button
-                type="button"
-                key={url}
-                onClick={() => {
-                  hapticTap();
-                  onOpenImage(url);
-                }}
-                className="haptic-action"
-              >
-                <img src={url} alt="" loading="lazy" className="chat-photo" />
-              </button>
-            ))}
+        {message.is_deleted ? (
+          // 撤回 / 被管理员下架：不显示原文与图片，只留一条占位（保留时间线，避免历史跳号）
+          <div className="chat-bubble chat-bubble-recalled">
+            🚫 {message.is_mine ? t("chatRecalled") : t("chatRecalledByModerator")}
           </div>
+        ) : (
+          <>
+            {message.media_urls.length > 0 && (
+              <div className="chat-photos">
+                {message.media_urls.map((url) => (
+                  <button
+                    type="button"
+                    key={url}
+                    onClick={() => {
+                      hapticTap();
+                      onOpenImage(url);
+                    }}
+                    className="haptic-action"
+                  >
+                    <img src={url} alt="" loading="lazy" className="chat-photo" />
+                  </button>
+                ))}
+              </div>
+            )}
+            {message.body && (
+              // 长按自己的消息 → 撤回（对方与我这边都会变成占位文案）
+              <div
+                className="chat-bubble"
+                onContextMenu={(event) => {
+                  if (!mine || message.pending || message.queued) return;
+                  event.preventDefault();
+                  onRecall(message.id);
+                }}
+                onTouchStart={() => {
+                  if (!mine || message.pending || message.queued) return;
+                  longPressTimer.current = window.setTimeout(() => onRecall(message.id), 550);
+                }}
+                onTouchEnd={() => window.clearTimeout(longPressTimer.current)}
+                onTouchMove={() => window.clearTimeout(longPressTimer.current)}
+                onTouchCancel={() => window.clearTimeout(longPressTimer.current)}
+              >
+                {message.body}
+              </div>
+            )}
+          </>
         )}
-        {message.body && <div className="chat-bubble">{message.body}</div>}
         {(status || (isLast && !mine && message.created_at)) && (
           <span className="chat-status">
             {status || clockTime(message.created_at)}

@@ -20,6 +20,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import os
 import sys
 import tempfile
@@ -52,7 +53,9 @@ from app.admin_ui import (  # noqa: E402
 )
 from app.bootstrap import ensure_super_admin  # noqa: E402
 from app.database import SessionLocal, init_db  # noqa: E402
-from app.models import GlobalNotification, Post  # noqa: E402
+from app.models import GlobalNotification, Post, User  # noqa: E402
+from app.push import push_existing_notification  # noqa: E402
+from app.realtime import manager  # noqa: E402
 from app.seed import seed_campus_if_empty, seed_if_empty  # noqa: E402
 
 USERNAME = os.environ["SUPER_ADMIN_USERNAME"]
@@ -287,6 +290,72 @@ async def _run() -> None:
                 ok("未登录点赞 → 401")
             else:
                 bad(f"未登录点赞返回 {unauth_like.status_code}（应为 401）")
+
+        # ---- 10b) 全校广播：投递 id / pushed_at / 重复推送仍算"新投递" ----
+        # 直接检查 WS 帧内容（用桩连接，不需要真起 WS 服务端）：这是"App 弹窗 + 响铃"
+        # 能否生效的关键 —— 客户端按 delivery_id 去重，重复推送必须拿到**不同的** id。
+        class _FakeSocket:
+            def __init__(self) -> None:
+                self.frames: list[dict] = []
+
+            async def send_text(self, text: str) -> None:
+                self.frames.append(json.loads(text))
+
+        async with SessionLocal() as session:
+            admin_user = await session.scalar(
+                select(User).where(User.univer_username == USERNAME)
+            )
+            sock = _FakeSocket()
+            await manager.connect(admin_user.id, sock)
+            try:
+                broadcast = await anon.post(
+                    "/api/v1/notifications/broadcast",
+                    headers=auth,
+                    json={
+                        "title": "E2E 广播",
+                        "message": "这条用来验证投递 id 与 pushed_at",
+                        "level": "warning",
+                    },
+                )
+                body = broadcast.json() if broadcast.status_code == 200 else {}
+                frames = [f for f in sock.frames if f.get("type") == "broadcast"]
+                first_delivery = (
+                    (frames[0].get("broadcast") or {}).get("delivery_id") if frames else None
+                )
+                if broadcast.status_code == 200 and first_delivery:
+                    ok(f"广播 → 200 且 WS 帧带 delivery_id（{first_delivery.split(':')[-1]}）")
+                else:
+                    bad(f"广播未带 delivery_id：{broadcast.status_code} {sock.frames[:1]}")
+
+                latest = (await anon.get("/api/v1/notifications/latest")).json()
+                if isinstance(latest, dict) and latest.get("pushed_at"):
+                    ok("GET /notifications/latest 返回 pushed_at（前端据此识别'又被推了一次'）")
+                else:
+                    bad(f"/notifications/latest 缺 pushed_at：{latest}")
+
+                # 管理端「📣 Push now」：同一条通知再推一次 → delivery_id 必须不同
+                if body.get("id"):
+                    row = await session.scalar(
+                        select(GlobalNotification).where(GlobalNotification.id == body["id"])
+                    )
+                    sock.frames.clear()
+                    await push_existing_notification(session, row)
+                    frames2 = [f for f in sock.frames if f.get("type") == "broadcast"]
+                    second_delivery = (
+                        (frames2[0].get("broadcast") or {}).get("delivery_id") if frames2 else None
+                    )
+                    if second_delivery and second_delivery != first_delivery:
+                        ok("重复推送产生**新的** delivery_id（App 会再次弹窗 + 响铃）")
+                    else:
+                        bad(f"重复推送仍是同一个 delivery_id（{second_delivery}）→ 会被客户端去重")
+                    if row is not None and row.pushed_at is not None:
+                        ok("Push now 写入 pushed_at（后台与客户端都能看出'已推送时间'）")
+                    else:
+                        bad("Push now 未写入 pushed_at")
+                else:
+                    bad("广播响应里没有 id，无法验证重复推送")
+            finally:
+                await manager.disconnect(admin_user.id, sock)
 
         # ---- 11) 评论（匿名 + 实名）----
         if new_id:

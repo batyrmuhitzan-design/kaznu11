@@ -13,6 +13,7 @@
 from __future__ import annotations
 
 import asyncio
+import secrets
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any
@@ -350,6 +351,48 @@ def serialize_notification(row: UserNotification) -> dict[str, Any]:
 # =====================================================================
 
 
+def _delivery_id(row_id: str, at: datetime) -> str:
+    """每次投递的**唯一**标识（客户端按它去重，决定是否再次弹窗/响铃）。
+
+    ⚠️ 不能用秒级时间戳：管理员连点两次「📣 Push now」、或"建广播后立刻推送"
+    都会落在**同一秒**，于是两次拿到同一个 id，客户端直接去重 → 用户只觉得"点了没反应"。
+    这里用微秒 + 3 字节随机后缀，保证任何情况下两次投递都不会撞。
+    """
+    return f"{row_id}:{int(at.timestamp() * 1_000_000)}-{secrets.token_hex(3)}"
+
+
+async def _deliver_broadcast(
+    session: AsyncSession, row: GlobalNotification, *, delivery_id: str
+) -> dict[str, Any]:
+    """把一条广播**真正投递出去**：WS 实时帧 + APNs 扇出。
+
+    ``delivery_id`` 是每次投递的唯一标识：客户端用它做横幅/系统通知去重。
+    用 ``row.id`` 会在"先轮询看到、再点 Push now"时被去重掉（不再响铃），
+    所以每次显式投递都要生成新的（见 ``_delivery_id``）。
+    """
+    ws_delivered = await manager.broadcast(
+        {
+            "type": "broadcast",
+            "broadcast": {
+                "id": row.id,
+                "delivery_id": delivery_id,
+                "title": row.title,
+                "message": row.message,
+                "level": row.level,
+                "pushed_at": row.pushed_at.isoformat() if row.pushed_at else None,
+                "created_at": row.created_at.isoformat() if row.created_at else None,
+            },
+        }
+    )
+
+    payload = build_broadcast_payload(
+        title=row.title, message=row.message, level=row.level, notification_id=row.id
+    )
+    targets = await all_push_targets(session)
+    push_result = await dispatch_alert(session, targets=targets, payload_for=lambda _t: payload)
+    return {"ws": ws_delivered, "push": push_result, "targets": len(targets)}
+
+
 async def broadcast_notification(
     session: AsyncSession,
     *,
@@ -362,31 +405,39 @@ async def broadcast_notification(
     **不写 N 行 UserNotification**：广播的已读状态由
     ``NotificationReadCursor.broadcasts_read_at`` 一个时间戳表达（见 models 注释）。
     """
-    row = GlobalNotification(title=title, message=message, level=level, is_active=True)
+    now = datetime.now(timezone.utc)
+    row = GlobalNotification(
+        title=title, message=message, level=level, is_active=True, pushed_at=now
+    )
     session.add(row)
     await session.commit()
     await session.refresh(row)
 
-    ws_delivered = await manager.broadcast(
-        {
-            "type": "broadcast",
-            "broadcast": {
-                "id": row.id,
-                "title": row.title,
-                "message": row.message,
-                "level": row.level,
-                "created_at": row.created_at.isoformat() if row.created_at else None,
-            },
-        }
+    # API 建的广播天生就是"已推送"，delivery_id 带时间戳 → 客户端一定视为新的一条
+    delivered = await _deliver_broadcast(
+        session, row, delivery_id=_delivery_id(row.id, now)
     )
+    return {"id": row.id, **delivered}
 
-    payload = build_broadcast_payload(
-        title=title, message=message, level=level, notification_id=row.id
+
+async def push_existing_notification(
+    session: AsyncSession, row: GlobalNotification
+) -> dict[str, Any]:
+    """把**已存在**的通知重新推送一次（管理端「📣 Push now」）。
+
+    与 ``broadcast_notification`` 的区别：不新建行，只更新 ``pushed_at`` 并重新投递。
+    每次调用都会拿到新的 delivery_id，所以**重复推送会再次响铃/弹窗** ——
+    这正是管理员的预期（"我按了推送键，用户就该收到提示"）。
+    """
+    now = datetime.now(timezone.utc)
+    row.is_active = True
+    row.pushed_at = now
+    await session.commit()
+    await session.refresh(row)
+    delivered = await _deliver_broadcast(
+        session, row, delivery_id=_delivery_id(row.id, now)
     )
-    targets = await all_push_targets(session)
-    push_result = await dispatch_alert(session, targets=targets, payload_for=lambda _t: payload)
-
-    return {"id": row.id, "ws": ws_delivered, "push": push_result, "targets": len(targets)}
+    return {"id": row.id, "pushed_at": row.pushed_at.isoformat(), **delivered}
 
 
 # =====================================================================

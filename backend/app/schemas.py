@@ -359,6 +359,9 @@ class GlobalNotificationOut(BaseModel):
     #: info | warning | danger
     level: str
     created_at: datetime
+    #: 上一次真正推送的时间（管理员点「📣 Push now」时写入）。
+    #: 前端把它拼进"投递 id"做横幅/系统通知去重 —— 否则重复推送不会再次响铃。
+    pushed_at: datetime | None = None
 
     model_config = ConfigDict(from_attributes=True)
 

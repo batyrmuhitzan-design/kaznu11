@@ -64,6 +64,7 @@ async def init_db() -> None:
         await conn.run_sync(Base.metadata.create_all)
         await conn.run_sync(_ensure_user_role_columns)
         await conn.run_sync(_ensure_post_official_columns)
+        await conn.run_sync(_ensure_global_notification_columns)
 
 
 def _ensure_user_role_columns(sync_conn: Any) -> None:
@@ -106,3 +107,26 @@ def _ensure_post_official_columns(sync_conn: Any) -> None:
         statements.append("ALTER TABLE posts ADD COLUMN official_badge VARCHAR(40)")
     for stmt in statements:
         sync_conn.execute(text(stmt))
+
+
+def _ensure_global_notification_columns(sync_conn: Any) -> None:
+    """轻量兼容迁移：旧库补列 —— global_notifications.pushed_at 与 messages.deleted_by。
+
+    线上库的表是上一版建的，`create_all` **不会给已存在的表加列**：
+      * 少了 pushed_at，「📣 Push now」与 `/notifications/latest` 会 500；
+      * 少了 deleted_by，管理端私信审核页会 500。
+    Production 请迁移到 Alembic。
+    """
+    from sqlalchemy import inspect, text
+
+    inspector = inspect(sync_conn)
+
+    if inspector.has_table("global_notifications"):
+        existing = {col["name"] for col in inspector.get_columns("global_notifications")}
+        if "pushed_at" not in existing:
+            sync_conn.execute(text("ALTER TABLE global_notifications ADD COLUMN pushed_at DATETIME"))
+
+    if inspector.has_table("messages"):
+        existing = {col["name"] for col in inspector.get_columns("messages")}
+        if "deleted_by" not in existing:
+            sync_conn.execute(text("ALTER TABLE messages ADD COLUMN deleted_by VARCHAR(16)"))

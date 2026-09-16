@@ -17,15 +17,18 @@ import {
   type Conversation,
 } from "./services/ChatService";
 import {
+  dismissBroadcastAlert,
   fetchNotificationUnread,
   handleRealtimeNotificationEvent,
   notifyRealtimeChange,
   startNotificationWatcher,
   subscribeBanner,
+  useBroadcastAlert,
   type InAppBanner,
 } from "./services/NotificationService";
 import { attachPushRegistration } from "./services/PushRegistrationService";
 import { applyPushRoute, attachPushRouteListener, consumePushRoute, readNativePushRoute } from "./services/PushRouteService";
+import { flushCampusOutbox } from "./services/CampusService";
 import { isSessionValid, touchSession } from "./utils/session";
 import LoginScreen from "./views/LoginScreen";
 import { useTheme } from "./contexts/ThemeContext";
@@ -102,6 +105,8 @@ export default function App() {
   const chatsReturnRef = useRef("dashboard");
   /** 全局应用内 Banner（全校广播 / 新通知），任意 Tab 都可见 */
   const [banner, setBanner] = useState<InAppBanner | null>(null);
+  /** 全校广播弹窗（需要用户手动"知道了"确认） */
+  const broadcastAlert = useBroadcastAlert();
   /** 从通知点进来的帖子 id：Campus 加载完 Feed 后自动打开该帖 */
   const [campusFocusPostId, setCampusFocusPostId] = useState<string | null>(null);
   const { resolvedTheme } = useTheme();
@@ -209,6 +214,31 @@ export default function App() {
   useEffect(() => {
     if (!authed) return;
     return startNotificationWatcher();
+  }, [authed]);
+
+  // Campus 离线发件箱看护：登录后立刻补发一次，并监听"回到前台 / 网络恢复"。
+  // 60s 的周期重试兜底"接口临时 5xx / 弱网"这类失败 —— 保证用户写的评论最终一定能
+  // 上传到服务器（否则管理端永远看不到）。
+  useEffect(() => {
+    if (!authed) return;
+    let stopped = false;
+    const run = () => {
+      if (stopped) return;
+      void flushCampusOutbox();
+    };
+    run();
+    const timer = window.setInterval(run, 60_000);
+    const onVisible = () => {
+      if (document.visibilityState === "visible") run();
+    };
+    window.addEventListener("online", run);
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      stopped = true;
+      window.clearInterval(timer);
+      window.removeEventListener("online", run);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
   }, [authed]);
 
   // 用会话 id 打开私信：推送点击只带 id，对端信息要从会话列表里取
@@ -423,6 +453,37 @@ export default function App() {
           >
             ✕
           </button>
+        </div>
+      )}
+
+      {/* 全校广播弹窗（iOS 风格 Alert）：横幅会淡出、可能被当前页面盖住，
+          而"停水停电 / 考试周调整"这类信息漏掉代价太大 → 再加一层需要手动确认的弹窗。
+          同时系统横幅（本地通知）会响苹果经典 Tri-tone 提示音。 */}
+      {broadcastAlert && (
+        <div
+          className={`alert-overlay alert-overlay-${broadcastAlert.level}`}
+          role="alertdialog"
+          aria-modal="true"
+          aria-label={broadcastAlert.title}
+          onClick={dismissBroadcastAlert}
+        >
+          <div className="alert-card" onClick={(event) => event.stopPropagation()}>
+            <span className="alert-card-icon">
+              {broadcastAlert.level === "danger"
+                ? "🚨"
+                : broadcastAlert.level === "warning"
+                  ? "⚠️"
+                  : "📣"}
+            </span>
+            <p className="alert-card-title">{broadcastAlert.title}</p>
+            {broadcastAlert.message && <p className="alert-card-text">{broadcastAlert.message}</p>}
+            <p className="alert-card-meta">
+              📣 {t("broadcastLabel")} · {t("notifSystem")}
+            </p>
+            <button type="button" onClick={dismissBroadcastAlert} className="alert-card-btn">
+              {t("done")}
+            </button>
+          </div>
         </div>
       )}
 

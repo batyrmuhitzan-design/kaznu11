@@ -288,6 +288,13 @@ class GlobalNotification(Base):
     # info | warning | danger
     level: Mapped[str] = mapped_column(String(16), default="info", index=True, nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, index=True, nullable=False)
+    #: **上一次真正推送给用户的时间**（管理员在后台点「📣 Push now」时写入）。
+    #:
+    #: 为什么需要它：App 侧的横幅/系统通知是按"投递 id"去重的，只用 row.id 会导致
+    #: 「新建通知 → App 轮询先看到了 → 再点 Push now 就不再提示」。
+    #: 有了 pushed_at，每次推送都是一次**新的投递**（delivery_id = id + 时间戳），
+    #: 所以重复推送仍会响铃提示 —— 这正是管理员对该按钮的预期。
+    pushed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, index=True)
 
 
@@ -569,9 +576,13 @@ class Message(Base):
     read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     #: 软删除（撤回 / 管理员下架都不物理删行，保留审计轨迹）
     is_deleted: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    #: **谁撤回/下架的**（user = 本人撤回，staff = 管理员下架）；null = 未删除
+    deleted_by: Mapped[str | None] = mapped_column(String(16), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, index=True)
 
     sender: Mapped[User] = relationship()
+    #: 管理端要展示"这条私信属于哪个会话/对方是谁"，给 SQLAdmin 一个可 eager-load 的关系
+    conversation: Mapped["Conversation"] = relationship()
 
 
 class UserNotification(Base):

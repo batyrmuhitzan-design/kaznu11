@@ -207,6 +207,109 @@ if (/startNotificationWatcher/.test(notifService) && /startNotificationWatcher/.
   ok("通知: 前台轮询看护已挂载（兜底管理端直接插库、没有 WS 帧的情况）");
 } else bad("通知: 缺少前台轮询兜底（管理端插库后 App 不会自己发现）");
 
+// ------------------------------------------- 9c) 广播弹窗 + 提示音 / 私信撤回 / 离线发件箱
+const campusService = read("src/services/CampusService.ts");
+const alarm = read("src/utils/alarm.ts");
+const pushPy = read("backend/app/push.py");
+const chatRouterPy = read("backend/app/routers/chat.py");
+const adminUiPy = read("backend/app/admin_ui.py");
+const modelsPy = read("backend/app/models.py");
+const packageJson = read("package.json");
+const soundPatchPath = "scripts/patch-capacitor-system-sound.cjs";
+
+// —— ① 全校广播弹窗 ——
+if (
+  /subscribeBroadcastAlert/.test(notifService) &&
+  /useBroadcastAlert/.test(notifService) &&
+  /dismissBroadcastAlert/.test(notifService)
+) {
+  ok("广播: 弹窗状态可订阅（WS 帧 / 轮询两条通路共用一个弹窗）");
+} else bad("广播: 缺少弹窗订阅接口");
+
+if (/delivery_id \? String\(raw\.delivery_id\)/.test(notifService) && /function deliveryKey/.test(notifService)) {
+  ok("广播: 去重优先用服务端 delivery_id（重复推送能再次弹窗，只按行 id 会被吃掉）");
+} else bad("广播: deliveryKey 未优先使用 delivery_id —— 「Push now」会被去重，用户看不到第二次");
+
+if (/alert-overlay/.test(app) && /alert-card/.test(app) && /alert-overlay/.test(css) && /\.alert-card\b/.test(css)) {
+  ok("广播: 根节点渲染 iOS 风格 Alert（App.tsx 结构 + index.css 样式都在）");
+} else bad("广播: Alert 结构或样式缺失");
+
+if (/playAlertTone\(\)/.test(notifService) && /if \(!scheduled\) playAlertTone\(\)/.test(notifService)) {
+  ok("广播: 系统横幅排程失败才补 Web Audio 提示音（成功时交给 iOS 响 Tri-tone）");
+} else bad("广播: 缺少提示音兜底 —— 权限被拒时横幅会静默出现");
+
+if (/export function playAlertTone/.test(alarm) && !/\.(mp3|m4a|wav|aiff|caf)\b/.test(alarm)) {
+  ok("广播: 提示音是 Web Audio 合成（未打包苹果音频文件，无版权风险）");
+} else bad("广播: playAlertTone 缺失或引入了音频文件");
+
+if (exists(soundPatchPath) && /patch-capacitor-system-sound\.cjs/.test(packageJson)) {
+  ok("广播: postinstall 打补丁把 sound=system-default 映射到 UNNotificationSound.default（真 Tri-tone）");
+} else bad(`广播: 缺少 ${soundPatchPath} 或 package.json 未挂 postinstall`);
+
+if (/_delivery_id\(row\.id, now\)/.test(pushPy) && /token_hex/.test(pushPy) && /1_000_000/.test(pushPy)) {
+  ok("后端: 每次投递生成唯一 delivery_id（微秒 + 随机后缀，同秒连推两次也不会撞）");
+} else bad("后端: delivery_id 仍可能在同一秒内重复 → 「重复推送」不响铃");
+
+if (/async def push_existing_notification/.test(pushPy) && /pushed_at = now/.test(pushPy)) {
+  ok("后端: 管理端「Push now」走 push_existing_notification 并写 pushed_at");
+} else bad("后端: 缺少 push_existing_notification / pushed_at 写入");
+
+if (/pushed_at: Mapped/.test(modelsPy) && /deleted_by: Mapped/.test(modelsPy)) {
+  ok("后端: GlobalNotification.pushed_at 与 Message.deleted_by 已建模");
+} else bad("后端: 新列未建模");
+
+// —— ② 私信撤回 ——
+if (/deleteChatMessage/.test(chatService) && /applyMessageDeleted/.test(chatService)) {
+  ok("撤回: ChatService 支持撤回（REST + 本地帧应用）");
+} else bad("撤回: ChatService 缺少撤回能力");
+
+if (/"message-deleted"/.test(chatService)) ok("撤回: WS 帧类型 message-deleted 已定义");
+else bad("撤回: 未处理 message-deleted 帧（对端不会实时变灰）");
+
+if (/onTouchStart/.test(chatView) && /confirmRecall/.test(chatView) && /chat-bubble-recalled/.test(chatView)) {
+  ok("撤回: 长按弹出撤回确认（contact 550ms + 滑动/抬手取消）");
+} else bad("撤回: 长按手势或撤回占位样式缺失");
+
+if (/\.chat-bubble-recalled/.test(css)) ok("撤回: 灰字斜体占位样式已定义");
+else bad("撤回: .chat-bubble-recalled 样式缺失");
+
+if (/@router\.delete\(\s*"\/chat\/messages\/\{message_id\}"/.test(chatRouterPy)) {
+  ok("撤回: 后端 DELETE /chat/messages/{id} 已登记");
+} else bad("撤回: 后端没有撤回接口");
+
+if (/body="" if deleted else/.test(chatRouterPy) && /media_urls=\[\] if deleted else/.test(chatRouterPy)) {
+  ok("撤回: 序列化时清空 body/media（否则历史请求仍能读到已撤回内容）");
+} else bad("撤回: 已撤回内容仍可能被返回");
+
+if (/deleted_by = "staff" if message\.sender_id != current\.id else "user"/.test(chatRouterPy)) {
+  ok("撤回: 区分本人撤回（user）与管理员下架（staff）");
+} else bad("撤回: 未记录撤回来源");
+
+if (/class MessageAdmin\(ModelView, model=Message\)/.test(adminUiPy) && /add_model_view\(MessageAdmin\)/.test(adminUiPy)) {
+  ok("管理端: 私信内容审核（MessageAdmin）已挂载");
+} else bad("管理端: 私信审核视图缺失/未挂载");
+
+// —— ③ Campus 离线发件箱 ——
+const enqueueCalls = (campusService.match(/enqueueOutbox\(\{/g) || []).length;
+if (enqueueCalls >= 3) {
+  ok(`发件箱: 发帖 / 评论 / 点赞失败都会入队（实查 ${enqueueCalls} 处 enqueueOutbox 调用）`);
+} else bad(`发件箱: 只有 ${enqueueCalls} 处入队 —— 有写操作仍然"只存本地"从不重试`);
+
+if (/await flushCampusOutbox\(\);/.test(campusService) && /export async function flushCampusOutbox/.test(campusService)) {
+  ok("发件箱: 进 Campus 拉数据前先补发（用户回来看不到自己的帖子会有强烈挫败感）");
+} else bad("发件箱: 缺少 flushCampusOutbox 调用");
+
+if (/subscribeOutbox/.test(campusService) && /subscribeOutbox|outboxCount/.test(campus)) {
+  ok("发件箱: Campus 页面显示待同步条数");
+} else bad("发件箱: 界面没有待同步提示");
+
+if (/retrySync|pendingSync/.test(campus)) ok("发件箱: 提供手动重试入口");
+else bad("发件箱: 没有手动重试入口");
+
+if (/flushCampusOutbox/.test(app) && /applicationServerOnline|addEventListener\("online"/.test(app)) {
+  ok("发件箱: App 层看护（回前台 / online / 周期）");
+} else bad("发件箱: App 层没有触发补发的时机");
+
 // ------------------------------------------------------------------ 10) 行为测试
 /**
  * 直接加载真实模块跑（Node ≥22.6 可直跑 TS）。

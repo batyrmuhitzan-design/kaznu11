@@ -36,6 +36,7 @@ import {
 import { startConversation, type Conversation } from "../services/ChatService";
 import { MAX_UPLOAD_FILES, uploadImages } from "../services/UploadService";
 import { loadClubs, loadMyClubs, type ClubApplication, type ClubItem } from "../services/ClubService";
+import { flushCampusOutbox, outboxCount, subscribeOutbox } from "../services/CampusService";
 import CreateClub from "./CreateClub";
 import { NewsList, NewsDetail, type NewsItem } from "./News";
 import { useChatUnread } from "./Chat";
@@ -186,6 +187,15 @@ export default function CampusView({
   const [clubs, setClubs] = useState<ClubItem[]>([]);
   /** 我提交过的申请（含 pending / rejected，让用户能看到审核进度） */
   const [myClubs, setMyClubs] = useState<ClubApplication[]>([]);
+  /**
+   * 离线发件箱里待同步的条数（发帖 / 评论 / 点赞）。
+   * 大于 0 时页面上会显示「N 条未同步 · 点此重试」——
+   * 用户必须能看见"还没上传成功"，否则会以为 App 有 bug（而且管理端确实看不到）。
+   */
+  const [pendingSync, setPendingSync] = useState(() => outboxCount());
+  const [syncing, setSyncing] = useState(false);
+
+  useEffect(() => subscribeOutbox(setPendingSync), []);
 
   const [dismissedNotification, setDismissedNotification] = useState<string | null>(() => {
     try {
@@ -204,6 +214,25 @@ export default function CampusView({
     setSource(snapshot.source);
     setLoading(false);
   }, []);
+
+  /**
+   * 手动重试同步（"N 条未同步 · 点此重试"）。
+   *
+   * ⚠️ 必须放在 `refresh` **之后**：`useCallback` 的依赖数组是在渲染期求值的，
+   * 写在 refresh 之前会命中 TDZ（Cannot access 'refresh' before initialization）。
+   */
+  const retrySync = useCallback(async () => {
+    if (syncing) return;
+    setSyncing(true);
+    const result = await flushCampusOutbox();
+    setSyncing(false);
+    if (result.sent > 0) {
+      toast.push(`${t("syncedNow")} ${result.sent}`, "success");
+      void refresh(category);
+    } else if (result.remaining > 0) {
+      toast.push(t("notSynced"), "info");
+    }
+  }, [syncing, toast, t, refresh, category]);
 
   useEffect(() => {
     void refresh(category);
@@ -429,7 +458,22 @@ export default function CampusView({
               setCategory(next);
             }}
           />
-          <div className="flex-1 min-h-0 overflow-y-auto px-4 pt-1 pb-28 space-y-3 animate-slide-up">
+          {/* 未同步提示：让用户知道内容还在本机排队（而不是"发出去了"） */}
+          {pendingSync > 0 && (
+            <button
+              type="button"
+              onClick={() => void retrySync()}
+              className="haptic-action mx-4 mb-2 flex items-center gap-2 px-3 py-2 squircle-sm text-[11px] font-semibold"
+              style={{ background: "var(--warm-soft-bg)", color: "var(--warm-soft-text)" }}
+            >
+              <span className="text-sm leading-none">{syncing ? "⏳" : "⚠️"}</span>
+              <span className="flex-1 text-left">
+                {pendingSync} · {t("notSynced")}
+              </span>
+              <span className="shrink-0 font-bold underline">{t("retrySync")}</span>
+            </button>
+          )}
+          <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-4 pt-1 pb-28 space-y-3 animate-slide-up min-w-0">
             {loading && posts.length === 0 ? (
               <p className="text-xs text-center py-10" style={{ color: "var(--tx-6)" }}>
                 …

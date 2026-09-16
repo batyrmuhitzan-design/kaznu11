@@ -78,6 +78,9 @@ export interface CampusNotificationItem {
   message: string;
   level: NotificationLevel;
   created_at: string;
+  /** 上一次真正推送的时间（管理员点「📣 Push now」写入；null = 从未推送）。
+   *  前端把它拼进"投递 id"做横幅/系统通知去重 —— 否则重复推送不会再次响铃。 */
+  pushed_at?: string | null;
 }
 
 /** 统一分页信封（与后端 Page[T] 一致）。 */

@@ -41,6 +41,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..database import SessionLocal, get_session
 from ..deps import get_current_user, limiter
 from ..models import (
+    ADMIN_ROLES,
     MESSAGE_MAX_LEN,
     MESSAGE_MAX_MEDIA,
     Conversation,
@@ -85,15 +86,23 @@ def _peer_out(user: User) -> ChatPeerOut:
 
 
 def _message_out(message: Message, viewer_id: str) -> MessageOut:
+    """序列化一条消息。
+
+    ⚠️ **撤回的消息绝不能带出原文**：``Message.body`` 在库里还在（软删除），
+    如果这里照原样返回，任何一次历史请求都能读到用户已撤回的内容 ——
+    等于"撤回"只是前端视觉上的假动作。所以 body / media 一律清空，
+    只留 ``is_deleted=True`` 让两端渲染「消息已被撤回」占位。
+    """
+    deleted = bool(message.is_deleted)
     return MessageOut(
         id=message.id,
         conversation_id=message.conversation_id,
         sender_id=message.sender_id,
-        body=message.body or "",
-        media_urls=list(message.media_urls or []),
+        body="" if deleted else (message.body or ""),
+        media_urls=[] if deleted else list(message.media_urls or []),
         client_id=message.client_id,
         read_at=message.read_at,
-        is_deleted=bool(message.is_deleted),
+        is_deleted=deleted,
         created_at=message.created_at,
         is_mine=message.sender_id == viewer_id,
     )
@@ -416,7 +425,10 @@ async def list_messages(
     这样天然复用 ``Page[T]`` 信封，不需要再造一套 "before cursor" 协议。
     """
     conversation = await _load_conversation(session, conversation_id, current)
-    base = [Message.conversation_id == conversation.id, Message.is_deleted.is_(False)]
+    # 注意：**不过滤 is_deleted** —— 撤回的消息要留在时间线里当占位（两端都看到
+    # 「消息已被撤回」）。若在这里过滤掉，双方历史长度会不一致、"往上翻"会跳号，
+    # 而且我方已经渲染出的占位在刷新后会凭空消失。原文由 _message_out 清空。
+    base = [Message.conversation_id == conversation.id]
     total = await session.scalar(select(func.count(Message.id)).where(*base)) or 0
     rows = (
         await session.scalars(
@@ -467,6 +479,72 @@ async def send_message(
     if created:
         await fan_out_message(session, conversation=conversation, message=message)
     return MessageCreated(message=SENT_MSG, sent=_message_out(message, current.id))
+
+
+@router.delete("/chat/messages/{message_id}", response_model=dict)
+async def delete_message(
+    message_id: str,
+    current: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    """撤回 / 下架一条私信（**软删除**，不物理删行）。
+
+    两条使用路径共用一个端点：
+      * **本人撤回**：只能删自己发的（``deleted_by="user"``）；
+      * **管理员下架**：staff 可删任何一条（``deleted_by="staff"``）——
+        后台私信审核页就是调它（见 ``admin_ui.MessageAdmin``）。
+
+    为什么软删除而不是 DELETE 行：
+      1. 消息是**会话链的一部分**，物理删会让双方的历史长度对不上，
+         前端"往上翻历史"的分页会跳号；
+      2. 管理端需要留审计轨迹（谁在什么时候撤回了什么）。
+    客户端侧：``is_deleted`` 的消息不返回 body，UI 显示「消息已被撤回」。
+    """
+    message = await session.scalar(select(Message).where(Message.id == message_id))
+    if message is None or message.is_deleted:
+        raise HTTPException(status_code=404, detail="Message not found")
+
+    is_staff = current.role in ADMIN_ROLES
+    if message.sender_id != current.id and not is_staff:
+        raise HTTPException(status_code=403, detail="You can only delete your own messages")
+
+    # 先取出会话（要通知对方），再落库
+    conversation = await session.scalar(
+        select(Conversation).where(Conversation.id == message.conversation_id)
+    )
+    if conversation is None:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+
+    message.is_deleted = True
+    message.deleted_by = "staff" if message.sender_id != current.id else "user"
+    # 撤回的若是"最后一条"，会话列表的预览也要跟着变 —— 否则列表里还挂着原文
+    if conversation.last_message_at and conversation.last_message_preview:
+        newest = await session.scalar(
+            select(Message)
+            .where(Message.conversation_id == conversation.id)
+            .order_by(Message.created_at.desc())
+            .limit(1)
+        )
+        if newest is not None and newest.id == message.id:
+            conversation.last_message_preview = "🚫"
+    await session.commit()
+
+    # 告知**对方**（若在线）这条消息被撤回了，对方 UI 立即把它替换成占位文案
+    peer_id = conversation.peer_of(current.id)
+    await manager.send_to_user(
+        peer_id,
+        {
+            "type": "message-deleted",
+            "conversation_id": message.conversation_id,
+            "message_id": message.id,
+            "deleted_by": message.deleted_by,
+        },
+    )
+    return {
+        "message": "Message deleted.",
+        "id": message.id,
+        "deleted_by": message.deleted_by,
+    }
 
 
 @router.post("/chat/read", response_model=ReadResultOut)

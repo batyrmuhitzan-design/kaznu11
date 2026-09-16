@@ -40,7 +40,10 @@ type ClubTranslationKey =
   | "clubStatusPending" | "clubStatusApproved" | "clubStatusRejected"
   | "clubSubmittedTitle" | "clubSubmittedHint"
   | "clubCatAcademic" | "clubCatSports" | "clubCatArts" | "clubCatTech" | "clubCatVolunteer" | "clubCatMedia"
-  | "clubApplyUnauth" | "clubApplyDuplicate" | "clubApplyInvalid" | "clubApplyFailed";
+  | "clubApplyUnauth" | "clubApplyDuplicate" | "clubApplyInvalid" | "clubApplyFailed"
+  // ---- 同步状态 / 私信撤回（本轮补齐）----
+  | "syncedNow" | "retrySync" | "chatRecall" | "chatRecalled" | "chatRecalledByModerator"
+  | "chatRecallFailed" | "chatTapToRecall";
 type ExtraTranslationKey =
   | "noMoreToday" | "degreePlan" | "targetStandard" | "justGraduate" | "magna" | "summa"
   | "futureAvg" | "ectsLeft" | "degreeProgress" | "avgPerSem" | "reachable" | "needsPerfect"
@@ -155,6 +158,12 @@ const ADDITIONAL_TRANSLATIONS: Record<Language, Record<string, string>> = {
     clubApplyDuplicate: "You already applied for a club with this name",
     clubApplyInvalid: "Please check the form — name and description are required",
     clubApplyFailed: "Couldn't submit right now — try again in a moment",
+    // ---- 同步状态 / 私信撤回（EN）----
+    syncedNow: "Synced", retrySync: "Retry",
+    chatRecall: "Recall", chatRecalled: "Message recalled",
+    chatRecalledByModerator: "Message removed by moderator",
+    chatRecallFailed: "Couldn't recall — try again",
+    chatTapToRecall: "Long-press your message to recall",
     noMoreToday: "No more classes today 🎉", degreePlan: "Graduation Plan", targetStandard: "Target",
     justGraduate: "Just Graduate", magna: "Magna Cum Laude", summa: "Summa Cum Laude",
     futureAvg: "avg GPA needed in remaining semesters", ectsLeft: "ECTS left", degreeProgress: "Degree progress",
@@ -238,6 +247,12 @@ const ADDITIONAL_TRANSLATIONS: Record<Language, Record<string, string>> = {
     clubApplyDuplicate: "Осы атаумен өтінім қабылданған",
     clubApplyInvalid: "Форманы тексеріңіз — атау мен сипаттама қажет",
     clubApplyFailed: "Қазір жіберілмеді — сәл кейінірек қайталаңыз",
+    // ---- 同步状态 / 私信撤回（KZ）----
+    syncedNow: "Синхрондалды", retrySync: "Қайталау",
+    chatRecall: "Қайтарып алу", chatRecalled: "Хабарлама қайтарып алынды",
+    chatRecalledByModerator: "Хабарлама модератор тарапынан жойылды",
+    chatRecallFailed: "Қайтарып алу мүмкін болмады — қайталаңыз",
+    chatTapToRecall: "Қайтарып алу үшін хабарламаны ұзақ басыңыз",
   },
   RU: {
     noMoreToday: "На сегодня занятий больше нет 🎉", degreePlan: "План до диплома", targetStandard: "Цель",
@@ -307,6 +322,12 @@ const ADDITIONAL_TRANSLATIONS: Record<Language, Record<string, string>> = {
     clubApplyDuplicate: "Заявка с таким названием уже отправлена",
     clubApplyInvalid: "Проверьте форму — нужны название и описание",
     clubApplyFailed: "Не удалось отправить — попробуйте позже",
+    // ---- 同步状态 / 私信撤回（RU）----
+    syncedNow: "Синхронизировано", retrySync: "Повторить",
+    chatRecall: "Отозвать", chatRecalled: "Сообщение отозвано",
+    chatRecalledByModerator: "Сообщение удалено модератором",
+    chatRecallFailed: "Не удалось отозвать — попробуйте снова",
+    chatTapToRecall: "Нажмите и удерживайте сообщение, чтобы отозвать",
   },
 };
 

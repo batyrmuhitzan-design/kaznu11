@@ -241,6 +241,59 @@ textarea::placeholder { color: var(--tx-7); }
 
 /* 行分隔线（替代 divide-white/5 —— 那个在浅色下完全看不见） */
 .hairline-rows > * + * { border-top: 1px solid var(--hairline); }
+
+/* ===== 全校广播弹窗（iOS 风格 Alert）=====
+   与 LegalModal 同样走 Portal 之外的 fixed 覆盖层 + 主题 token；
+   层级放在 90（高于 Modal 80 / Toast 70），确保任何页面都能盖住。 */
+.alert-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: var(--scrim);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  animation: alert-fade-in 160ms ease-out;
+}
+@keyframes alert-fade-in { from { opacity: 0; } to { opacity: 1; } }
+.alert-card {
+  width: 100%;
+  max-width: 340px;
+  border-radius: 22px;
+  padding: 22px 20px 18px;
+  text-align: center;
+  background: var(--sheet-bg);
+  color: var(--sheet-text);
+  border: 1px solid var(--sheet-border);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.45);
+  animation: alert-pop 220ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+@keyframes alert-pop {
+  from { transform: scale(0.88); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+.alert-card-icon { font-size: 34px; line-height: 1; display: block; }
+.alert-card-title { font-size: 16px; font-weight: 800; margin-top: 10px; letter-spacing: -0.2px; }
+.alert-card-text { font-size: 13px; line-height: 1.55; margin-top: 8px; color: var(--sheet-text-2); white-space: pre-line; }
+.alert-card-meta { font-size: 10px; margin-top: 12px; color: var(--sheet-text-3); font-family: var(--font-mono); }
+.alert-card-btn {
+  margin-top: 16px;
+  width: 100%;
+  padding: 12px 16px;
+  border-radius: 14px;
+  font-size: 14px;
+  font-weight: 700;
+  background: linear-gradient(135deg, var(--accent-strong), var(--accent));
+  color: var(--on-accent);
+}
+.alert-card-btn:active { transform: scale(0.97); }
+/* 级别配色：danger 红环 / warning 琥珀环 / info 蓝环（深浅色都靠 token） */
+.alert-overlay-danger .alert-card { border-color: var(--danger); }
+.alert-overlay-warning .alert-card { border-color: var(--warm-soft-border); }
+.alert-overlay-info .alert-card { border-color: var(--accent-soft-border); }
 .light .live-activity .text-white,
 .light [style*="0033A0"] .text-white { color: #fff !important; }
 .light .live-activity [style*="255, 255, 255"],
@@ -971,6 +1024,17 @@ html {
   word-break: break-word;
   background: rgba(255, 255, 255, 0.1);
   color: var(--app-text);
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+/* 已撤回 / 被下架：不再用气泡配色，改成一行灰字占位（保留时间线但不显眼） */
+.chat-bubble-recalled {
+  background: transparent !important;
+  color: var(--tx-6) !important;
+  font-size: 12px;
+  font-style: italic;
+  padding: 4px 6px;
 }
 .chat-row.is-mine .chat-bubble {
   background: linear-gradient(135deg, #0a84ff, #007aff);

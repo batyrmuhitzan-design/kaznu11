@@ -16,6 +16,7 @@
 import { useEffect, useState } from "react";
 import type { NotificationLevel } from "../data/campusDemo";
 import { postSystemBannerNow } from "../native/notifications";
+import { playAlertTone } from "../utils/alarm";
 import { API_BASE_URL, blockInsecureRequest } from "../utils/config";
 import { rmpEnsureToken } from "./ProfReviewsService";
 
@@ -42,6 +43,10 @@ export interface BroadcastItem {
   level: NotificationLevel;
   is_read: boolean;
   created_at: string | null;
+  /** 上一次真正推送的时间；有它就能识别"同一条又被推了一次" */
+  pushed_at?: string | null;
+  /** 服务端为每次投递生成的唯一 id（WS 帧里带；没有时回落到 id） */
+  delivery_id?: string | null;
 }
 
 export interface NotificationCenter {
@@ -200,7 +205,9 @@ function setBanner(next: InAppBanner | null): void {
   bannerListeners.forEach((cb) => cb(next));
   if (!next || hasSeenBanner(next.id)) return;
   rememberBanner(next.id);
-  // 同一事件走两条通路：应用内浮层（上）+ 真实 iOS 系统横幅（下，走本地通知）
+  // 同一事件走两条通路：应用内浮层（上）+ 真实 iOS 系统横幅（下，走本地通知）。
+  // 系统横幅负责"苹果经典提示音"（Tri-tone）：原生端 postinstall 补丁把
+  // sound: "system-default" 映射到 UNNotificationSound.default。
   void postSystemBannerNow({
     id: bannerNotificationId(next.id),
     threadId:
@@ -211,6 +218,10 @@ function setBanner(next: InAppBanner | null): void {
           : "kaznu.notify",
     title: next.title,
     body: next.message,
+  }).then((scheduled) => {
+    // 兜底：没权限 / 纯 Web / 排程失败时，用 Web Audio 播一个提示音，
+    // 否则用户只会看到静默的横幅（"为什么没有提示音"）。
+    if (!scheduled) playAlertTone();
   });
 }
 
@@ -254,6 +265,75 @@ function bannerNotificationId(seed: string): number {
 /** 关闭当前 Banner（用户手动 × 掉，或超时自动收起）。 */
 export function dismissBanner(): void {
   setBanner(null);
+}
+
+// =====================================================================
+// 全校广播弹窗（iOS 风格 Alert + 提示音）
+// =====================================================================
+
+/**
+ * 为什么广播需要**弹窗**而不只是顶部横幅
+ * ----------------------------------------
+ * 全校广播是"停水停电 / 假期调整 / 考试周"这类**必须被看到**的信息。
+ * 横幅会自己淡出、也可能被用户正在看的页面盖住，漏掉代价很大；
+ * 所以再加一层需要手动确认的 iOS 风格弹窗（抖音/微信那种"知道了"）。
+ */
+export interface BroadcastAlert {
+  /** 投递 id（同一条再次推送 = 新的 id → 会再次弹） */
+  id: string;
+  title: string;
+  message: string;
+  level: NotificationLevel;
+  at: number;
+}
+
+let broadcastAlert: BroadcastAlert | null = null;
+const alertListeners = new Set<(item: BroadcastAlert | null) => void>();
+
+export function subscribeBroadcastAlert(cb: (item: BroadcastAlert | null) => void): () => void {
+  alertListeners.add(cb);
+  cb(broadcastAlert);
+  return () => {
+    alertListeners.delete(cb);
+  };
+}
+
+export function getBroadcastAlert(): BroadcastAlert | null {
+  return broadcastAlert;
+}
+
+/** 用户点了「知道了」→ 收起弹窗 */
+export function dismissBroadcastAlert(): void {
+  broadcastAlert = null;
+  alertListeners.forEach((cb) => cb(null));
+}
+
+function showBroadcastAlert(item: BroadcastAlert): void {
+  broadcastAlert = item;
+  alertListeners.forEach((cb) => cb(item));
+}
+
+/** React Hook：任意组件都能渲染这个弹窗（App 根节点用）。 */
+export function useBroadcastAlert(): BroadcastAlert | null {
+  const [item, setItem] = useState<BroadcastAlert | null>(() => getBroadcastAlert());
+  useEffect(() => subscribeBroadcastAlert(setItem), []);
+  return item;
+}
+
+/**
+ * 广播的**投递 id** —— 去重与"系统通知 id"都以它为准。
+ *
+ * 关键点：不能只用通知行 id。管理员在后台"新建通知"后 App 的 45s 轮询可能已经
+ * 把它当成"已见"记下来了，之后点「📣 Push now」就会被去重掉 → 用户什么都收不到
+ * （这正是"我在管理端发了广播，App 没反应"的原因之一）。
+ * 服务端每次投递都会带 ``delivery_id``（id + 推送时间戳），这里优先用它。
+ */
+function deliveryKey(raw: { id?: unknown; delivery_id?: unknown; pushed_at?: unknown }): string {
+  const base = String(raw.id ?? "");
+  const delivery = raw.delivery_id ? String(raw.delivery_id) : "";
+  if (delivery) return delivery;
+  const pushed = raw.pushed_at ? String(raw.pushed_at) : "";
+  return pushed ? `${base}:${pushed}` : base;
 }
 
 // =====================================================================
@@ -310,12 +390,21 @@ export function handleRealtimeNotificationEvent(event: {
   }
   if (event.type === "broadcast" && event.broadcast) {
     const raw = event.broadcast as Partial<BroadcastItem>;
+    const key = deliveryKey(raw);
     setBanner({
-      id: String(raw.id ?? `b-${Date.now()}`),
+      id: key,
       title: String(raw.title ?? ""),
       message: String(raw.message ?? ""),
       level: (raw.level as NotificationLevel) ?? "info",
       origin: "broadcast",
+    });
+    // 广播同时弹一个需要手动确认的弹窗（横幅可能被页面盖住或淡出）
+    showBroadcastAlert({
+      id: key,
+      title: String(raw.title ?? ""),
+      message: String(raw.message ?? ""),
+      level: (raw.level as NotificationLevel) ?? "info",
+      at: Date.now(),
     });
     bumpRevision();
     return true;
@@ -364,6 +453,8 @@ interface LatestBroadcast {
   message: string;
   level: NotificationLevel;
   created_at: string | null;
+  /** 上一次真正推送的时间（管理员点 Push now 时写入） */
+  pushed_at?: string | null;
 }
 
 /**
@@ -467,16 +558,27 @@ export function startNotificationWatcher(): () => void {
       } catch {
         latest = null;
       }
-      if (latest?.id && !hasSeenBanner(latest.id)) {
-        // 统一走 setBanner：应用内浮层 + 系统横幅 + 去重都在那里完成
-        setBanner({
-          id: latest.id,
-          title: latest.title,
-          message: latest.message,
-          level: latest.level ?? "info",
-          origin: "broadcast",
-        });
-        bumpRevision();
+      if (latest?.id) {
+        const key = deliveryKey(latest);
+        if (!hasSeenBanner(key)) {
+          // 统一走 setBanner：应用内浮层 + 系统横幅 + 去重都在那里完成
+          setBanner({
+            id: key,
+            title: latest.title,
+            message: latest.message,
+            level: latest.level ?? "info",
+            origin: "broadcast",
+          });
+          // 轮询发现的广播同样弹窗（例如管理员刚点了 Push now）
+          showBroadcastAlert({
+            id: key,
+            title: latest.title,
+            message: latest.message,
+            level: latest.level ?? "info",
+            at: Date.now(),
+          });
+          bumpRevision();
+        }
       }
     }
     // 新官方公告 / 新活动（离线期间错过的 WS 帧在这里补上）

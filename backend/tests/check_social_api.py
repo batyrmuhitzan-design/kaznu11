@@ -573,7 +573,7 @@ async def _run_official_and_devices(alice: str, staff: str) -> None:
             bad(f"上传自检异常：{upload_status}")
 
 
-async def _run_websocket(alice: str, bob: str, ids: dict[str, str]) -> None:
+async def _run_websocket(alice: str, bob: str, staff: str, ids: dict[str, str]) -> None:
     """WebSocket 真实通道：真 uvicorn 进程 + 真 websockets 客户端。
 
     每个 recv 都用 ``asyncio.wait_for`` 加超时 —— 一旦收不到事件就**明确报失败**，
@@ -589,6 +589,15 @@ async def _run_websocket(alice: str, bob: str, ids: dict[str, str]) -> None:
             bad(f"WS 等待事件超时（10s）：{label}")
             return {"type": "__timeout__"}
         return json.loads(raw)
+
+    async def rest(method: str, path: str, token: str) -> httpx.Response:
+        """本函数里也要打几个 REST 接口（撤回 / 历史），单独开一个短连接客户端。
+
+        其它 ``_run_*`` 都用 `async with httpx.AsyncClient(...)` 包住整个函数体，
+        而这个函数要一直握着 WS 连接，所以不能那样写 —— 用这个辅助函数按需请求。
+        """
+        async with httpx.AsyncClient(base_url=SERVER_BASE, timeout=15.0) as http:
+            return await http.request(method, path, headers=_auth(token))
 
     # ---- 鉴权：没有 token / 假 token 必须在握手阶段被拒（403，而不是 404）
     for label, url in (
@@ -688,6 +697,85 @@ async def _run_websocket(alice: str, bob: str, ids: dict[str, str]) -> None:
             else:
                 bad(f"已读回执异常：{receipt}")
 
+            # ---- 撤回：A 撤回自己的消息 → 双方都收到 message-deleted，历史里不再是原文
+            await ws_a.send(
+                json.dumps(
+                    {
+                        "type": "send",
+                        "conversation_id": conversation_id,
+                        "body": "这条稍后会被撤回",
+                        "client_id": "recall-1",
+                    }
+                )
+            )
+            recalled_echo = await recv_json(ws_a, "recall-echo")
+            recalled_incoming = await recv_json(ws_b, "recall-incoming")
+            recalled_id = (recalled_echo.get("message") or {}).get("id") or (
+                recalled_incoming.get("message") or {}
+            ).get("id")
+            if recalled_id:
+                # 别人发的不能删（403）；自己的能删（200，deleted_by=user）
+                forbidden = await rest("DELETE", f"/api/v1/chat/messages/{recalled_id}", bob)
+                if forbidden.status_code == 403:
+                    ok("撤回权限：不能删除别人发的消息（403）")
+                else:
+                    bad(f"越权撤回未被拒绝：{forbidden.status_code}")
+
+                deleted = await rest("DELETE", f"/api/v1/chat/messages/{recalled_id}", alice)
+                if deleted.status_code == 200 and deleted.json().get("deleted_by") == "user":
+                    ok("本人撤回自己的消息 → 200（deleted_by=user）")
+                else:
+                    bad(f"本人撤回失败：{deleted.status_code} {deleted.text[:120]}")
+
+                frame = await recv_json(ws_b, "message-deleted@bob")
+                if frame.get("type") == "message-deleted" and frame.get("message_id") == recalled_id:
+                    ok("撤回帧实时推给对端（对方 UI 立即变占位文案）")
+                else:
+                    bad(f"撤回帧异常：{frame}")
+
+                history = await rest(
+                    "GET", f"/api/v1/chat/conversations/{conversation_id}/messages?limit=50", alice
+                )
+                items = history.json().get("items", [])
+                hit = next((m for m in items if m.get("id") == recalled_id), None)
+                if hit is not None and hit.get("is_deleted") is True and not hit.get("body"):
+                    ok("历史接口：已撤回的消息 is_deleted=true 且不返回原文")
+                else:
+                    bad(f"已撤回消息仍在历史里泄露原文：{hit}")
+
+                # 重复撤回 → 404（幂等，不会重复推帧）
+                again = await rest("DELETE", f"/api/v1/chat/messages/{recalled_id}", alice)
+                if again.status_code == 404:
+                    ok("重复撤回 → 404（不会重复推帧）")
+                else:
+                    bad(f"重复撤回应 404，实际 {again.status_code}")
+
+                # staff 可下架任意私信（后台私信审核页走同一条接口）
+                await ws_a.send(
+                    json.dumps(
+                        {
+                            "type": "send",
+                            "conversation_id": conversation_id,
+                            "body": "这条会被管理员下架",
+                            "client_id": "recall-2",
+                        }
+                    )
+                )
+                echo2 = await recv_json(ws_a, "recall2-echo")
+                await recv_json(ws_b, "recall2-incoming")
+                target2 = (echo2.get("message") or {}).get("id")
+                if target2:
+                    staff_delete = await rest("DELETE", f"/api/v1/chat/messages/{target2}", staff)
+                    if (
+                        staff_delete.status_code == 200
+                        and staff_delete.json().get("deleted_by") == "staff"
+                    ):
+                        ok("staff 可下架任意私信（deleted_by=staff，与后台审核同一条接口）")
+                    else:
+                        bad(f"staff 下架失败：{staff_delete.status_code} {staff_delete.text[:120]}")
+            else:
+                bad("撤回用例：拿不到刚发送消息的 id")
+
             # ---- 异常输入不能把连接搞崩
             await ws_a.send(json.dumps({"type": "definitely-not-a-thing"}))
             if (await recv_json(ws_a, "unknown-event")).get("type") == "error":
@@ -783,7 +871,7 @@ async def _run_all(alice: str, bob: str, staff: str, ids: dict[str, str]) -> Non
     notes.append(f"  —— 互动通知测试帖 id：{post_id[:8]}…")
     await _run_broadcast(alice, bob, staff)
     await _run_official_and_devices(alice, staff)
-    await _run_websocket(alice, bob, ids)
+    await _run_websocket(alice, bob, staff, ids)
 
 
 def main() -> None:

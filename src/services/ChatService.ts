@@ -84,6 +84,13 @@ export type ChatServerEvent =
   | { type: "read"; conversation_id: string; reader_id: string; at?: string }
   | { type: "read-ack"; conversation_id: string; marked: number }
   | { type: "typing"; conversation_id: string; user_id: string }
+  | {
+      /** 消息被撤回 / 被管理员下架 —— 对端 UI 立即替换成占位文案 */
+      type: "message-deleted";
+      conversation_id: string;
+      message_id: string;
+      deleted_by: "user" | "staff";
+    }
   | { type: "notification"; notification: Record<string, unknown> }
   | { type: "broadcast"; broadcast: Record<string, unknown> }
   | { type: "pong" }
@@ -434,7 +441,6 @@ export async function connectChatSocket(): Promise<boolean> {
     }
     emit(event);
   };
-
   ws.onerror = () => {
     /* onclose 一定会跟着来，这里不重复处理 */
   };
@@ -556,6 +562,37 @@ export function mergeMessage(list: ChatMessage[], incoming: ChatMessage): ChatMe
     );
   }
   return [...list, incoming];
+}
+
+/**
+ * 撤回 / 下架一条消息（软删除）。
+ *
+ * * 本人撤回：只能删自己发的；
+ * * 管理员下架：staff 可删任何一条（后台私信审核页也调同一个端点）。
+ *
+ * 返回后对端会通过 WS 收到 `message-deleted` 帧，UI 立即把气泡换成占位文案。
+ */
+export async function deleteChatMessage(
+  messageId: string,
+): Promise<{ ok: boolean; deletedBy?: string }> {
+  const res = await apiFetchAuthed(`/chat/messages/${encodeURIComponent(messageId)}`, {
+    method: "DELETE",
+  });
+  if (!res || !res.ok) return { ok: false };
+  try {
+    const data = (await res.json()) as { deleted_by?: string };
+    return { ok: true, deletedBy: data.deleted_by };
+  } catch {
+    return { ok: true };
+  }
+}
+
+/**
+ * 把"消息已撤回"应用到本地列表（WS 帧 / 本人撤回后共用）。
+ * 只改这一条：body 清空 + is_deleted，UI 显示「消息已被撤回」。
+ */
+export function applyMessageDeleted(list: ChatMessage[], messageId: string): ChatMessage[] {
+  return list.map((m) => (m.id === messageId ? { ...m, is_deleted: true, body: "", media_urls: [] } : m));
 }
 
 /**
