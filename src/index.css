@@ -345,6 +345,14 @@ button:focus-visible { outline: 2px solid rgba(0,122,255,0.8); outline-offset: 2
 .notification-icon { width: 38px; height: 38px; border-radius: 13px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
 .notification-unread { width: 7px; height: 7px; border-radius: 50%; background: #007AFF; margin-top: 5px; flex-shrink: 0; }
 .notification-count { color: var(--app-muted); font: 600 10px 'JetBrains Mono', monospace; }
+
+/* 「全部已读」按钮（通知中心右上角）
+   为什么单独写样式：之前用的是 .theme-secondary + disabled:opacity-40，
+   浅色模式下 0.72 × 0.40 ≈ 0.29 的黑字浮在浅色玻璃背景上 —— 基本看不见，
+   用户反馈"这个按钮不存在"。改成主题强调色；禁用态用 --tx-5（不再叠 opacity），
+   所以"没有未读"时它是明确的浅灰，而不是消失。 */
+.notif-read-all { color: var(--accent-soft-text); }
+.notif-read-all:disabled { color: var(--tx-5); opacity: 1; }
 .past-course { background: rgba(255,255,255,0.08); }
 .past-course-title { color: rgba(235,235,245,0.58); }
 .light .past-course { background: rgba(225,227,234,0.72); }
@@ -809,38 +817,11 @@ html {
 }
 
 /* ===== Dev Simulation Console ===== */
-.dev-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 8000;
-  background: rgba(0, 0, 0, 0.55);
-  display: flex;
-  align-items: flex-end;
-  justify-content: center;
-  animation: fade-in 180ms ease both;
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
-}
-.dev-sheet {
-  width: 100%;
-  max-width: 430px;
-  margin: 0 auto;
-  padding: 18px 18px calc(env(safe-area-inset-bottom, 0px) + 18px);
-  border-radius: 24px 24px 0 0;
-  background: rgba(22, 22, 26, 0.98);
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
-  box-shadow: 0 -18px 48px rgba(0, 0, 0, 0.45);
-  animation: sheet-up 260ms cubic-bezier(0.16, 1, 0.3, 1) both;
-  max-height: 82vh;
-}
-.light .dev-sheet {
-  background: rgba(246, 246, 250, 0.98);
-  border-top-color: rgba(0, 0, 0, 0.1);
-}
-@keyframes sheet-up {
-  from { transform: translateY(40px); opacity: 0; }
-  to { transform: translateY(0); opacity: 1; }
-}
+/* 已删除：.dev-backdrop / .dev-sheet / @keyframes sheet-up
+   这三个是早期"开发模拟控制台"调试面板的样式，代码里已经没有任何 JSX 引用它们
+   （实测：src/ 下对 dev-backdrop / dev-sheet 的引用数为 0）。
+   留着会让人以为 App 里还有调试面板 —— 真机上出现过的写死测试横幅就是那套东西。
+   需要调试 UI 时用浏览器 devtools，不要再往生产样式表里塞调试面板。 */
 @keyframes fade-in {
   from { opacity: 0; }
   to { opacity: 1; }

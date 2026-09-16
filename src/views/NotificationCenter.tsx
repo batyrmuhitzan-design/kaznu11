@@ -150,23 +150,28 @@ export default function NotificationCenter({
   return (
     <div className="app-surface h-full flex flex-col overflow-hidden">
       <div className="screen-pin px-4 pt-1 shrink-0">
-        <div className="flex items-center justify-between mb-2.5">
+        {/* ⚠️ 这一行必须允许换行：哈语 "Барлығын оқылды деп белгілеу"（28 字符）
+            与俄语 "Отметить все как прочитанные" 都比英语长一倍，
+            在 iPhone SE / mini 上与返回键挤成一行会把文字压扁甚至截断。
+            flex-wrap 让长语言自动落到第二行并右对齐，不改语言长度也不写死宽度。 */}
+        <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 mb-2.5">
           <BackButton onClick={onBack} />
           <button
             type="button"
             onClick={() => void readAll()}
             disabled={unread === 0}
-            className="haptic-action theme-secondary text-xs font-semibold disabled:opacity-40"
+            className="haptic-action notif-read-all ml-auto text-right text-xs font-semibold"
           >
             {t("markAllRead")}
           </button>
         </div>
-        <div className="flex items-end justify-between">
-          <div>
+        <div className="flex items-end justify-between gap-2">
+          <div className="min-w-0">
             <p className="theme-muted text-xs font-semibold uppercase tracking-wide">KazNU Helper</p>
-            <h1 className="text-2xl font-bold text-white mt-1">{t("notifCenter")}</h1>
+            {/* 标题也放宽：哈语 "Хабарландырулар" / 俄语 "Уведомления" 都比 "Notifications" 长 */}
+            <h1 className="text-2xl font-bold text-white mt-1 truncate">{t("notifCenter")}</h1>
           </div>
-          <span className="notification-count">
+          <span className="notification-count shrink-0 text-right">
             {unread} {t("newMessages")}
           </span>
         </div>

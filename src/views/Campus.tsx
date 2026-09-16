@@ -185,8 +185,13 @@ export default function CampusView({
   const [createClubOpen, setCreateClubOpen] = useState(false);
   /** 已通过审核的公开社团 */
   const [clubs, setClubs] = useState<ClubItem[]>([]);
-  /** 我提交过的申请（含 pending / rejected，让用户能看到审核进度） */
-  const [myClubs, setMyClubs] = useState<ClubApplication[]>([]);
+  /** 我提交过的申请（含 pending / rejected，让用户能看到审核进度）。
+   *
+   * ⚠️ 类型是 `ClubApplication[] | null`，**null 表示"还没成功拿到"**（未登录 / 断网 / 超时）。
+   * 真机上曾用 `[]` 兜底 + `myClubs.length > 0` 才渲染 → 整个「我的申请」模块直接消失，
+   * 用户以为 App 漏做了这个功能（网页预览有数据所以看得见）。现在空态与失败态都会显示。
+   */
+  const [myClubs, setMyClubs] = useState<ClubApplication[] | null>(null);
   /**
    * 离线发件箱里待同步的条数（发帖 / 评论 / 点赞）。
    * 大于 0 时页面上会显示「N 条未同步 · 点此重试」——
@@ -238,11 +243,13 @@ export default function CampusView({
     void refresh(category);
   }, [category, refresh]);
 
-  /** 拉社团：公开列表（已审核通过）+ 我提交的（含 pending）。两个都拿不到就保持空态。 */
+  /** 拉社团：公开列表（已审核通过）+ 我提交的（含 pending）。
+   *  失败时**明确写成 null**（而不是保留旧值/空数组），这样界面上能显示"加载失败 · 重试"，
+   *  不会出现"模块凭空消失"。 */
   const refreshClubs = useCallback(async () => {
     const [publicClubs, mine] = await Promise.all([loadClubs(30), loadMyClubs()]);
     if (publicClubs) setClubs(publicClubs);
-    if (mine) setMyClubs(mine);
+    setMyClubs((prev) => mine ?? prev);
   }, []);
 
   useEffect(() => {
@@ -499,6 +506,7 @@ export default function CampusView({
           <ClubsSection
             clubs={clubs}
             myClubs={myClubs}
+            onRetry={() => void refreshClubs()}
             onCreate={() => {
               hapticTap();
               setCreateClubOpen(true);
@@ -604,10 +612,13 @@ function NotificationBanner({
 function ClubsSection({
   clubs,
   myClubs,
+  onRetry,
   onCreate,
 }: {
   clubs: ClubItem[];
-  myClubs: ClubApplication[];
+  /** null = 还没成功拿到（未登录 / 断网 / 超时）→ 显示失败态，绝不静默隐藏 */
+  myClubs: ClubApplication[] | null;
+  onRetry: () => void;
   onCreate: () => void;
 }) {
   const t = useI18n();
@@ -621,12 +632,52 @@ function ClubsSection({
     <div className="space-y-2.5">
       <p className="theme-section-title text-sm font-semibold">{t("clubs")}</p>
 
-      {myClubs.length > 0 && (
-        <div className="glass squircle-lg p-3.5 space-y-2">
-          <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "var(--tx-5)" }}>
-            {t("myClubApplications")}
-          </p>
-          {myClubs.map((app) => {
+      {/* 「我的申请」：**三种状态都渲染**（有数据 / 空 / 加载失败）。
+          之前只在 myClubs.length > 0 时渲染 —— 真机上没数据或请求失败就直接消失，
+          用户以为客户端漏了这块功能（网页预览有种子数据，所以只在真机暴露）。 */}
+      <div className="glass squircle-lg p-3.5 space-y-2">
+        <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "var(--tx-5)" }}>
+          {t("myClubApplications")}
+        </p>
+
+        {myClubs === null ? (
+          <div className="flex items-center gap-2">
+            <span className="text-sm leading-none">⚠️</span>
+            <span className="min-w-0 flex-1 text-[11px] leading-snug" style={{ color: "var(--danger)" }}>
+              {t("clubAppsFailed")}
+            </span>
+            <button
+              type="button"
+              onClick={() => {
+                hapticTap();
+                onRetry();
+              }}
+              className="haptic-action shrink-0 text-[11px] font-bold underline"
+              style={{ color: "var(--accent-soft-text)" }}
+            >
+              {t("clubReload")}
+            </button>
+          </div>
+        ) : myClubs.length === 0 ? (
+          <div className="flex items-center gap-2">
+            <span className="text-sm leading-none">📭</span>
+            <span className="min-w-0 flex-1 text-[11px] leading-snug text-[color:var(--tx-3)]">
+              {t("clubAppsEmpty")}
+            </span>
+            <button
+              type="button"
+              onClick={() => {
+                hapticTap();
+                onCreate();
+              }}
+              className="haptic-action shrink-0 text-[11px] font-bold underline"
+              style={{ color: "var(--accent-soft-text)" }}
+            >
+              {t("createClub")}
+            </button>
+          </div>
+        ) : (
+          myClubs.map((app) => {
             const style = statusStyle[app.status] ?? statusStyle.pending;
             return (
               <div key={app.id} className="flex items-center gap-2.5">
@@ -645,17 +696,19 @@ function ClubsSection({
                     </p>
                   )}
                 </div>
+                {/* 状态标签：长语言（哈语 "Қабылданбады" / 俄语 "Отклонено"）交给 flex 自适应，
+                    不写死宽度，也不让它把左边的社团名挤变形 */}
                 <span
-                  className="shrink-0 text-[9px] font-bold px-2 py-0.5 rounded-full"
-                  style={{ background: style.bg, color: style.color }}
+                  className="shrink-0 max-w-[45%] px-2 py-0.5 rounded-full text-[9px] font-bold text-center"
+                  style={{ background: style.bg, color: style.color, lineHeight: 1.35 }}
                 >
                   {style.label}
                 </span>
               </div>
             );
-          })}
-        </div>
-      )}
+          })
+        )}
+      </div>
 
       {clubs.length > 0 && (
         <div className="chip-scroller flex gap-2.5 overflow-x-auto pb-1">

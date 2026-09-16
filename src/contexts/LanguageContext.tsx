@@ -38,6 +38,7 @@ type ClubTranslationKey =
   | "clubContact" | "clubContactNamePlaceholder" | "clubTelegramPlaceholder" | "clubContactHint"
   | "clubSubmit" | "clubSubmitting" | "clubReviewHint"
   | "clubStatusPending" | "clubStatusApproved" | "clubStatusRejected"
+  | "clubAppsEmpty" | "clubAppsFailed" | "clubReload"
   | "clubSubmittedTitle" | "clubSubmittedHint"
   | "clubCatAcademic" | "clubCatSports" | "clubCatArts" | "clubCatTech" | "clubCatVolunteer" | "clubCatMedia"
   | "clubApplyUnauth" | "clubApplyDuplicate" | "clubApplyInvalid" | "clubApplyFailed"
@@ -150,6 +151,10 @@ const ADDITIONAL_TRANSLATIONS: Record<Language, Record<string, string>> = {
     clubSubmit: "Submit", clubSubmitting: "Submitting…",
     clubReviewHint: "Applications are reviewed by the student affairs team — usually within 1–2 days.",
     clubStatusPending: "Pending review", clubStatusApproved: "Approved", clubStatusRejected: "Rejected",
+    // 我的申请：**空态与失败态都要显示**，不能静默隐藏（真机上曾因此"整个模块不见了"）
+    clubAppsEmpty: "No applications yet",
+    clubAppsFailed: "Could not load your applications",
+    clubReload: "Reload",
     clubSubmittedTitle: "Application submitted",
     clubSubmittedHint: "Our team will review it shortly. You can follow the status right here in Campus.",
     clubCatAcademic: "Academic", clubCatSports: "Sports", clubCatArts: "Arts",
@@ -239,6 +244,9 @@ const ADDITIONAL_TRANSLATIONS: Record<Language, Record<string, string>> = {
     clubSubmit: "Жіберу", clubSubmitting: "Жіберілуде…",
     clubReviewHint: "Өтінімдерді студенттік істер тобы қарайды — әдетте 1–2 күн ішінде.",
     clubStatusPending: "Тексеруде", clubStatusApproved: "Мақұлданды", clubStatusRejected: "Қабылданбады",
+    clubAppsEmpty: "Әзірге өтінім жоқ",
+    clubAppsFailed: "Өтінімдеріңізді жүктеу мүмкін болмады",
+    clubReload: "Қайта жүктеу",
     clubSubmittedTitle: "Өтінім жіберілді",
     clubSubmittedHint: "Команда жақын арада қарайды. Күйін осы жерден бақылай аласыз.",
     clubCatAcademic: "Академиялық", clubCatSports: "Спорт", clubCatArts: "Өнер",
@@ -314,6 +322,9 @@ const ADDITIONAL_TRANSLATIONS: Record<Language, Record<string, string>> = {
     clubSubmit: "Отправить", clubSubmitting: "Отправка…",
     clubReviewHint: "Заявки рассматривает студенческий отдел — обычно 1–2 дня.",
     clubStatusPending: "На проверке", clubStatusApproved: "Одобрено", clubStatusRejected: "Отклонено",
+    clubAppsEmpty: "Заявок пока нет",
+    clubAppsFailed: "Не удалось загрузить ваши заявки",
+    clubReload: "Обновить",
     clubSubmittedTitle: "Заявка отправлена",
     clubSubmittedHint: "Команда скоро рассмотрит её. Статус можно отслеживать прямо здесь.",
     clubCatAcademic: "Академическое", clubCatSports: "Спорт", clubCatArts: "Искусство",

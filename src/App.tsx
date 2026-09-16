@@ -1,3 +1,4 @@
+import { Capacitor } from "@capacitor/core";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import Dashboard from "./views/Dashboard";
 import Grades from "./views/Grades";
@@ -96,6 +97,19 @@ function TabIcon({ icon, active }: { icon: string; active: boolean }) {
   };
   return icons[icon] || null;
 }
+
+/**
+ * 是否运行在真机（iOS WebView / Android）原生容器里。
+ *
+ * ⚠️ 用它来决定要不要给根容器加"手机列"宽度限制：
+ *    - 真机：宽度必须 **100%**（iPhone 竖屏 / 横屏、iPad 都要铺满，
+ *      否则 iPad 上会被夹成 430px 的一条，两侧留黑）；
+ *    - 桌面浏览器预览：保留 430px 宽的"手机列"，方便对着设计稿调 UI。
+ * 注意 SafeArea 不靠这个：刘海/灵动岛/Home Indicator 由 CSS
+ * `env(safe-area-inset-*)`（见 index.css 的 .app-root / .screen-pin）避让，
+ * 配合 capacitor.config.ts 的 `contentInset: 'never'` 与状态栏 overlay 使用。
+ */
+const IS_NATIVE_PLATFORM = Capacitor.isNativePlatform();
 
 export default function App() {
   const [activeTab, setActiveTab] = useState("dashboard");
@@ -323,9 +337,9 @@ export default function App() {
       className="app-root relative w-full h-full flex flex-col overflow-hidden"
       style={{
         fontFamily: "Inter, system-ui, sans-serif",
-        // min(430px, 100%)：桌面预览仍保持 430px 的"手机列"，但在窄屏/iPhone SE 上
-        // 严格不超过视口宽度 —— 配合 CSS 的 overflow-x:hidden 彻底堵住横向拖动。
-        maxWidth: "min(430px, 100%)",
+        // 真机：100% 铺满；桌面预览：min(430px, 100%) 保持"手机列"且绝不超出视口。
+        // 配合 CSS 的 overflow-x:hidden，横向拖动被彻底堵住。
+        maxWidth: IS_NATIVE_PLATFORM ? "none" : "min(430px, 100%)",
         margin: "0 auto",
       }}
     >

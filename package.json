@@ -12,6 +12,9 @@
     "verify:theme": "node --import ./scripts/lib/register-ts.mjs scripts/verify-theme-system.cjs",
     "verify:guard": "node scripts/lib/guard-self-test.cjs",
     "verify:subpath": "node scripts/lib/verify-subpath.cjs",
+    "verify:ios-bundle": "node scripts/verify-ios-bundle.cjs",
+    "verify:native": "node --import ./scripts/lib/register-ts.mjs scripts/verify-native-layout.cjs",
+    "ios:sync": "npm run build && npx cap sync ios",
     "postinstall": "node scripts/patch-capacitor-system-sound.cjs"
   },
   "dependencies": {

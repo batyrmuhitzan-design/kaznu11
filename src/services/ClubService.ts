@@ -81,21 +81,63 @@ async function authHeader(): Promise<Record<string, string>> {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
+/**
+ * 社团接口超时：**12s**。
+ *
+ * ⚠️ 真机排查记录：之前是 4s（公开列表）/ 5s（我的申请）。手机在蜂窝网络下
+ * "冷启动"一次请求要 DNS + TLS 握手（可能还有 IPv6 回退重试），4 秒经常不够 ——
+ * Web 端（同源、已缓存连接）毫秒级返回，于是出现"网页好好的、真机连不上服务器"
+ * 的现象。这不是域名/端口配错（本项目地址统一是 https://1losion.me，见 utils/config.ts）。
+ */
+const CLUB_TIMEOUT_MS = 12000;
+
+/**
+ * 带一次重试的 GET。
+ *
+ * 只在"网络异常 / 超时 / 5xx"时重试一次（间隔 700ms）：
+ *  - 4xx（含 401 / 404）不重试 —— 重试不会变好，还会拖慢界面；
+ *  - 幂等 GET 重试是安全的。
+ */
+async function fetchJsonWithRetry(
+  url: string,
+  init: RequestInit,
+  attempts = 2,
+): Promise<Response | null> {
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => controller.abort(), CLUB_TIMEOUT_MS);
+    try {
+      const res = await fetch(url, { ...init, signal: controller.signal });
+      if (res.ok || res.status < 500) return res;
+      console.warn("[clubs] 服务端 5xx，准备重试：", res.status, url);
+    } catch (err) {
+      console.warn(
+        `[clubs] 请求失败（第 ${attempt + 1}/${attempts} 次）：`,
+        err instanceof Error ? err.name : err,
+        url,
+      );
+    } finally {
+      window.clearTimeout(timer);
+    }
+    if (attempt < attempts - 1) {
+      await new Promise((resolve) => window.setTimeout(resolve, 700));
+    }
+  }
+  return null;
+}
+
 /** 公开社团列表。失败返回 null。 */
 export async function loadClubs(limit = 20): Promise<ClubItem[] | null> {
   const url = `${CLUBS_API}/clubs?limit=${limit}`;
   if (blockInsecureRequest(url)) return null;
-  const controller = new AbortController();
-  const timer = window.setTimeout(() => controller.abort(), 4000);
+  const res = await fetchJsonWithRetry(url, { headers: { Accept: "application/json" } });
+  if (!res) return null;
   try {
-    const res = await fetch(url, { signal: controller.signal, headers: { Accept: "application/json" } });
     if (!res.ok) return null;
     const page = (await res.json()) as { items?: ClubItem[] };
     return Array.isArray(page.items) ? page.items : null;
   } catch {
     return null;
-  } finally {
-    window.clearTimeout(timer);
   }
 }
 
@@ -105,17 +147,14 @@ export async function loadMyClubs(): Promise<ClubApplication[] | null> {
   if (blockInsecureRequest(url)) return null;
   const headers = await authHeader();
   if (!headers.Authorization) return null;
-  const controller = new AbortController();
-  const timer = window.setTimeout(() => controller.abort(), 5000);
+  const res = await fetchJsonWithRetry(url, { headers: { ...headers, Accept: "application/json" } });
+  if (!res) return null;
   try {
-    const res = await fetch(url, { signal: controller.signal, headers: { ...headers, Accept: "application/json" } });
     if (!res.ok) return null;
     const data = (await res.json()) as ClubApplication[];
     return Array.isArray(data) ? data : null;
   } catch {
     return null;
-  } finally {
-    window.clearTimeout(timer);
   }
 }
 
