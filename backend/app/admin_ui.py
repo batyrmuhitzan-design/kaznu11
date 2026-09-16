@@ -12,7 +12,10 @@ from pathlib import Path
 from fastapi import Request
 from sqladmin import Admin, ModelView, action
 from sqladmin.authentication import AuthenticationBackend
+from sqlalchemy import inspect as sa_inspect
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
+from sqlalchemy.sql import Select
 from starlette.responses import RedirectResponse
 
 from .admin_service import get_application_or_404, handle_application, set_user_banned
@@ -930,7 +933,17 @@ class ClubApplicationAdmin(ModelView, model=ClubApplication):
 
 
 def _chat_sender_label(model: Message, _attr: str) -> str:
-    """私信发送者（管理端要能追责，这里显示全局显示名 + 学号）。"""
+    """私信发送者（管理端要能追责，这里显示全局显示名 + 学号）。
+
+    ⚠️ 必须防 DetachedInstanceError：列表页的行对象在模板渲染时可能已经与 Session
+    分离，此时访问 ``model.sender`` 会抛
+    ``Parent instance <Message> is not bound to a Session; lazy load operation of
+    attribute 'sender' cannot proceed`` → **整个后台页面 500**（线上实测踩到：
+    本地临时库没有私信，空表不触发格式化函数，所以本地一直是 200）。
+    这里先看属性是否已加载；没加载就退回 sender_id，绝不让页面挂掉。
+    """
+    if "sender" in sa_inspect(model).unloaded:
+        return model.sender_id or "—"
     sender = model.sender
     if sender is None:
         return "—"
@@ -940,9 +953,14 @@ def _chat_sender_label(model: Message, _attr: str) -> str:
 
 def _chat_conversation_label(model: Message, _attr: str) -> str:
     """会话参与者摘要（a ↔ b），让人一眼看懂这条私信在谁和谁之间。"""
+    if "conversation" in sa_inspect(model).unloaded:
+        return model.conversation_id or "—"
     conversation = model.conversation
     if conversation is None:
         return model.conversation_id or "—"
+    state = sa_inspect(conversation)
+    if "user_a" in state.unloaded or "user_b" in state.unloaded:
+        return conversation.id
     a = conversation.user_a
     b = conversation.user_b
     if a is None or b is None:
@@ -1000,6 +1018,26 @@ class MessageAdmin(ModelView, model=Message):
     column_searchable_list = [Message.body]
     column_default_sort = [("created_at", True)]
     page_size = 40
+
+    # 预加载关联对象：格式化函数要显示"谁发给谁的"，
+    # 不预加载就会在模板渲染阶段触发 lazy load → DetachedInstanceError → 整页 500。
+    # （格式化函数里另有兜底，这里是为了正常情况下真的显示出人名字。）
+    # ⚠️ 这一版 sqladmin 的 list_query 是**方法**（list_query(request) -> Select），
+    #    直接写成类属性会得到 `TypeError: 'Select' object is not callable`。
+    def list_query(self, request: Request) -> Select:
+        return super().list_query(request).options(
+            selectinload(Message.sender),
+            selectinload(Message.conversation).selectinload(Conversation.user_a),
+            selectinload(Message.conversation).selectinload(Conversation.user_b),
+        )
+
+    def form_details_query(self, request: Request) -> Select:
+        """详情页（管理员点开一条私信准备下架时走的页面）同样要预加载关联对象。"""
+        return super().form_details_query(request).options(
+            selectinload(Message.sender),
+            selectinload(Message.conversation).selectinload(Conversation.user_a),
+            selectinload(Message.conversation).selectinload(Conversation.user_b),
+        )
 
     def is_accessible(self, request: Request) -> bool:
         return _allowed(request, STAFF_ROLES)

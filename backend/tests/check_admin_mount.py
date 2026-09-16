@@ -38,11 +38,13 @@ SUPER_ADMIN_USERNAME = "admin@1losion.me"
 SUPER_ADMIN_PASSWORD = "admin123456"
 
 import httpx  # noqa: E402
+from sqlalchemy import select  # noqa: E402
 
 import main as entrypoint  # noqa: E402  ← 被测对象：仓库根 main.py（线上 uvicorn main:app 用的入口）
 
 from app.bootstrap import ensure_super_admin  # noqa: E402
 from app.database import SessionLocal, init_db  # noqa: E402
+from app.models import ROLE_SUPER_ADMIN, User  # noqa: E402
 from app.seed import seed_if_empty  # noqa: E402
 
 EXPECTED_PATHS = [
@@ -134,6 +136,42 @@ async def _run() -> None:
             bad(f"/admin/login → {login.status_code}")
 
         # ---- 2b) 管理端视图真的挂上了（不是"代码里写了 add_model_view"就算数）----
+        # ⚠️ 这里必须**造一条真实私信**再访问列表页：空表时 SQLAdmin 不会调用
+        #    列格式化函数，于是关联对象懒加载的 bug（DetachedInstanceError）不会暴露 ——
+        #    线上就是这样 500 的（本地空库一直 200，被骗过）。
+        from app.models import Conversation as _Conversation  # noqa: E402
+        from app.models import Message as _Message  # noqa: E402
+
+        async with SessionLocal() as session:
+            author = (
+                await session.scalar(select(User).where(User.role == ROLE_SUPER_ADMIN))
+            )
+            peer = User(
+                univer_username="e2e-peer@student.kaznu.kz",
+                global_display_name="E2E Peer",
+                role="user",
+            )
+            session.add(peer)
+            await session.flush()
+            a_id, b_id = sorted([author.id, peer.id])
+            conversation = _Conversation(user_a_id=a_id, user_b_id=b_id)
+            session.add(conversation)
+            await session.flush()
+            session.add(
+                _Message(
+                    conversation_id=conversation.id,
+                    sender_id=author.id,
+                    body="管理端应当能看到这条（E2E）",
+                )
+            )
+            await session.commit()
+            author_name = author.global_display_name or author.univer_username
+
+        async with SessionLocal() as session:
+            message_id = await session.scalar(
+                select(_Message.id).where(_Message.body == "管理端应当能看到这条（E2E）")
+            )
+
         # ⚠️ 必须先登录：SQLAdmin 的认证中间件在**路由匹配之前**就把匿名请求 302 到
         # 登录页，所以未登录时"不存在的视图"也返回 302 —— 那时 302/404 无法区分。
         # 登录后：已挂载的视图 → 200，编造的 identity → 404（对照组才成立）。
@@ -158,6 +196,24 @@ async def _run() -> None:
                 ok(f"{path} → 200（{label} 视图已挂载）")
             else:
                 bad(f"{path} → {res.status_code}（{label} 视图**没挂上**）")
+
+        # 行渲染也要用真实数据过一遍：关联对象懒加载会在这一步炸
+        listing = await client.get("/admin/message/list")
+        if listing.status_code == 200 and "管理端应当能看到这条" in listing.text:
+            ok("私信审核列表能渲染出真实行（正文 + 关联对象都能取到）")
+        else:
+            bad(f"私信审核列表渲染失败：HTTP {listing.status_code}")
+        if listing.status_code == 200 and author_name in listing.text:
+            ok(f"列表里显示了发送者显示名（{author_name}）—— 关联预加载生效")
+        else:
+            bad("列表里没有发送者显示名（关联对象没预加载，只能退回 id）")
+
+        # 详情页：管理员点开一条私信准备下架时走的就是这个页面，同样会做关联渲染
+        detail = await client.get(f"/admin/message/details/{message_id}", follow_redirects=False)
+        if detail.status_code == 200 and "管理端应当能看到这条" in detail.text:
+            ok("私信详情页 → 200 且渲染出正文（下架前能看清内容）")
+        else:
+            bad(f"私信详情页 → {detail.status_code}（管理员点开会 500）")
 
         control = await client.get("/admin/definitely-not-a-view/list", follow_redirects=False)
         if control.status_code == 404:
