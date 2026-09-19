@@ -9,8 +9,14 @@
   · 本脚本可重复执行（幂等）：secret 只在缺失时生成一次，之后保持不变
     （secret 变了会让已登录会话全部失效）。
 
-NodeBB 官方 setup.json 结构（database=redis 时只需 redis 段）：
-  {"url":..., "secret":..., "database":"redis", "redis":{...}, "admin":{...}}
+NodeBB 的 setup.json 有**两种**格式，别混（实测踩过）：
+  · CLI 非交互安装（我们用这条）→ **nconf 扁平键**：`admin:username` / `redis:host` …
+    依据：src/install.js:57 `NODEBB_ADMIN_USERNAME: 'admin:username'`、
+          install/databases.js:24 `config['redis:host']`
+  · 网页安装器的预填值 → `{"defaults": {"redis": {...}, "mongo": {...}}}`
+    （镜像自带 install/docker/setup.json 就是这个形状）
+本脚本按**扁平键**生成——因为我们是 headless CLI 安装；网页安装器读不到 defaults
+只会"以空默认值继续"，不影响功能。
 """
 from __future__ import annotations
 
@@ -68,13 +74,17 @@ def main() -> int:
         "url": env.get("NODEBB_URL", "http://127.0.0.1:4567"),
         "secret": env["NODEBB_SECRET"],
         "database": "redis",
-        # 服务名来自 docker-compose.yml（同一 compose 网络内解析）
-        "redis": {"host": "redis", "port": 6379, "database": 0},
-        "admin": {
-            "username": env["NODEBB_ADMIN_USER"],
-            "password": env["NODEBB_ADMIN_PASSWORD"],
-            "email": env["NODEBB_ADMIN_EMAIL"],
-        },
+        # 服务名来自 docker-compose.yml（同一 compose 网络内解析）。
+        # ⚠️ 必须用扁平键：install/databases.js 读的是 config['redis:host']
+        "redis:host": "redis",
+        "redis:port": 6379,
+        "redis:database": 0,
+        # ⚠️ 同理：src/install.js 读的是 'admin:username' 这类键，
+        #    而且校验里要求 admin:password:confirm 存在
+        "admin:username": env["NODEBB_ADMIN_USER"],
+        "admin:password": env["NODEBB_ADMIN_PASSWORD"],
+        "admin:password:confirm": env["NODEBB_ADMIN_PASSWORD"],
+        "admin:email": env["NODEBB_ADMIN_EMAIL"],
     }
 
     SETUP_FILE.write_text(json.dumps(setup, indent=2) + "\n", encoding="utf-8")
