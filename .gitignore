@@ -20,6 +20,10 @@ venv/
 .venv/
 *.db
 
+# NodeBB 试跑栈的密钥文件（含管理员密码 / NodeBB secret，只生成在服务器上）
+deploy/nodebb/setup.json
+deploy/nodebb/token.json
+
 # Platform-managed agentplat state, not project source. In the
 # client-initiated single-repo workspace layout (make's `Path: "."` spec) the
 # repo root IS the workspace root, so these land inside this repo rather than

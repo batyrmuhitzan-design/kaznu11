@@ -47,5 +47,10 @@ StandardError=append:/var/log/kaznu-api.log
 KillSignal=SIGINT
 TimeoutStopSec=20
 
+# 生产保护：这台 VPS 只有 842MB 内存（可用 ~159MB）且装了 NodeBB 试跑栈。
+# OOM killer 挑人时按 oom_score 打分，-500 让内核**最后**才考虑杀生产 API；
+# 试跑容器另有 mem_limit，超限会死在自己的 cgroup 里，轮不到宿主 OOM。
+OOMScoreAdjust=-500
+
 [Install]
 WantedBy=multi-user.target

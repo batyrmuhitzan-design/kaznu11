@@ -1,0 +1,85 @@
+# =====================================================================
+# NodeBB 社区试跑栈 —— 与生产 FastAPI / SQLite / 1Panel-openresty 完全隔离
+#
+# 四条隔离原则（这台机器上还跑着生产）：
+#   1) 只绑回环 127.0.0.1:4567；公网入口留给已有的 openresty，
+#      **绝不启动 Caddy**（README 已警告 Caddy 会抢 80/443）；
+#   2) 独立 compose project 名 + 独立网络，不与生产容器混用；
+#   3) mem_limit 硬上限：内存超了就死在容器自己的 cgroup 内，
+#      不会被宿主 OOM killer 波及生产（uvicorn 另有 OOMScoreAdjust=-500）；
+#   4) 数据全在具名 volume 里，`down -v` 即彻底回滚，不碰 kaznu_helper.db。
+#
+# 用法（仓库根目录）：
+#   cp -n deploy/nodebb/.env.example deploy/nodebb/.env   # 填管理员密码
+#   python3 deploy/nodebb/make-setup.py                   # 生成 setup.json（不入库）
+#   docker compose -f deploy/nodebb/docker-compose.yml up -d
+#   python3 deploy/nodebb/smoke.py                        # 分类/发帖/引用/投票/举报/搜索
+# 回滚：docker compose -f deploy/nodebb/docker-compose.yml down -v
+# =====================================================================
+name: kaznu-nodebb
+
+services:
+  nodebb:
+    image: ghcr.io/nodebb/nodebb:latest
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${NODEBB_PORT:-4567}:4567"
+    env_file: [.env]
+    environment:
+      # 反代 / 子域名部署必须让 NodeBB 知道对外真实地址，否则登录与 WebSocket 会出错
+      URL: ${NODEBB_URL:-http://127.0.0.1:4567}
+      TZ: ${TZ:-Asia/Almaty}
+    volumes:
+      - nodebb-config:/opt/config
+      - nodebb-uploads:/usr/src/app/public/uploads
+      - nodebb-build:/usr/src/app/build
+      - ./setup.json:/usr/src/app/setup.json:ro
+    mem_limit: ${NODEBB_MEM_LIMIT:-320m}
+    cpus: "1.0"
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:4567/api/ping >/dev/null 2>&1 || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 240s
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+
+  redis:
+    # NodeBB 官方支持 Redis ≥ 7.2 作为**主库**：常驻内存 ~几十 MB，
+    # 而 Mongo 要几百 MB —— 这台 842MB 的机器上只有 Redis 这条路。
+    image: redis:7.4-alpine
+    restart: unless-stopped
+    # ⚠️ 必须 noeviction：Redis 当主库时逐出 key 等于 NodeBB 丢数据
+    command:
+      - redis-server
+      - --appendonly
+      - "yes"
+      - --maxmemory
+      - ${REDIS_MAXMEMORY:-96mb}
+      - --maxmemory-policy
+      - noeviction
+      - --loglevel
+      - warning
+    volumes:
+      - redis-data:/data
+    mem_limit: ${REDIS_MEM_LIMIT:-160m}
+    # 不发布任何端口：只有本 compose 网络内可达（NodeBB 通过服务名 redis 连）
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    logging:
+      driver: json-file
+      options: { max-size: "5m", max-file: "2" }
+
+volumes:
+  nodebb-config:
+  nodebb-uploads:
+  nodebb-build:
+  redis-data:
