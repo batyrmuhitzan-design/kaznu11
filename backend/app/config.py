@@ -123,6 +123,41 @@ class Settings:
     #: 全校广播时的 APNs 并发批次大小（避免一次性打开上千条 HTTP/2 流）
     broadcast_push_batch: int = int(os.getenv("BROADCAST_PUSH_BATCH", "120"))
 
+    # ---------- 社区论坛（NodeBB）单点登录：session-sharing 插件 ----------
+    # 原理：我们在**裸域**上写一个含 JWT 的 cookie，NodeBB 的
+    # `nodebb-plugin-session-sharing` 读到就自动登录/建号 —— 不需要 OAuth 往返，
+    # 也不需要用户重输密码（详见 deploy/nodebb/README.md）。
+    #: 论坛地址，必须是 1losion.me 的**子域**（cookie 才能跨子域共享）。
+    #: 留空 → 社区入口整体关闭（前端按钮自动隐藏，不给用户"点了没反应"）。
+    community_forum_url: str = os.getenv("COMMUNITY_FORUM_URL", "").rstrip("/")
+    #: 与 NodeBB 插件共用的 HS256 密钥。**必填**（留空同样视为未启用）
+    community_sso_secret: str = os.getenv("COMMUNITY_SSO_SECRET", "")
+    #: 共享 cookie 名（要与插件设置里的一致，插件默认 `token`）
+    community_sso_cookie: str = os.getenv("COMMUNITY_SSO_COOKIE", "token")
+    #: cookie 的 Domain（裸域，例 `.1losion.me`）；留空则按论坛域名自动推导
+    community_cookie_domain: str = os.getenv("COMMUNITY_COOKIE_DOMAIN", "")
+    #: 一次性跳转码有效期（秒）—— 只够浏览器完成一次跳转
+    community_launch_ttl: int = int(os.getenv("COMMUNITY_LAUNCH_TTL", "60"))
+    #: 共享 JWT 的有效期（秒，默认 12 小时）；到期后论坛会话自动失效
+    community_jwt_ttl: int = int(os.getenv("COMMUNITY_JWT_TTL", str(12 * 60 * 60)))
+    #: 论坛上用的用户名前缀（避免与 NodeBB 里已有的用户名撞车）
+    community_username_prefix: str = os.getenv("COMMUNITY_USERNAME_PREFIX", "kaznu_")
+
+    @property
+    def community_enabled(self) -> bool:
+        """论坛地址与密钥都配了才算启用。"""
+        return bool(self.community_forum_url and self.community_sso_secret)
+
+    @property
+    def community_cookie_scope(self) -> str:
+        """cookie 的 Domain 属性：优先用显式配置，否则从论坛 URL 推导裸域。"""
+        if self.community_cookie_domain:
+            return self.community_cookie_domain
+        host = self.community_forum_url.split("//")[-1].split("/")[0].split(":")[0]
+        parts = host.split(".")
+        return f".{'.'.join(parts[-2:])}" if len(parts) >= 2 else host
+
+
 
 @lru_cache
 def get_settings() -> Settings:

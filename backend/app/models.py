@@ -298,6 +298,33 @@ class GlobalNotification(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, index=True)
 
 
+class CommunityLaunchCode(Base):
+    """社区论坛（NodeBB）一次性跳转码 —— 换取共享会话 cookie 用。
+
+    为什么需要"码"这一层，而不是把 JWT 直接塞进 URL：
+      * JWT 一旦出现在 URL 里，就会进浏览器历史 / `Referer` / 服务器访问日志，
+        而且在有效期内**可被重放**（谁拿到链接谁就能以该用户身份进论坛）；
+      * 这里存的是随机码的 **SHA-256 哈希**（不存原文），校验后立刻标记 `used_at`，
+        有效期内也**只能用一次**；真正的 JWT 是在 `/community/launch` 那一次
+        响应里以 `Set-Cookie` 下发的，不经过 URL。
+
+    `create_all` 会在启动时自动建表（与仓库其它新表一致，无需迁移脚本）。
+    """
+
+    __tablename__ = "community_launch_codes"
+    __table_args__ = (Index("ix_community_code_expires", "expires_at"),)
+
+    #: sha256(raw_code) —— 故意不存原文
+    code_hash: Mapped[str] = mapped_column(String(64), primary_key=True)
+    user_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
+
 # =====================================================================
 # Live Activity 远程推送（APNs）
 # =====================================================================

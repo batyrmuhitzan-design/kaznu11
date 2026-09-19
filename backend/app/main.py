@@ -23,6 +23,7 @@ from .routers import (
     campus,
     chat,
     clubs,
+    community,
     courses,
     live_activity,
     materials,
@@ -154,6 +155,8 @@ def _make_app() -> FastAPI:
     app.include_router(materials.router, prefix="/api/v1")
     # 社团 / 组织申请与展示（CreateClubScreen → POST /clubs/apply）
     app.include_router(clubs.router, prefix="/api/v1")
+    # 社区论坛（NodeBB）入口：一次性跳转码 → 共享会话 cookie（session-sharing 插件）
+    app.include_router(community.router, prefix="/api/v1")
 
     # 上传的图片：本地存储后端下通过 /media 静态提供（云存储后端则由其公网域名直接提供）
     _mount_media(app)

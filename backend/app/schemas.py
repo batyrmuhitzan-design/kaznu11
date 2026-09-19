@@ -311,6 +311,20 @@ class LikeOut(BaseModel):
     message: str
 
 
+class CommunityStatusOut(BaseModel):
+    """社区入口状态：未配置时前端隐藏按钮，避免"点了没反应"。"""
+
+    enabled: bool
+    forum_url: str | None = None
+
+
+class CommunityLaunchOut(BaseModel):
+    """一次性跳转 URL（前端拿到后直接在（应用内）浏览器打开）。"""
+
+    url: str
+    expires_in: int
+
+
 class CommentIn(BaseModel):
     content: str = Field(min_length=1, max_length=800)
     is_anonymous: bool = True

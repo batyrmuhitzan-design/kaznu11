@@ -111,6 +111,46 @@ server {
 
 读操作不受影响（公开分类的读接口无需鉴权，可直连）。
 
+## 进度与续做指引（Phase A 进行中）
+
+### 已完成
+- **FastAPI 侧全绿**（`backend/tests/check_community_sso.py`，24 项断言）：
+  `/community/status`（未配置 → enabled=False，前端隐藏按钮）、`/community/launch-token`
+  （一次性码，库内只存 SHA-256）、`/community/launch`（302 + Set-Cookie，JWT 自行验签通过、
+  HttpOnly/Secure/SameSite=Lax/Domain=裸域）、重放/过期/未知码 → 410、封禁 → 403。
+- **NodeBB 侧**：`nodebb-plugin-session-sharing@8.0.2` 已装、已用写 API 激活（200）、
+  设置已写入 Redis（`secret` / `cookieName=token` / `behaviour=trust`）；论坛与生产均 healthy。
+- **踩坑与修法**（`enable-sso.sh` 已按此实现）：
+  1. `./nodebb activate` 在 v4.16 会误判"未安装"去起 Web 安装向导 → 抢 4567（EADDRINUSE）。
+     改用**写 API**：`PUT /api/v3/admin/plugins/{id}/active`。
+  2. 插件自带的 **2017 升级脚本**（`upgrades/session_sharing_hash_to_zset.js`）在**全新 Redis** 上会崩：
+     `getObject('<name>:uid')` 返回 null → `Object.keys(null)`。它的设计是"没有 `secret` 就跳过"，
+     所以**顺序必须是**：激活 → 在**无 secret** 状态启动一次（升级跳过并记账）→ 再写 secret → 再重启。
+     先写 secret 再启动 = 落进它唯一没防护的分支 = 容器无限重启。
+
+### 未完成（下一步从这里继续）
+**共享 JWT 还没被 NodeBB 接受**（自检返回 `401 not-authorized`）。
+
+排查顺序（都已在脚本里留好入口）：
+1. 确认插件真的进了激活列表并在启动时被加载：
+   `docker compose exec redis redis-cli ZRANGE plugins:active 0 -1`
+   以及 `docker compose logs --tail=200 nodebb | grep -i session`
+2. 若插件未加载：在**应用停止**时构建一次再启动
+   （`docker compose stop nodebb && docker compose exec -T nodebb ./nodebb build && docker compose start nodebb`）
+   —— 之前 build 是在运行中执行的，撞了 4567。
+3. 若已加载但仍 401：查 `library.js` 里 `hostWhitelist` 的语义（空/未设置时是否等于"全拒"），
+   必要时把它设成允许 `127.0.0.1:4567` 与 `forum.1losion.me`。
+4. 通过后，去掉 `enable-sso.sh` 里的顺序注释所依赖的临时状态，再跑
+   `bash deploy/nodebb/enable-sso.sh` 复检（脚本自带 JWT 自检 + 篡改反证）。
+
+### 打开 App 入口（等 DNS/证书就绪）
+```bash
+# 1) DNS：forum.1losion.me A → 74.241.248.9（你来做）
+# 2) 1Panel 里给该子域签证书，并把请求反代到 127.0.0.1:4567（含 WebSocket 升级头）
+# 3) 打开入口开关（写 FastAPI 的 .env 并重启）
+bash deploy/nodebb/enable-sso.sh --enable-entry
+```
+
 ## 已知边界（来自官方 OpenAPI 的实测核对）
 
 | 能力 | 结论 |
