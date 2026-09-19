@@ -180,11 +180,25 @@ def jwt(payload: dict) -> str:
 def probe(token: str):
     """模拟真实浏览器：先请求页面（插件在此校验 JWT 并下发 NodeBB 会话），再带会话查 /api/self。
 
-    只带 JWT 直接打 /api/self 会 401 —— 那不是故障，而是流程不对（实测踩到）。
+    实测：首次登录时插件会返回 **302（Location: /）** —— 这是它建立会话的正常动作，
+    必须手动跟随（urllib 对没有 Location 的 3xx 会抛 HTTPError；直接当失败会误报）。
     """
     jar = http.cookiejar.CookieJar()
     opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(jar))
-    opener.open(urllib.request.Request(BASE + "/", headers={"Cookie": f"token={token}"}), timeout=25).read()
+    url = BASE + "/"
+    req = urllib.request.Request(url, headers={"Cookie": f"token={token}"})
+    for _ in range(4):  # 最多跟 4 跳
+        try:
+            with opener.open(req, timeout=25) as res:
+                res.read()
+            break
+        except urllib.error.HTTPError as exc:
+            if exc.code in (301, 302, 303, 307, 308):
+                loc = exc.headers.get("Location") or "/"
+                url = loc if loc.startswith("http") else BASE + loc
+                req = urllib.request.Request(url, headers={"Cookie": f"token={token}"})
+                continue
+            raise
     with opener.open(urllib.request.Request(BASE + "/api/self"), timeout=25) as res:
         return json.loads(res.read().decode())
 

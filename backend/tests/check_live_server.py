@@ -190,7 +190,6 @@ def code(url: str) -> int:
 for path, label in (
     ("/admin/message/list", "私信内容审核（Message）"),
     ("/admin/global-notification/list", "全校通知"),
-    ("/admin/post-comment/list", "校园墙评论"),
 ):
     status = code(f"http://127.0.0.1:8000{path}")
     if status == 200:

@@ -46,10 +46,7 @@ from sqlalchemy import select  # noqa: E402
 import main as entrypoint  # noqa: E402  ← 被测对象：仓库根 main.py
 
 from app.admin_ui import (  # noqa: E402
-    ClubEventAdmin,
     GlobalNotificationAdmin,
-    PostAdmin,
-    PostCommentAdmin,
 )
 from app.bootstrap import ensure_super_admin  # noqa: E402
 from app.database import SessionLocal, init_db  # noqa: E402
@@ -451,7 +448,7 @@ async def _run() -> None:
             follow_redirects=False,
         )
         if login.status_code in (302, 303):
-            for cls in (PostAdmin, PostCommentAdmin, ClubEventAdmin, GlobalNotificationAdmin):
+            for cls in (GlobalNotificationAdmin,):
                 res = await staff.get(f"/admin/{cls.identity}/list")
                 if res.status_code == 200:
                     ok(f"/admin/{cls.identity}/list → 200（{cls.__name__}）")

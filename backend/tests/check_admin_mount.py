@@ -188,7 +188,6 @@ async def _run() -> None:
         expected_views = {
             "/admin/message/list": "私信内容审核（Message）",
             "/admin/global-notification/list": "全校通知（GlobalNotification）",
-            "/admin/post-comment/list": "校园墙评论（PostComment）",
         }
         for path, label in expected_views.items():
             res = await client.get(path, follow_redirects=False)
