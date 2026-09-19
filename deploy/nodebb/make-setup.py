@@ -100,7 +100,7 @@ def main() -> int:
         perms = "0644（非 root，无法 chown 给容器用户）"
 
     print(f"  [ok] 已写出 {SETUP_FILE.name}（{perms}，已 gitignore）")
-    print(f"       url={setup['url']}  database=redis  admin={setup['admin']['username']}")
+    print(f"       url={setup['url']}  database=redis  admin={setup['admin:username']}")
     print("  下一步：docker compose -f deploy/nodebb/docker-compose.yml up -d")
     return 0
 

@@ -33,6 +33,16 @@ services:
       # 反代 / 子域名部署必须让 NodeBB 知道对外真实地址，否则登录与 WebSocket 会出错
       URL: ${NODEBB_URL:-http://127.0.0.1:4567}
       TZ: ${TZ:-Asia/Almaty}
+      # ------------------------------------------------------------------
+      # ⚠️ 这两个变量必须显式设置（实测踩坑）：
+      #   官方 entrypoint 会 `export CONFIG_DIR=... CONFIG=$CONFIG_DIR/config.json`；
+      #   我们覆盖了 entrypoint，如果不补上，loader.js 就按默认路径
+      #   /usr/src/app/config.json 去找 —— 那里什么都没有（config 在卷里），
+      #   于是判定 "No config detected" 并再次 fork 起 web 安装器：
+      #   表现为 setup 明明成功、Redis 里也有数据，但论坛就是不启动。
+      # ------------------------------------------------------------------
+      CONFIG_DIR: /opt/config
+      CONFIG: /opt/config/config.json
     volumes:
       - nodebb-config:/opt/config
       - nodebb-uploads:/usr/src/app/public/uploads
