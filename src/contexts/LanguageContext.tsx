@@ -66,7 +66,10 @@ type ExtraTranslationKey =
   | "comments" | "noComments" | "addComment" | "send"
   | "organizer" | "where" | "when" | "rsvp"
   | "noPosts" | "noPostsHint" | "noEvents" | "noEventsHint"
-  | "offlineDemo" | "notSynced" | "postPublished" | "commentPosted" | "campusLoadFailed";
+  | "offlineDemo" | "notSynced" | "postPublished" | "commentPosted" | "campusLoadFailed"
+// ---- 社区论坛（NodeBB）入口 ----
+| "communityTitle" | "communityBody" | "communityOpen" | "communityOpening" | "communityFailed"
+| "communityAccountNote";
 export type AllTranslationKey = TranslationKey | ExtendedTranslationKey | NewsTranslationKey | ExtraTranslationKey | ChatTranslationKey | ClubTranslationKey;
 
 interface LanguageContextType {
@@ -155,6 +158,15 @@ const ADDITIONAL_TRANSLATIONS: Record<Language, Record<string, string>> = {
     clubAppsEmpty: "No applications yet",
     clubAppsFailed: "Could not load your applications",
     clubReload: "Reload",
+    // 社区论坛（NodeBB）入口
+    communityTitle: "Campus Forum",
+    communityBody:
+      "Discuss courses, buy & sell, and chat with other students. You are signed in automatically.",
+    communityOpen: "Open forum",
+    communityOpening: "Opening…",
+    communityFailed: "Could not open the forum. Please check your connection and try again.",
+    communityAccountNote: "Your KazNU Helper account is used — no separate sign-up needed.",
+
     clubSubmittedTitle: "Application submitted",
     clubSubmittedHint: "Our team will review it shortly. You can follow the status right here in Campus.",
     clubCatAcademic: "Academic", clubCatSports: "Sports", clubCatArts: "Arts",
@@ -247,6 +259,15 @@ const ADDITIONAL_TRANSLATIONS: Record<Language, Record<string, string>> = {
     clubAppsEmpty: "Әзірге өтінім жоқ",
     clubAppsFailed: "Өтінімдеріңізді жүктеу мүмкін болмады",
     clubReload: "Қайта жүктеу",
+    // 社区论坛（NodeBB）入口
+    communityTitle: "Кампус форумы",
+    communityBody:
+      "Курстарды талқылаңыз, сатып алыңыз және сатыңыз, студенттермен сөйлесіңіз. Аккаунт автоматты түрде кіреді.",
+    communityOpen: "Форумды ашу",
+    communityOpening: "Ашылуда…",
+    communityFailed: "Форумды ашу мүмкін болмады. Байланысты тексеріп, қайта көріңіз.",
+    communityAccountNote: "KazNU Helper аккаунтыңыз қолданылады — бөлек тіркелу қажет емес.",
+
     clubSubmittedTitle: "Өтінім жіберілді",
     clubSubmittedHint: "Команда жақын арада қарайды. Күйін осы жерден бақылай аласыз.",
     clubCatAcademic: "Академиялық", clubCatSports: "Спорт", clubCatArts: "Өнер",
@@ -325,6 +346,15 @@ const ADDITIONAL_TRANSLATIONS: Record<Language, Record<string, string>> = {
     clubAppsEmpty: "Заявок пока нет",
     clubAppsFailed: "Не удалось загрузить ваши заявки",
     clubReload: "Обновить",
+    // 社区论坛（NodeBB）入口
+    communityTitle: "Форум кампуса",
+    communityBody:
+      "Обсуждайте курсы, покупайте и продавайте, общайтесь со студентами. Вход выполняется автоматически.",
+    communityOpen: "Открыть форум",
+    communityOpening: "Открывается…",
+    communityFailed: "Не удалось открыть форум. Проверьте соединение и попробуйте снова.",
+    communityAccountNote: "Используется ваш аккаунт KazNU Helper — отдельная регистрация не нужна.",
+
     clubSubmittedTitle: "Заявка отправлена",
     clubSubmittedHint: "Команда скоро рассмотрит её. Статус можно отслеживать прямо здесь.",
     clubCatAcademic: "Академическое", clubCatSports: "Спорт", clubCatArts: "Искусство",

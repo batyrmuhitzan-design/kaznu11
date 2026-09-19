@@ -94,6 +94,18 @@ if [ "$(curl -s -o /dev/null -w '%{http_code}' -m 5 http://127.0.0.1:4567/api/ 2
 fi
 
 echo
+echo "== 2b) 停机构建（必须在容器停止状态跑 build，否则和运行中的实例抢 4567）=="
+docker compose -f docker-compose.yml stop nodebb 2>&1 | tail -1
+docker compose -f docker-compose.yml run --rm --no-deps --entrypoint sh nodebb \
+  -c 'cd /usr/src/app && CONFIG=/opt/config/config.json ./nodebb build 2>&1 | tail -6'
+docker compose -f docker-compose.yml start nodebb >/dev/null 2>&1
+for i in $(seq 1 25); do
+  code=$(curl -s -o /dev/null -w '%{http_code}' -m 5 http://127.0.0.1:4567/api/ 2>/dev/null)
+  [ "$code" = "200" ] && { echo "  构建后论坛已恢复（第 $i 次探测）"; break; }
+  sleep 6
+done
+
+echo
 echo "== 3) 写入插件设置（secret / cookieName / behaviour）=="
 docker compose -f docker-compose.yml exec -T redis redis-cli \
   HSET settings:session-sharing \
@@ -136,9 +148,9 @@ else
 fi
 
 echo
-echo "== 5) 自检：共享 JWT 能否自动登录（含篡改反证）=="
+echo "== 5) 自检：共享 JWT 能否自动登录（两步：先建会话，再验身份）+ 篡改反证 =="
 python3 - "$SECRET" <<'PY'
-import base64, hashlib, hmac, json, sys, time, urllib.error, urllib.request
+import base64, hashlib, hmac, http.cookiejar, json, sys, time, urllib.error, urllib.request
 
 SECRET = sys.argv[1]
 BASE = "http://127.0.0.1:4567"
@@ -160,25 +172,39 @@ def jwt(payload: dict) -> str:
     return f"{seg}.{b64(sig)}"
 
 
+def probe(token: str):
+    """模拟真实浏览器：先请求页面（插件在此校验 JWT 并下发 NodeBB 会话），再带会话查 /api/self。
+
+    只带 JWT 直接打 /api/self 会 401 —— 那不是故障，而是流程不对（实测踩到）。
+    """
+    jar = http.cookiejar.CookieJar()
+    opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(jar))
+    opener.open(urllib.request.Request(BASE + "/", headers={"Cookie": f"token={token}"}), timeout=25).read()
+    with opener.open(urllib.request.Request(BASE + "/api/self"), timeout=25) as res:
+        return json.loads(res.read().decode())
+
+
 token = jwt({"id": UID, "username": "kaznu_verify", "email": "verify@student.kaznu.kz"})
-req = urllib.request.Request(BASE + "/api/self", headers={"Cookie": f"token={token}"})
 try:
-    with urllib.request.urlopen(req, timeout=20) as res:
-        data = json.loads(res.read().decode())
-    print("  [ok] 共享 JWT 被接受：uid=%s username=%s" % (data.get("uid"), data.get("username")))
+    data = probe(token)
+    if data.get("uid"):
+        print("  [ok] 共享 JWT 被接受：uid=%s username=%s" % (data.get("uid"), data.get("username")))
+    else:
+        print("  [!!] 页面请求后仍未登录（/api/self 返回游客）")
+        raise SystemExit(1)
 except urllib.error.HTTPError as exc:
     print("  [!!] 共享 JWT 未被接受：HTTP", exc.code, exc.read().decode()[:200])
     raise SystemExit(1)
 
-bad = jwt({"id": UID, "username": "kaznu_verify"})[:-4] + "0000"
-req = urllib.request.Request(BASE + "/api/self", headers={"Cookie": f"token={bad}"})
-with urllib.request.urlopen(req, timeout=20) as res:
-    data = json.loads(res.read().decode())
-if not data.get("uid"):
-    print("  [ok] 签名被篡改的 JWT 不会登录（仍是游客）")
-else:
-    print("  [!!] 篡改签名竟然也登录了 uid=%s" % data.get("uid"))
-    raise SystemExit(1)
+try:
+    bad = probe((jwt({"id": UID, "username": "kaznu_verify"}))[:-4] + "0000")
+    if not bad.get("uid"):
+        print("  [ok] 签名被篡改的 JWT 不会登录（仍是游客）")
+    else:
+        print("  [!!] 篡改签名竟然也登录了 uid=%s" % bad.get("uid"))
+        raise SystemExit(1)
+except urllib.error.HTTPError as exc:
+    print("  [ok] 签名被篡改的 JWT 被拒（HTTP %s）" % exc.code)
 PY
 echo "ENABLE_SSO_DONE"
 

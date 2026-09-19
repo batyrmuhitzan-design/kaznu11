@@ -150,6 +150,8 @@ function EmptyState({ icon, title, hint }: { icon: string; title: string; hint: 
 // 主视图
 // =====================================================================
 
+import CommunityEntry from "../components/CommunityEntry";
+
 export default function CampusView({
   focusPostId = null,
   onFocusHandled,
@@ -455,6 +457,9 @@ export default function CampusView({
       {notification && notification.id !== dismissedNotification && (
         <NotificationBanner item={notification} onDismiss={dismissNotification} />
       )}
+
+      {/* 社区论坛入口：服务端未配置（enabled=false）时组件自身返回 null，不渲染空壳 */}
+      <CommunityEntry />
 
       {mode === "wall" ? (
         <>
