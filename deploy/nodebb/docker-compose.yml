@@ -74,12 +74,14 @@ services:
       redis:
         condition: service_healthy
     healthcheck:
-      # 镜像里没有 wget/curl（node:lts-slim），用 node 自己探活
+      # 镜像里没有 wget/curl（node:lts-slim），用 node 自己探活。
+      # ⚠️ 探活路径必须是**真实存在**的路由：实测 NodeBB v4 没有 /api/ping
+      #    （那会返回 404 → 容器永远 "health: starting"），而 /api/ 稳定 200。
       test:
         - CMD
         - node
         - -e
-        - "require('http').get('http://127.0.0.1:4567/api/ping',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"
+        - "require('http').get('http://127.0.0.1:4567/api/',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"
       interval: 20s
       timeout: 8s
       retries: 15
