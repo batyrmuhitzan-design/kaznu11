@@ -91,6 +91,7 @@ const serverChecks = [
   ["只扫 is_active = 1 的广播（真机会显示的那些）", /is_active = 1/.test(server), true],
   ["命中测试数据时判失败并指名处理方式", /if hit:[\s\S]{0,220}?bad\(/.test(server), true],
   ["打印当前最新生效通知（运维一眼看到内容）", /最新生效通知/.test(server), true],
+  ["横幅问题给出一键下线链接（不用去翻后台）", /deactivate-notification\?pks=/.test(server), true],
   ["保留迁移补列检查（老库是否真 ALTER）", /pushed_at[\s\S]{0,200}?deleted_by/.test(server), true],
   ["保留 /app 子路径部署检查", /相对路径/.test(server), true],
 ];

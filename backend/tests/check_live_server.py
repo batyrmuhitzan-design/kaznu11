@@ -61,6 +61,9 @@ print(f"  已推送过的广播 = {pushed} 条；已撤回私信 = {recalled} �
 
 print("=== 2b) 顶部横幅卫生（真机顶部显示的就是下面这条）===", flush=True)
 import re  # noqa: E402
+SITE = os.environ.get("KAZNU_SITE", "https://1losion.me").rstrip("/")
+# 一键下线链接：与 check_live_e2e.py 清理走同一条后台动作路由（已实测可用）
+DEACTIVATE = f"{SITE}/admin/global-notification/action/deactivate-notification?pks={{}}"
 
 # 为什么查这个：广播是**所有人可见**的，联调时留下的 '1111' / '测试' / 'E2E 广播'
 # 会像"App 里写死的数据"一样挂在每台设备最上面 —— 用户就是这么投诉的。
@@ -86,7 +89,7 @@ for row in active_rows:
     if hit:
         bad(
             f"真机横幅上是**测试数据**：{row[1]!r}（id={row[0]}）"
-            f" —— 请在后台 Global Notifications 里 🔕 Deactivate 或直接删除"
+            f" —— 一键下线：{DEACTIVATE.format(row[0])}（或后台勾选 → 🔕 Deactivate）"
         )
 residue = con.execute(
     "select count(*) from global_notifications where is_active = 0"
