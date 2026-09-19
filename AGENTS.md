@@ -39,3 +39,17 @@ This project uses **Tailwind CSS v4** through the `@tailwindcss/vite` plugin con
 - Use double quotes for strings containing apostrophes (`"We're here to help"`), or escape them in single-quoted strings. An unescaped apostrophe in a single-quoted string breaks the build.
 - Ensure JSX tags are closed and braces are balanced.
 - Export components as default exports.
+
+## Verification
+
+Run these before calling UI/native work done (`npx tsc --noEmit` plus the guards; each exits non-zero on failure):
+
+- `npm run verify:social` - chat/social UI wiring
+- `npm run verify:theme` - theme/token system
+- `npm run verify:guard` - negative self-test that the guards' selectors can tell good code from bad
+- `npm run verify:subpath` - build works when served from a sub-path
+- `npm run verify:ios-bundle` - the web assets bundled into the iOS app match the latest `dist/`
+- `npm run verify:native` - native layout rules (safe areas, width, no debug leftovers)
+- `npm run verify:live` - the two online-check scripts (`backend/tests/check_live_e2e.py`, `check_live_server.py`) still clean up after themselves
+
+The live checks themselves are run by hand, not by npm (they need a public server): see 「线上验证（部署后必做，两个脚本）」 in `backend/README.md`.

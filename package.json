@@ -14,6 +14,7 @@
     "verify:subpath": "node scripts/lib/verify-subpath.cjs",
     "verify:ios-bundle": "node scripts/verify-ios-bundle.cjs",
     "verify:native": "node --import ./scripts/lib/register-ts.mjs scripts/verify-native-layout.cjs",
+    "verify:live": "node scripts/verify-live-scripts.cjs",
     "ios:sync": "npm run build && npx cap sync ios",
     "postinstall": "node scripts/patch-capacitor-system-sound.cjs"
   },
