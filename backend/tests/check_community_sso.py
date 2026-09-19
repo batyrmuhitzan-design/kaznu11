@@ -183,8 +183,10 @@ async def main() -> None:
             ok("一次性码 → 302（未跟随重定向）")
         else:
             bad(f"一次性码 → HTTP {launched.status_code}（期望 302） {launched.text[:160]}")
-        if launched.headers.get("location") == os.environ["COMMUNITY_FORUM_URL"]:
-            ok(f"Location 指向论坛：{launched.headers.get('location')}")
+        loc = launched.headers.get("location") or ""
+        # 跳转会带 ?kz_app=1（App 内嵌极简主题的启用标记）
+        if loc.startswith(os.environ["COMMUNITY_FORUM_URL"]):
+            ok(f"Location 指向论坛：{loc}")
         else:
             bad(f"Location 不对：{launched.headers.get('location')}")
 

@@ -124,7 +124,12 @@ async def launch(
         payload["email"] = user.univer_email
     token = sign_jwt_hs256(payload, settings.community_sso_secret, settings.community_jwt_ttl)
 
-    response = RedirectResponse(url=settings.community_forum_url, status_code=status.HTTP_302_FOUND)
+    response = RedirectResponse(
+        # `?kz_app=1` 让注入的 JS 给 <html> 加 `.kz-app`，从而只在"从 App / 入口卡进入"
+        # 的会话里启用 App 内嵌极简主题（直接访问 forum 域名或 ACP 后台都不受影响）。
+        url=f"{settings.community_forum_url}?kz_app=1",
+        status_code=status.HTTP_302_FOUND,
+    )
     response.set_cookie(
         key=settings.community_sso_cookie,
         value=token,

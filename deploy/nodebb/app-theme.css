@@ -1,0 +1,99 @@
+/* =====================================================================
+ * KazNU Helper —— App 内嵌（WKWebView）极简主题
+ *
+ * 只作用于**从 App 进入**的会话：注入的 JS 在 URL 带 `kz_app=1`（或本地已记过标记）时
+ * 给 <html> 加上 `.kz-app`，下面所有规则都挂在 `html.kz-app` 下 ——
+ * 网页版（forum.1losion.me 直接访问）与 ACP 后台**完全不受影响**。
+ *
+ * 目标：把 NodeBB 的"网页感"去掉，只保留帖子列表 / 发帖框 / 回复框。
+ * ===================================================================== */
+
+/* 1) 去掉所有"网页骨架"：顶部导航、页脚、侧栏、品牌区、聊天侧栏、面包屑 */
+html.kz-app #header,
+html.kz-app header#header,
+html.kz-app .navbar,
+html.kz-app #footer,
+html.kz-app footer,
+html.kz-app [component="sidebar"],
+html.kz-app [component="chat/nav-wrapper"],
+html.kz-app .brand-container,
+html.kz-app [component="breadcrumb"],
+html.kz-app .topic-main-buttons .dropdown,
+html.kz-app [component="navigation/back-to-top"],
+html.kz-app #panel,
+html.kz-app .offcanvas,
+html.kz-app aside {
+  display: none !important;
+}
+
+/* 2) 让内容占满安全区，去掉网页留白/外边距 */
+html.kz-app body {
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+  background: var(--bs-body-bg);
+}
+html.kz-app .container,
+html.kz-app .container-fluid,
+html.kz-app .container-lg,
+html.kz-app .container-xl {
+  max-width: 100% !important;
+  padding-left: 12px !important;
+  padding-right: 12px !important;
+  padding-top: env(safe-area-inset-top, 0px) !important;
+}
+
+/* 3) 字号 / 行高向 App 靠拢 */
+html.kz-app body,
+html.kz-app .post-content,
+html.kz-app .topic .posts {
+  font-size: 15px !important;
+  line-height: 1.6 !important;
+  -webkit-text-size-adjust: 100%;
+}
+
+/* 4) 帖子卡片：圆角 + 轻分隔，贴近 App 的 squircle 观感 */
+html.kz-app .topic-list > li,
+html.kz-app .categories > li,
+html.kz-app [component="post"] {
+  border: 0 !important;
+  border-radius: 14px !important;
+  margin-bottom: 8px !important;
+  padding: 12px 14px !important;
+  background: var(--bs-tertiary-bg, rgba(127, 127, 127, 0.06)) !important;
+}
+html.kz-app [component="post"] .post-container {
+  padding: 0 !important;
+}
+
+/* 5) 发帖/回复框：去掉工具条杂乱感，聚焦输入 */
+html.kz-app [component="composer"],
+html.kz-app .composer {
+  border-radius: 16px !important;
+}
+html.kz-app .composer .toolbar,
+html.kz-app [component="composer"] .toolbar {
+  border: 0 !important;
+  background: transparent !important;
+}
+
+/* 6) 去掉网页版浮层式的小提示/广告位/推荐块 */
+html.kz-app [component="widget"],
+html.kz-app .widget,
+html.kz-app [component="chat/global"],
+html.kz-app .alert-info a[href*="/admin"] {
+  display: none !important;
+}
+
+/* 7) 底部输入/按钮 适配 Home Indicator */
+html.kz-app .composer-footer,
+html.kz-app .fixed-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px) !important;
+}
+
+/* 8) 亮/暗色跟随 App（Bootstrap 5.3 变量，NodeBB Harmony 已内置） */
+html.kz-app[data-bs-theme="dark"] {
+  color-scheme: dark;
+}
+html.kz-app[data-bs-theme="light"] {
+  color-scheme: light;
+}

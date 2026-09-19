@@ -15,6 +15,9 @@ import { rmpEnsureToken } from "./ProfReviewsService";
 
 const TIMEOUT_MS = 10_000;
 
+/** 官方内嵌 WebView 插件（未安装时下面的动态 import 会失败并自动降级） */
+const IN_APP_BROWSER_PKG = "@capacitor/inappbrowser";
+
 export interface CommunityStatus {
   /** 服务端是否配置好了论坛（域名 + 共享密钥） */
   enabled: boolean;
@@ -73,6 +76,29 @@ export async function openCommunityForum(): Promise<boolean> {
   }
   if (!url) return false;
 
+  // ── 1) 首选：官方 @capacitor/inappbrowser 的**应用内 WKWebView** ──────────────
+  //    为什么不用 @capacitor/browser：它在 iOS 上是 SFSafariViewController（进程外），
+  //    **无法内嵌、也无法注入样式**（`windowName: '_self'` 并不是内嵌开关，别被字段名骗了）。
+  //    为什么不用 iframe：NodeBB 发了 `X-Frame-Options: SAMEORIGIN` +
+  //    `CSP frame-ancestors 'self'`，且从 capacitor://localhost 看属第三方 cookie，
+  //    WKWebView 会拦 —— 登录态拿不到。
+  //    动态 import + 兜底：插件没装时不报错，自动走下面的降级链。
+  try {
+    const [{ Capacitor }, inAppBrowser] = await Promise.all([
+      import("@capacitor/core"),
+      // 用变量 + @vite-ignore：插件未安装时不该让**打包失败**（Vite 默认会静态解析字面量 import）
+      import(/* @vite-ignore */ IN_APP_BROWSER_PKG).catch(() => null),
+    ]);
+    const api = (inAppBrowser as unknown as { InAppBrowser?: { openInWebView?: (o: { url: string }) => Promise<unknown> } } | null)?.InAppBrowser;
+    if (Capacitor.isNativePlatform() && api?.openInWebView) {
+      await api.openInWebView({ url });
+      return true;
+    }
+  } catch (error) {
+    console.warn("[community] InAppBrowser 不可用，尝试降级", error);
+  }
+
+  // ── 2) 降级：Capacitor Browser（应用内 Safari，仍是系统浏览器进程）──────────
   try {
     const [{ Capacitor }, { Browser }] = await Promise.all([
       import("@capacitor/core"),
@@ -85,7 +111,7 @@ export async function openCommunityForum(): Promise<boolean> {
   } catch (error) {
     console.warn("[community] Capacitor Browser 不可用，回落到同页跳转", error);
   }
-  // 网页端：同页跳转（不会被弹窗拦截），后端 302 到论坛
+  // ── 3) 网页端：同页跳转（不会被弹窗拦截），后端 302 到论坛 ─────────────────
   window.location.href = url;
   return true;
 }
