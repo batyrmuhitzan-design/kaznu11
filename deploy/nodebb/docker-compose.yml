@@ -38,17 +38,42 @@ services:
       - nodebb-uploads:/usr/src/app/public/uploads
       - nodebb-build:/usr/src/app/build
       - ./setup.json:/usr/src/app/setup.json:ro
-    mem_limit: ${NODEBB_MEM_LIMIT:-320m}
+    mem_limit: ${NODEBB_MEM_LIMIT:-448m}
     cpus: "1.0"
+    # ------------------------------------------------------------------
+    # 为什么覆盖官方镜像的 entrypoint（实测踩坑）：
+    #   官方 Dockerfile 的默认流程是 `if [ -f /opt/config/config.json ] → 启动论坛；
+    #   否则 → nodebb install（**启动浏览器安装向导**）`。我们这里是 headless 服务器，
+    #   向导无人可点，容器会反复"启动向导 → 退出 → 重启"（实测 restarts=29 的循环）。
+    #   而 src/cli/index.js:184 支持 `nodebb setup '<json>'` 做**非交互**安装，
+    #   所以这里显式走 CLI 路径，并把 --config 固定到卷里
+    #   （setup.js 默认写到 /usr/src/app/config.json —— 不在卷上，重启即丢）。
+    # ------------------------------------------------------------------
+    entrypoint: ["/bin/bash", "-lc"]
+    command:
+      - |
+        set -e
+        if [ ! -f /opt/config/config.json ]; then
+          echo "[nodebb] 首次安装：CLI 非交互 setup（setup.json 由 make-setup.py 生成）"
+          ./nodebb setup --config=/opt/config/config.json "$(cat /usr/src/app/setup.json)"
+          echo "[nodebb] setup 完成"
+        fi
+        echo "[nodebb] 启动论坛（前台，非 daemon）"
+        exec npm start -- --config=/opt/config/config.json --no-silent --no-daemon
     depends_on:
       redis:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:4567/api/ping >/dev/null 2>&1 || exit 1"]
-      interval: 15s
-      timeout: 5s
-      retries: 10
-      start_period: 240s
+      # 镜像里没有 wget/curl（node:lts-slim），用 node 自己探活
+      test:
+        - CMD
+        - node
+        - -e
+        - "require('http').get('http://127.0.0.1:4567/api/ping',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"
+      interval: 20s
+      timeout: 8s
+      retries: 15
+      start_period: 300s
     logging:
       driver: json-file
       options: { max-size: "10m", max-file: "3" }

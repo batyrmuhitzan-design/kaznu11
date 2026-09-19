@@ -79,6 +79,16 @@ server {
 `docker compose -f deploy/nodebb/docker-compose.yml up -d nodebb`（URL 变了必须重建 config 才生效：
 必要时 `docker compose ... exec nodebb ./nodebb config` 后重启）。
 
+## 首次部署实际踩到的坑（都已在文件里修掉，留作前车之鉴）
+
+| 现象 | 根因 | 修法 |
+|---|---|---|
+| 服务器上找不到模板文件 | 仓库 `.gitignore` 有 `.env*`，`.env.example` 被**静默忽略**（首次提交少了它） | 模板改名 `env.example`（与仓库既有 `deploy/env.example` 同约定） |
+| 容器每 ~30s 重启一次（`restarts=29`，`exit=0`，但 `/opt/config/config.json` 始终不存在） | 官方镜像默认流程是「没有 config.json → 启动**浏览器安装向导**」，headless 无人可点 → 向导进程退出 → 重启循环 | 在 compose 里覆盖 `entrypoint`，显式走 CLI 非交互安装：`./nodebb setup --config=/opt/config/config.json "$(cat setup.json)"`（`src/cli/index.js:184` 支持位置参数 JSON） |
+| 日志里 `EACCES: permission denied, access '/usr/src/app/setup.json'` | 容器以 `nodebb(uid 1001)` 运行，而 `setup.json` 是 root:root 0600 | `make-setup.py` 改为 `chown 1001:1001` + `0640`（非 root 时退回 0644） |
+| `setup.js` 会把 config 写到 `/usr/src/app/config.json` | 不传 `--config` 时用的是 `paths.config`，不在任何卷上，**容器一重启就丢** | 安装与启动命令都显式带 `--config=/opt/config/config.json`（挂载在 `nodebb-config` 卷里） |
+| healthcheck 永远不健康 | `node:lts-slim` 里**没有 wget/curl** | 换成 `node -e` 探活 |
+
 ## 已知边界（来自官方 OpenAPI 的实测核对）
 
 | 能力 | 结论 |

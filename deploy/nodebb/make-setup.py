@@ -78,9 +78,18 @@ def main() -> int:
     }
 
     SETUP_FILE.write_text(json.dumps(setup, indent=2) + "\n", encoding="utf-8")
-    os.chmod(SETUP_FILE, stat.S_IRUSR | stat.S_IWUSR)  # 0600：里面有明文密码
+    # 容器以 uid 1001(nodebb) 运行，必须能读到 setup.json —— 否则 NodeBB 会报
+    # "EACCES: permission denied, access '/usr/src/app/setup.json'" 然后启动失败。
+    # 所以：chown 给容器用户 + 0640（宿主上没有别的用户可以读）；非 root 时退回 0644。
+    try:
+        os.chown(SETUP_FILE, 1001, 1001)
+        os.chmod(SETUP_FILE, stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP)
+        perms = "0640, owner=1001:1001（容器内 nodebb 用户可读）"
+    except (PermissionError, OSError):
+        os.chmod(SETUP_FILE, 0o644)
+        perms = "0644（非 root，无法 chown 给容器用户）"
 
-    print(f"  [ok] 已写出 {SETUP_FILE.name}（0600，已 gitignore）")
+    print(f"  [ok] 已写出 {SETUP_FILE.name}（{perms}，已 gitignore）")
     print(f"       url={setup['url']}  database=redis  admin={setup['admin']['username']}")
     print("  下一步：docker compose -f deploy/nodebb/docker-compose.yml up -d")
     return 0
