@@ -94,16 +94,21 @@ if [ "$(curl -s -o /dev/null -w '%{http_code}' -m 5 http://127.0.0.1:4567/api/ 2
 fi
 
 echo
-echo "== 2b) 停机构建（必须在容器停止状态跑 build，否则和运行中的实例抢 4567）=="
-docker compose -f docker-compose.yml stop nodebb 2>&1 | tail -1
-docker compose -f docker-compose.yml run --rm --no-deps --entrypoint sh nodebb \
-  -c 'cd /usr/src/app && CONFIG=/opt/config/config.json ./nodebb build 2>&1 | tail -6'
-docker compose -f docker-compose.yml start nodebb >/dev/null 2>&1
-for i in $(seq 1 25); do
-  code=$(curl -s -o /dev/null -w '%{http_code}' -m 5 http://127.0.0.1:4567/api/ 2>/dev/null)
-  [ "$code" = "200" ] && { echo "  构建后论坛已恢复（第 $i 次探测）"; break; }
-  sleep 6
-done
+if [ "${BUILD:-0}" = "1" ]; then
+  echo "== 2b) 停机构建（可选：BUILD=1 才跑。session-sharing 不需要前端资产，"
+  echo "       而这台小机器构建时换页严重、可能卡十几分钟 → 默认跳过）"
+  docker compose -f docker-compose.yml stop nodebb 2>&1 | tail -1
+  timeout 600 docker compose -f docker-compose.yml run -T --rm --no-deps --entrypoint sh nodebb \
+    -c 'cd /usr/src/app && CONFIG=/opt/config/config.json ./nodebb build 2>&1 | tail -6' || true
+  docker compose -f docker-compose.yml start nodebb >/dev/null 2>&1
+  for i in $(seq 1 25); do
+    code=$(curl -s -o /dev/null -w '%{http_code}' -m 5 http://127.0.0.1:4567/api/ 2>/dev/null)
+    [ "$code" = "200" ] && { echo "  构建后论坛已恢复（第 $i 次探测）"; break; }
+    sleep 6
+  done
+else
+  echo "== 2b) 跳过前端资产构建（需要时：BUILD=1 bash $0）=="
+fi
 
 echo
 echo "== 3) 写入插件设置（secret / cookieName / behaviour）=="
