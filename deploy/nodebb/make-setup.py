@@ -41,7 +41,7 @@ def read_env(path: Path) -> dict[str, str]:
 
 def main() -> int:
     if not ENV_FILE.exists():
-        print(f"❌ 缺少 {ENV_FILE.name}：先 cp -n .env.example .env 并填管理员密码", file=sys.stderr)
+        print(f"❌ 缺少 {ENV_FILE.name}：先 cp -n env.example .env 并填管理员密码", file=sys.stderr)
         return 1
 
     env = read_env(ENV_FILE)

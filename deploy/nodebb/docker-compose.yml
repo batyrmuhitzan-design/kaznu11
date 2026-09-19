@@ -10,11 +10,15 @@
 #   4) 数据全在具名 volume 里，`down -v` 即彻底回滚，不碰 kaznu_helper.db。
 #
 # 用法（仓库根目录）：
-#   cp -n deploy/nodebb/.env.example deploy/nodebb/.env   # 填管理员密码
+#   cp -n deploy/nodebb/env.example deploy/nodebb/.env   # 填管理员密码
 #   python3 deploy/nodebb/make-setup.py                   # 生成 setup.json（不入库）
 #   docker compose -f deploy/nodebb/docker-compose.yml up -d
 #   python3 deploy/nodebb/smoke.py                        # 分类/发帖/引用/投票/举报/搜索
 # 回滚：docker compose -f deploy/nodebb/docker-compose.yml down -v
+#
+# 注意：模板文件叫 env.example 而**不是** .env.example —— 仓库 .gitignore 里有 `.env*`，
+# 带前导点的模板会被静默忽略（第一次部署就踩到了：服务器上根本没有这个文件）。
+# 真实配置是 deploy/nodebb/.env（被忽略），模板必须能被 git 跟踪。
 # =====================================================================
 name: kaznu-nodebb
 

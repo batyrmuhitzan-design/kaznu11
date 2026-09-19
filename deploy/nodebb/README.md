@@ -31,7 +31,8 @@ bash deploy/nodebb/server-prep.sh
 cat /proc/$(systemctl show -p MainPID --value kaznu-api)/oom_score_adj   # 期望 -500
 
 # 1) 配置（密码自己生成，别用弱口令）
-cp -n deploy/nodebb/.env.example deploy/nodebb/.env
+#    模板叫 env.example（不带前导点）—— .gitignore 的 `.env*` 会吞掉 .env.example
+cp -n deploy/nodebb/env.example deploy/nodebb/.env
 openssl rand -base64 18        # 填进 NODEBB_ADMIN_PASSWORD
 python3 deploy/nodebb/make-setup.py        # 生成 setup.json（含密码，0600，已 gitignore）
 
