@@ -89,6 +89,28 @@ server {
 | `setup.js` 会把 config 写到 `/usr/src/app/config.json` | 不传 `--config` 时用的是 `paths.config`，不在任何卷上，**容器一重启就丢** | 安装与启动命令都显式带 `--config=/opt/config/config.json`（挂载在 `nodebb-config` 卷里） |
 | healthcheck 永远不健康 | `node:lts-slim` 里**没有 wget/curl** | 换成 `node -e` 探活 |
 
+## 鉴权（实测结论，Step 2/3 必须按这个设计）
+
+| 事实 | 证据 | 影响 |
+|---|---|---|
+| 写请求**一律要 CSRF**，Bearer 也不例外 | 对照实验：Bearer+CSRF=200，Bearer 不带 CSRF=403 `Forbidden`（服务端日志 `invalid csrf token`） | ⚠️ **跨源/移动端无法只靠 Bearer 调用写接口** |
+| CSRF 令牌**绑在会话上**（`csrf-sync`，非 cookie 双提交） | `src/middleware/csrf.js`：读 `x-csrf-token` / body.csrf_token；令牌从 `/login` 页面里取 | 客户端必须持有一个 NodeBB 会话（cookie），再取页面里的令牌 |
+| 有会话时，**会话 uid 优先**，master token 的 `_uid` 不生效 | 管理员会话 + master token + `?_uid=2` → 仍以 uid=1 投票 → 400 `You cannot vote on your own post` | 想"代表某用户"就必须用**该用户自己的会话/令牌** |
+| master token 用 `uid="0"` + `password` 签发；Bearer 用响应里的 **`secret` 字段** | `src/routes/write/admin.js:21-30`；响应为 `{uid, tokenId, tokenMasked, secret}` | 取错字段会"明明 200 却拿不到令牌" |
+| 回复（楼中楼）的路由是 `POST /api/v3/topics/{tid}` | `public/openapi/write/topics/tid.yaml`（`/api/v3/posts` 会 404） | 前端接引用回复时要打对路由 |
+| 投票不允许投自己的帖子 | 400 `You cannot vote on your own post` | 联调需要**第二个用户**（smoke.py 会自动建 `e2e_voter`） |
+| 读分类的结构是 `response.categories[]` | 实测 | 不是裸数组 |
+
+**对前端架构的直接后果**：我们的 SPA 跑在 `capacitor://localhost`（原生）
+和 `https://1losion.me`（网页）两个源上，而 NodeBB 写接口要求
+「同源会话 + CSRF」——**移动端 WebView 会拦第三方 cookie**，
+所以「前端直连 NodeBB 写接口」这条路走不通。可行方案：
+1. **由 FastAPI 代理写操作**（服务端持会话/CSRF，对 SPA 暴露我们自己的接口）；
+2. 或把 NodeBB 的网页界面直接嵌进 WebView（体验差，但零集成成本）；
+3. 或改用 NodeBB 的插件/主题侧扩展，避免跨源写。
+
+读操作不受影响（公开分类的读接口无需鉴权，可直连）。
+
 ## 已知边界（来自官方 OpenAPI 的实测核对）
 
 | 能力 | 结论 |
